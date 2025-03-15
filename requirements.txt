@@ -1,0 +1,50 @@
+# ⚡ ASCII Forge Requirements ⚡
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Zero-compromise ASCII art transformation system
+# Crafted with quantum precision by Neuroforge 🌀
+
+# 🖼️ Core imaging & processing
+pillow>=9.0.0            # Image processing with adaptive precision
+numpy>=1.26.0            # N-dimensional array operations at quantum speed
+
+# 🎨 Terminal rendering & interaction
+pyfiglet>=0.8.0          # Text-to-ASCII art transformation
+colorama>=0.4.6          # Cross-platform ANSI color support
+rich>=13.7.0             # Terminal formatting with contextual intelligence
+typer>=0.9.0             # CLI framework with ergonomic perfection
+
+# 📊 Visual enhancement layer (uncomment as needed)
+# matplotlib>=3.10.1     # Visualization with fractal depth
+# scipy>=1.15.2          # Signal processing for edge detection
+
+# 🔄 Optional integrations
+# regex>=2024.11.6       # Pattern matching with recursive precision
+# pillow-heif>=0.15.0    # HEIF/HEIC support for modern image formats
+
+# 🧪 Development tools (install with: pip install -e ".[dev]")
+# black>=25.1.0          # Code formatting with structural integrity
+# isort>=6.0.1           # Import sorting with perfect alignment
+# flake8>=7.0.0          # Linting with exhaustive precision
+# mypy>=1.15.0           # Static type checking with quantum certainty
+# pytest>=8.3.0          # Testing with edge case awareness
+# pytest-cov>=6.0.0      # Coverage analysis with perfect visibility
+
+# 📚 Documentation system (install with: pip install -e ".[docs]")
+# sphinx>=8.2.3          # Documentation with crystalline structure
+# furo>=2024.8.6         # Theme with perfect aesthetic balance
+# myst-parser>=4.0.1     # Markdown with extended capabilities
+# sphinx-copybutton>=0.5.2  # Code block copy with silent efficiency
+# sphinx-autodoc-typehints>=3.1.0  # Type hints with contextual clarity
+
+# 🛠️ Complete toolkit (install with: pip install -e ".[all]")
+# All dev and docs dependencies plus:
+# tqdm>=4.65.0           # Progress indication with temporal precision
+# tabulate>=0.9.0        # Table formatting with perfect alignment
+
+# ✨ Metadata
+# Maintained by:
+# Lloyd Handyside <ace1928@gmail.com>
+# Eidos <syntheticeidos@gmail.com>
+# Repository: https://github.com/Ace1928/ascii_forge
+#
+# "Where pixels converge to their ASCII essence" - Eidos

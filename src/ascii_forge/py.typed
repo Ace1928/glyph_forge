@@ -1,0 +1,39 @@
+# ⚡ ASCII FORGE TYPE MARKER ⚡
+# ～～～～～～～～～～～～～～～～～～～～
+# This file intentionally contains no code.
+# Its mere existence signals PEP 561 compliance.
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🧬 Type System - Structural DNA
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# This marker activates static type checking capabilities.
+# A function without types is like ASCII without patterns—technically 
+# functional but missing critical information.
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📦 Package Identity
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Name: ASCII Forge
+# Version: 0.1.0
+# Description: Hyper-optimized text, image and video-to-ASCII art converter
+# License: MIT
+# Copyright: 2023-2024 Neuroforge
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔍 Type Architecture - What static analyzers see
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# - Full parameter annotation
+# - Complete return type specification
+# - Generic support with precise constraints
+# - Protocol-based interface definitions
+# - Runtime type guards with TypeGuard
+# - Literal and Union type specialization
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🧠 Maintained By - Stewards of structural integrity
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Lloyd Handyside <ace1928@gmail.com>
+# Eidos <syntheticeidos@gmail.com>
+# Neuroforge <lloyd.handyside@neuroforge.io>
+
+# "Type clarity creates freedom through constraint." - Eidos

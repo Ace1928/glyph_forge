@@ -1,0 +1,505 @@
+/**
+ * ⚡ ASCII Forge UI Stylesheet ⚡
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * 
+ * Terminal-optimized UI system with pixel-perfect precision.
+ * Every declaration follows the structure-as-function principle.
+ * 
+ * 📐 Eidosian Design Matrix:
+ * - Contextual Integrity: Each rule serves exactly one purpose
+ * - Structure as Control: Visual hierarchy through deliberate styling
+ * - Self-Awareness: Responsive adaptation across all environments
+ * - Minimal Surface Area: Maximum impact with fewest declarations
+ * - Fractal Coherence: Visual patterns that reinforce system identity
+ * 
+ * 🧠 "Style without structure is like ASCII without pattern recognition—
+ *     technically visible but fundamentally meaningless." - Eidos
+ *
+ * 📝 Maintained by:
+ * Lloyd Handyside <ace1928@gmail.com>
+ * Eidos <syntheticeidos@gmail.com>
+ * Neuroforge <lloyd.handyside@neuroforge.io>
+ */
+
+/* 🏗️ Core structural elements - Terminal foundation */
+Screen {
+    background: #0f0f23;
+    /* Deep space - 16:1 contrast ratio for ASCII art */
+    --layers: base overlay notifications;
+    /* Three-tier z-index system */
+    scrollbar-color: #3f3f74 #0f0f23;
+    /* Minimally invasive scrollbar */
+    overflow-y: scroll;
+    /* Vertical content flow */
+    color-scheme: dark;
+    /* System adaptation hint */
+}
+
+Header {
+    background: #333366;
+    /* Distinct control surface */
+    height: 3;
+    /* Triple-row information density */
+    --dock: top;
+    /* Fixed position system */
+    --content-align: center middle;
+    /* Centered identity placement */
+    --text-style: bold;
+    /* Enhanced navigation clarity */
+    color: #ffcc00;
+    /* Primary interaction color */
+    border-bottom: heavy #4a4a8c;
+    /* Component separation */
+}
+
+Footer {
+    background: #333366;
+    /* Visual system consistency */
+    height: 1;
+    /* Single-row information line */
+    --dock: bottom;
+    /* Terminal-aligned positioning */
+    --content-align: right middle;
+    /* Secondary information alignment */
+    color: #99aaff;
+    /* De-emphasized text color */
+    border-top: heavy #4a4a8c;
+    /* Consistent boundary system */
+}
+
+/* 📦 Container system - Content organization grid */
+Container {
+    height: auto;
+    /* Content-driven dimensions */
+    margin: 0 1;
+    /* Horizontal breathing room */
+    transition: background 300ms in_out_cubic;
+    /* Smooth state transitions */
+    position: relative;
+    /* Stacking context root */
+}
+
+#app_container {
+    width: 100%;
+    /* Full terminal width */
+    margin: 0;
+    /* Edge-to-edge coverage */
+    height: 100%;
+    /* Complete vertical space */
+    display: flex;
+    /* Modern layout system */
+    flex-direction: column;
+    /* Vertical content flow */
+}
+
+#main_container {
+    width: 100%;
+    margin: 1 0;
+    /* Top/bottom spacing */
+    height: auto;
+    /* Content-driven height */
+    display: flex;
+    /* Flexible layout engine */
+    flex-direction: column;
+    /* Vertical arrangement */
+    gap: 1;
+    /* Consistent component spacing */
+}
+
+#screen_container {
+    width: 100%;
+    height: auto;
+    padding: 1;
+    /* Uniform internal spacing */
+    border-radius: 2px;
+    /* Subtle corner softening */
+}
+
+/* 🔘 Interactive controls - Command interface */
+Button {
+    min-width: 16;
+    /* Accommodates command text */
+    margin: 1 2;
+    /* Prevents accidental activation */
+    height: 3;
+    /* Optimal interaction target */
+    --content-align: center middle;
+    /* Centered label positioning */
+    background: #333366;
+    /* System-aligned coloring */
+    color: #ffffff;
+    /* Maximum text contrast */
+    border: tall #4a4a8c;
+    /* Tactile depth signifier */
+    --text-style: bold;
+    /* Command clarity */
+    transition: all 200ms cubic-bezier(0.17, 0.67, 0.83, 0.67);
+    /* Responsive feedback curve */
+    cursor: pointer;
+    /* Interaction signifier */
+}
+
+Button:hover {
+    background: #ffcc00;
+    /* Distinct hover state */
+    color: #000000;
+    /* Maintained readability */
+    border: tall #ffdd44;
+    /* State-consistent border */
+    transform: translateY(-1px);
+    /* Subtle dimension shift */
+}
+
+Button:focus {
+    background: #ffaa00;
+    /* Keyboard navigation state */
+    color: #000000;
+    border: tall #ffbb33;
+    /* Focus indication */
+    box-shadow: 0 0 0 2px #ffbb33;
+    /* Accessibility enhancement */
+}
+
+Button.-active {
+    background: #cc8800;
+    /* Active state indication */
+    color: #ffffff;
+    /* Text visibility */
+    transform: translateY(1px);
+    /* Pressed effect */
+}
+
+Button:disabled {
+    background: #222244;
+    /* Reduced prominence */
+    color: #555577;
+    /* Non-interactive signifier */
+    border: tall #333355;
+    /* Visual consistency */
+    cursor: not-allowed;
+    /* Interaction feedback */
+    transform: none;
+    /* Removes interactive effects */
+}
+
+/* 📝 Form elements - Data capture system */
+Input,
+FileInput {
+    width: 100%;
+    /* Full width utilization */
+    margin: 1 0;
+    /* Vertical rhythm */
+    height: 3;
+    /* Consistent interactive height */
+    background: #1a1a2a;
+    /* Input field background */
+    color: #ffffff;
+    /* Maximum readability */
+    border: tall #333366;
+    /* Input boundary */
+    padding: 0 2;
+    /* Text padding */
+    transition: border 150ms ease;
+    /* Smooth state change */
+}
+
+Input:focus,
+FileInput:focus {
+    border: tall #ffcc00;
+    /* Focus indication */
+    outline: none;
+    /* Custom focus style */
+    box-shadow: 0 0 0 1px #ffcc00;
+    /* Focus ring */
+}
+
+Input.-valid,
+FileInput.-valid {
+    border: tall #00cc66;
+    /* Validation success */
+    background: #1a1a2a;
+    /* Maintains contrast */
+}
+
+Input.-invalid,
+FileInput.-invalid {
+    border: tall #ff3366;
+    /* Error indication */
+    background: #1a1a2a;
+    /* Maintains contrast */
+}
+
+/* 📺 Display surfaces - Information visualization */
+#welcome {
+    --content-align: center middle;
+    width: 100%;
+    height: auto;
+    margin: 1 0;
+    padding: 1;
+    --text-style: bold;
+    color: #ffcc00;
+    /* Entry point emphasis */
+    background: #1a1a2a;
+    /* Subtle container */
+    border: panel #333366;
+    /* Consistent boundary */
+    border-radius: 2px;
+    /* Edge smoothing */
+}
+
+#output_area {
+    width: 100%;
+    height: auto;
+    min-height: 10;
+    /* Ensures visibility */
+    max-height: 40;
+    /* Prevents overwhelming */
+    margin: 1 0;
+    background: #1a1a2a;
+    /* ASCII display surface */
+    border: panel #333366;
+    /* Content container */
+    overflow: auto;
+    /* Scroll when needed */
+    padding: 1;
+    color: #e0e0ff;
+    /* Optimal text visibility */
+    font-family: monospace;
+    /* ASCII alignment */
+    white-space: pre;
+    /* Preserves formatting */
+}
+
+/* 🔤 Typography - Textual system */
+.screen_title {
+    --content-align: center middle;
+    width: 100%;
+    height: 3;
+    margin: 1 0;
+    --text-style: bold;
+    color: #ffcc00;
+    /* Section heading */
+    background: #1a1a2a;
+    border-bottom: heavy #333366;
+    /* Visual organization */
+    letter-spacing: 1px;
+    /* Enhanced readability */
+}
+
+/* 🔔 Status indicators - System feedback */
+.status_indicator {
+    width: auto;
+    height: 1;
+    /* Single line status */
+    --dock: bottom;
+    background: #1a1a2a;
+    color: #aaaacc;
+    /* De-emphasized info */
+    padding: 0 1;
+    /* Text padding */
+    font-size: 90%;
+    /* Subtle size reduction */
+    border-radius: 2px;
+    /* Edge smoothing */
+}
+
+/* 🎨 ASCII output - Core content presentation */
+.ascii_banner {
+    color: #00ffaa;
+    /* High-visibility primary content */
+    background: #1a1a2a;
+    border: panel #333366;
+    padding: 1;
+    min-height: 5;
+    /* Accommodates ASCII height */
+    font-family: monospace;
+    /* Character alignment */
+    white-space: pre;
+    /* Preserves ASCII structure */
+    text-shadow: 0 0 5px rgba(0, 255, 170, 0.3);
+    /* Subtle glow effect */
+}
+
+/* 🚦 Semantic indicators - Information classification */
+.success {
+    color: #00cc66;
+    /* Universal success signal */
+    border-left: solid #00cc66;
+    /* State indicator */
+    padding-left: 1;
+    /* Text offset */
+}
+
+.error {
+    color: #ff3366;
+    /* Error notification */
+    border-left: solid #ff3366;
+    /* State indicator */
+    padding-left: 1;
+    /* Text offset */
+}
+
+.warning {
+    color: #ffcc00;
+    /* Caution indicator */
+    border-left: solid #ffcc00;
+    /* State indicator */
+    padding-left: 1;
+    /* Text offset */
+}
+
+.info {
+    color: #3388ff;
+    /* Information signal */
+    border-left: solid #3388ff;
+    /* State indicator */
+    padding-left: 1;
+    /* Text offset */
+}
+
+/* ✨ Animation effects - Temporal attention guidance */
+@keyframes pulse {
+    0% {
+        background: #333366;
+        /* Base state */
+    }
+
+    50% {
+        background: #4a4a8c;
+        /* Peak emphasis */
+    }
+
+    100% {
+        background: #333366;
+        /* Return to base */
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite ease-in-out;
+    /* Attention-drawing effect */
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        /* Initial state */
+    }
+
+    to {
+        opacity: 1;
+        /* Final state */
+    }
+}
+
+.fade-in {
+    animation: fade-in 0.3s ease-out forwards;
+    /* Smooth entrance */
+}
+
+/* 📱 Responsive adaptations - Environment-aware layouts */
+@media (width <=80) {
+
+    /* Standard terminal width */
+    Button {
+        min-width: 10;
+        /* Compact sizing */
+        margin: 1 1;
+        /* Reduced spacing */
+    }
+
+    #welcome {
+        height: auto;
+        /* Content-driven */
+    }
+
+    .screen_title {
+        height: auto;
+        /* Multi-line adaptation */
+    }
+}
+
+@media (width <=40) {
+
+    /* Minimal terminal width */
+    Button {
+        width: 100%;
+        /* Full-width buttons */
+        margin: 1 0;
+        /* Vertical flow */
+    }
+
+    #output_area {
+        font-size: 90%;
+        /* Size adaptation */
+    }
+}
+
+/* 🧩 Component variants - Functional specializations */
+.button-primary {
+    background: #3388ff;
+    /* Primary action */
+    color: white;
+    border: tall #4499ff;
+    /* Consistent styling */
+}
+
+.button-primary:hover {
+    background: #4499ff;
+    /* Interactive state */
+    border: tall #55aaff;
+}
+
+.button-danger {
+    background: #cc3355;
+    /* Destructive action */
+    color: white;
+    border: tall #dd4466;
+    /* Consistent styling */
+}
+
+.button-danger:hover {
+    background: #dd4466;
+    /* Interactive state */
+    border: tall #ee5577;
+}
+
+.panel-inset {
+    background: #1a1a2a;
+    /* Recessed surface */
+    border: tall #2a2a4a;
+    padding: 1;
+    border-radius: 2px;
+    /* Edge softening */
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    /* Depth effect */
+}
+
+/* Dark mode optimization */
+@media (prefers-color-scheme: dark) {
+    .ascii_banner {
+        color: #00ffaa;
+        /* Enhanced visibility */
+        text-shadow: 0 0 8px rgba(0, 255, 170, 0.4);
+        /* Stronger glow */
+    }
+}
+
+/* High contrast support */
+@media (forced-colors: active) {
+    Button {
+        border: 2px solid CanvasText;
+        /* Accessibility enhancement */
+    }
+
+    Input,
+    FileInput {
+        border: 2px solid CanvasText;
+        /* Accessibility enhancement */
+    }
+}
+
+/* 
+ * 🔮 "The best CSS is like perfect ASCII art—
+ *     every character placed with intention, nothing wasted." - Eidos 
+ */

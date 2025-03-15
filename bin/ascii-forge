@@ -1,0 +1,428 @@
+#!/usr/bin/env python3
+"""
+ASCII Forge - A super user friendly stylish UX interactive experience for ASCII art
+"""
+
+import sys
+import argparse
+import os
+import importlib.util
+import json
+import readline
+import shutil
+from pathlib import Path
+from enum import Enum
+import time
+
+# Style constants for terminal output
+class Style:
+    """Terminal styling constants."""
+    BOLD = "\033[1m"
+    GREEN = "\033[32m"
+    RED = "\033[31m"
+    BLUE = "\033[34m"
+    CYAN = "\033[36m"
+    YELLOW = "\033[33m"
+    MAGENTA = "\033[35m"
+    UNDERLINE = "\033[4m"
+    REVERSE = "\033[7m"
+    RESET = "\033[0m"
+    
+    @staticmethod
+    def apply(text, *styles):
+        """Apply multiple styles to text with automatic reset."""
+        style_codes = "".join(styles)
+        return f"{style_codes}{text}{Style.RESET}"
+
+    @staticmethod
+    def rainbow(text):
+        """Apply rainbow colors to text."""
+        colors = [Style.RED, Style.YELLOW, Style.GREEN, Style.CYAN, Style.BLUE, Style.MAGENTA]
+        result = ""
+        for i, char in enumerate(text):
+            if char.strip():
+                result += f"{colors[i % len(colors)]}{char}{Style.RESET}"
+            else:
+                result += char
+        return result
+
+class Config:
+    """Configuration manager for ASCII Forge."""
+    DEFAULT_CONFIG = {
+        "theme": "default",
+        "animation_speed": 0.02,
+        "banner_font": "standard",
+        "show_animations": True,
+        "color_scheme": "rainbow",
+        "terminal_width": 80,
+        "history_size": 100,
+        "default_command": "interactive"
+    }
+    
+    @staticmethod
+    def get_config_dir():
+        """Get the configuration directory."""
+        config_dir = Path.home() / ".config" / "ascii-forge"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        return config_dir
+    
+    @staticmethod
+    def load():
+        """Load configuration from file."""
+        config_file = Config.get_config_dir() / "config.json"
+        if config_file.exists():
+            try:
+                with open(config_file, 'r') as f:
+                    return {**Config.DEFAULT_CONFIG, **json.load(f)}
+            except json.JSONDecodeError:
+                print(Style.apply("Warning: Config file corrupted, using defaults", Style.YELLOW))
+                return dict(Config.DEFAULT_CONFIG)
+        return dict(Config.DEFAULT_CONFIG)
+    
+    @staticmethod
+    def save(config):
+        """Save configuration to file."""
+        config_file = Config.get_config_dir() / "config.json"
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=4)
+        return True
+
+def animated_print(text, delay=0.02, style=None):
+    """Print text with typing animation."""
+    config = Config.load()
+    if not config["show_animations"]:
+        if style:
+            print(Style.apply(text, style))
+        else:
+            print(text)
+        return
+    
+    for char in text:
+        if style:
+            sys.stdout.write(Style.apply(char, style))
+        else:
+            sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    print()
+
+def clear_screen():
+    """Clear the terminal screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def get_terminal_size():
+    """Get terminal size."""
+    width, height = shutil.get_terminal_size((80, 24))
+    return width, height
+
+def print_centered(text, style=None):
+    """Print text centered in the terminal."""
+    width, _ = get_terminal_size()
+    lines = text.split("\n")
+    for line in lines:
+        padding = (width - len(line)) // 2
+        if padding < 0:
+            padding = 0
+        if style:
+            print(" " * padding + Style.apply(line, style))
+        else:
+            print(" " * padding + line)
+
+def setup_environment():
+    """Set up the environment variables and Python path for proper execution."""
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
+    sys.path.insert(0, str(project_root))
+    
+    # Setup readline history
+    config = Config.load()
+    history_file = Config.get_config_dir() / "history"
+    try:
+        readline.read_history_file(history_file)
+        readline.set_history_length(config["history_size"])
+    except FileNotFoundError:
+        pass
+    import atexit
+    atexit.register(readline.write_history_file, history_file)
+
+def print_header(config=None):
+    """Print stylish ASCII Forge header."""
+    if config is None:
+        config = Config.load()
+
+    # Try to use the bannerize function if available
+    try:
+        from .src.ascii_forge.cli import bannerize
+        banner = bannerize.create_banner("ASCII FORGE", font=config["banner_font"])
+        if config["color_scheme"] == "rainbow":
+            banner = Style.rainbow(banner)
+        else:
+            banner = Style.apply(banner, Style.BOLD, Style.CYAN)
+        print("\n" + banner)
+    except ImportError:
+        # Fallback if bannerize module not available
+        print(Style.apply("\n⚡ ASCII FORGE ⚡\n", Style.BOLD, Style.CYAN))
+    
+    term_width, _ = get_terminal_size()
+    print(Style.apply("=" * term_width, Style.CYAN))
+
+def load_subcommands():
+    """Load and return available subcommands."""
+    subcommands = {
+        "bannerize": {
+            "help": "Generate ASCII text banners with various styles and fonts",
+            "module": "ascii_forge.cli.bannerize",
+            "description": "Create stunning ASCII text banners with customizable fonts and effects"
+        },
+        "imagize": {
+            "help": "Convert images to ASCII art with advanced options",
+            "module": "ascii_forge.cli.imagize",
+            "description": "Transform images into ASCII art with full color support and various styles"
+        },
+        "animate": {
+            "help": "Create animated ASCII art sequences",
+            "module": "ascii_forge.cli.animate",
+            "description": "Generate animated ASCII art sequences for terminals and HTML output"
+        },
+        "colorize": {
+            "help": "Apply color schemes to ASCII art",
+            "module": "ascii_forge.cli.colorize",
+            "description": "Add vibrant colors to existing ASCII art with multiple palette options"
+        },
+        "config": {
+            "help": "Configure ASCII Forge settings",
+            "module": "ascii_forge.cli.config_cmd",
+            "description": "Customize the behavior and appearance of ASCII Forge"
+        },
+        "gallery": {
+            "help": "Browse and manage your ASCII art collection",
+            "module": "ascii_forge.cli.gallery",
+            "description": "View, organize, and share your ASCII art creations"
+        },
+        "demo": {
+            "help": "Run demos showcasing ASCII Forge capabilities",
+            "module": "scripts.demo",
+            "description": "See examples of what ASCII Forge can do with guided demonstrations"
+        }
+    }
+    
+    return subcommands
+
+def execute_subcommand(command, args):
+    """Import and execute a subcommand module."""
+    try:
+        module_name = command["module"]
+        print(Style.apply(f"Loading {module_name}...", Style.CYAN))
+        module = importlib.import_module(module_name)
+        
+        if hasattr(module, 'main'):
+            sys.argv = [module_name] + args
+            return module.main()
+        else:
+            print(Style.apply(f"Error: Module {module_name} has no main() function", Style.RED))
+            return 1
+            
+    except ImportError as e:
+        print(Style.apply(f"Error: Could not import {module_name}", Style.RED, Style.BOLD))
+        print(Style.apply(f"Reason: {str(e)}", Style.RED))
+        return 1
+    except Exception as e:
+        print(Style.apply(f"Error executing command: {str(e)}", Style.RED, Style.BOLD))
+        return 1
+
+def show_command_help(command_name, command_info):
+    """Show detailed help for a specific command."""
+    clear_screen()
+    print_header()
+    print(Style.apply(f"\n{command_name.upper()} COMMAND REFERENCE", Style.BOLD, Style.GREEN))
+    print(Style.apply("=" * 50, Style.GREEN))
+    print(f"\n{Style.apply('Description:', Style.BOLD)}")
+    print(f"  {command_info['description']}")
+    print(f"\n{Style.apply('Usage:', Style.BOLD)}")
+    print(f"  ascii-forge {command_name} [options]")
+    print(f"\n{Style.apply('For detailed help:', Style.BOLD)}")
+    print(f"  ascii-forge {command_name} -h")
+    
+    print(f"\n{Style.apply('Press Enter to continue...', Style.CYAN)}")
+    input()
+
+def interactive_ui():
+    """Launch the interactive UI experience."""
+    config = Config.load()
+    
+    while True:
+        clear_screen()
+        print_header(config)
+        
+        animated_print("Welcome to the ASCII Forge interactive experience!", 
+                      config["animation_speed"], Style.YELLOW)
+        print()
+        
+        subcommands = load_subcommands()
+        
+        # Display command menu in a stylish way
+        print(Style.apply("AVAILABLE COMMANDS:", Style.BOLD, Style.GREEN))
+        print(Style.apply("─" * get_terminal_size()[0], Style.GREEN))
+        
+        for i, (cmd_name, cmd_info) in enumerate(subcommands.items(), 1):
+            number = Style.apply(f"[{i}]", Style.BOLD, Style.YELLOW)
+            command = Style.apply(cmd_name, Style.BOLD, Style.CYAN)
+            print(f"{number} {command}: {cmd_info['help']}")
+        
+        print(Style.apply("─" * get_terminal_size()[0], Style.GREEN))
+        print(f"{Style.apply('[q]', Style.BOLD, Style.YELLOW)} {Style.apply('quit', Style.BOLD, Style.RED)}: Exit ASCII Forge")
+        print(f"{Style.apply('[c]', Style.BOLD, Style.YELLOW)} {Style.apply('config', Style.BOLD, Style.MAGENTA)}: Configure settings")
+        
+        choice = input(f"\n{Style.apply('Choose a command (1-{len(subcommands)}, q, c): ', Style.CYAN)}")
+        
+        if choice.lower() == 'q':
+            print(Style.apply("\nThank you for using ASCII Forge! Goodbye!", Style.CYAN))
+            return 0
+        elif choice.lower() == 'c':
+            configure_settings(config)
+            continue
+            
+        try:
+            if choice.isdigit() and 1 <= int(choice) <= len(subcommands):
+                cmd_name = list(subcommands.keys())[int(choice) - 1]
+                cmd_info = subcommands[cmd_name]
+                
+                # Show command help first
+                show_command_help(cmd_name, cmd_info)
+                
+                # Execute the command
+                return execute_subcommand(cmd_info, ["-h"])
+            else:
+                # Check if the input matches a command name
+                if choice in subcommands:
+                    cmd_info = subcommands[choice]
+                    show_command_help(choice, cmd_info)
+                    return execute_subcommand(cmd_info, ["-h"])
+                else:
+                    print(Style.apply("\nInvalid choice! Press Enter to continue...", Style.RED))
+                    input()
+        except Exception as e:
+            print(Style.apply(f"\nError: {str(e)}", Style.RED))
+            print(Style.apply("Press Enter to continue...", Style.YELLOW))
+            input()
+
+def configure_settings(config):
+    """Allow user to configure ASCII Forge settings."""
+    while True:
+        clear_screen()
+        print_header(config)
+        print(Style.apply("\nASCII FORGE CONFIGURATION", Style.BOLD, Style.MAGENTA))
+        print(Style.apply("─" * get_terminal_size()[0], Style.MAGENTA))
+        
+        print(f"1. Theme: {Style.apply(config['theme'], Style.CYAN)}")
+        print(f"2. Animation Speed: {Style.apply(str(config['animation_speed']), Style.CYAN)}")
+        print(f"3. Banner Font: {Style.apply(config['banner_font'], Style.CYAN)}")
+        print(f"4. Show Animations: {Style.apply(str(config['show_animations']), Style.CYAN)}")
+        print(f"5. Color Scheme: {Style.apply(config['color_scheme'], Style.CYAN)}")
+        print(f"6. Terminal Width: {Style.apply(str(config['terminal_width']), Style.CYAN)}")
+        print(f"7. History Size: {Style.apply(str(config['history_size']), Style.CYAN)}")
+        print(f"8. Default Command: {Style.apply(config['default_command'], Style.CYAN)}")
+        print(f"9. Save Configuration")
+        print(f"0. Return to Main Menu")
+        
+        choice = input(f"\n{Style.apply('Choose an option (0-9): ', Style.CYAN)}")
+        
+        if choice == '0':
+            return
+        elif choice == '1':
+            config['theme'] = input("Enter theme name (default, dark, light, hacker): ")
+        elif choice == '2':
+            try:
+                config['animation_speed'] = float(input("Enter animation speed (0.01-0.1): "))
+            except ValueError:
+                print(Style.apply("Invalid value! Press Enter to continue...", Style.RED))
+                input()
+        elif choice == '3':
+            config['banner_font'] = input("Enter banner font (standard, big, small, script, shadow): ")
+        elif choice == '4':
+            show_anim = input("Show animations (true/false): ").lower()
+            config['show_animations'] = show_anim in ('true', 't', 'yes', 'y', '1')
+        elif choice == '5':
+            config['color_scheme'] = input("Enter color scheme (rainbow, blue, green, cyan, custom): ")
+        elif choice == '6':
+            try:
+                config['terminal_width'] = int(input("Enter terminal width (40-200): "))
+            except ValueError:
+                print(Style.apply("Invalid value! Press Enter to continue...", Style.RED))
+                input()
+        elif choice == '7':
+            try:
+                config['history_size'] = int(input("Enter history size (10-1000): "))
+            except ValueError:
+                print(Style.apply("Invalid value! Press Enter to continue...", Style.RED))
+                input()
+        elif choice == '8':
+            config['default_command'] = input("Enter default command (interactive, bannerize, imagize): ")
+        elif choice == '9':
+            Config.save(config)
+            print(Style.apply("Configuration saved successfully!", Style.GREEN))
+            input("Press Enter to continue...")
+
+def main():
+    """Main entry point for ASCII Forge CLI."""
+    setup_environment()
+    config = Config.load()
+    
+    # Main parser
+    parser = argparse.ArgumentParser(
+        description="ASCII Forge - Create and manipulate ASCII art with style",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    # Load available subcommands
+    subcommands = load_subcommands()
+    
+    # Create subparsers
+    subparsers = parser.add_subparsers(
+        dest='command',
+        title='commands',
+        description='valid commands',
+        help='Choose a command to run'
+    )
+    
+    # Add subparsers for each command
+    for cmd_name, cmd_info in subcommands.items():
+        subparsers.add_parser(
+            cmd_name,
+            help=cmd_info['help'],
+            description=cmd_info.get('description', cmd_info['help'])
+        )
+    
+    # Add interactive mode flag
+    parser.add_argument('-i', '--interactive', action='store_true', 
+                        help='Launch interactive mode regardless of other arguments')
+    
+    # Parse arguments
+    args, remaining = parser.parse_known_args()
+    
+    # Handle interactive mode
+    if args.interactive:
+        return interactive_ui()
+    
+    # Process command if given
+    if args.command and args.command in subcommands:
+        return execute_subcommand(subcommands[args.command], remaining)
+    
+    # No command or invalid command
+    if len(sys.argv) > 1 and sys.argv[1] not in ('-h', '--help', '-i', '--interactive'):
+        print(Style.apply(f"Unknown command: {sys.argv[1]}", Style.RED))
+        print(Style.apply("Try 'ascii-forge --help' for more information.", Style.YELLOW))
+        return 1
+    
+    # Default to interactive UI or use the default command from config
+    if config["default_command"] == "interactive" or not config["default_command"] in subcommands:
+        return interactive_ui()
+    else:
+        return execute_subcommand(subcommands[config["default_command"]], [])
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print(Style.apply("\nOperation cancelled by user", Style.YELLOW))
+        sys.exit(130)

@@ -1,0 +1,198 @@
+# ⚡ ASCII FORGE CONFIGURATION ⚡
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Central configuration nexus for ASCII art transformation ecosystem
+# Where every parameter serves a precise purpose - no waste, no excess
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔮 Project Identity - Digital signature matrix
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+project:
+  name: "ASCII Forge"
+  version: "0.1.0" # Foundation state - all systems operational
+  description: "High-precision text, image and video-to-ASCII art converter with Eidosian principles"
+  authors:
+    - name: "Lloyd Handyside"
+      email: "ace1928@gmail.com"
+      role: "Implementation Lead"
+    - name: "Eidos"
+      email: "syntheticeidos@gmail.com"
+      role: "Architectural Principles"
+  organization: "Neuroforge"
+  org_email: "lloyd.handyside@neuroforge.io"
+  license: "MIT"
+  status: "Beta" # Functional core with expansion capacity
+  copyright: "Copyright 2024-2025 Neuroforge"
+  repository: "https://github.com/Ace1928/ascii_forge"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🎯 System Parameters - Operational framework
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+system:
+  logging:
+    level: "INFO" # Signal clarity threshold
+    format: "⚡ {asctime} [{levelname}] {name}: {message}"
+    style: "{"
+    file: "ascii_forge.log"
+    max_size: 10485760 # 10MB - enough history, no bloat
+    backup_count: 3 # Sufficient redundancy without excess
+
+  performance:
+    threads: "auto" # Self-aware resource allocation
+    buffer_size: 8192 # 8KB chunks - optimal transfer size
+    cache_enabled: true # Strategic memory utilization
+    cache_ttl: 3600 # 1 hour - practical retention limit
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🧩 Character Maps - Typographic translation matrix
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# A character set is like a vocabulary - its limits become your limits
+character_sets:
+  standard: ".:-=+*#%@" # Universal ASCII baseline
+  detailed: ".'\"^,;Il!i><~+_-?][}{1)(|/tfj\\\"\\\\|/\\\\|\\_\\+\\-=\\><i\\!lI;:,\\\"^\\`'. " # High-fidelity rendering
+  block: "░▒▓█" # Density blocks - clean gradients
+  minimal: ".:*#" # Core elements only - maximum compatibility
+  quantum: " .°:oO0@" # Progressive density steps
+  eidosian: "⚡✧✦⚛⚘⚔⚙⚚⚜⛭⛯❄❈❉❊" # Symbolic meaning system
+  custom: "" # Extension point - user creativity interface
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔄 Transformers - Media processing engines
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+transformers:
+  image:
+    default_width: 80 # Terminal standard baseline
+    default_height: "auto" # Context-aware dimension calculation
+    pixel_ratio: 0.43 # Font geometry correction factor
+    invert: false # Light/dark inversion switch
+    edge_detection:
+      enabled: true # Structure preservation system
+      algorithm: "sobel" # Gradient vector analysis method
+      threshold: 25 # Signal-to-noise cutoff point
+    brightness_adjustment: 1.0 # Light intensity multiplier
+    contrast: 1.2 # Dynamic range enhancement
+
+  color:
+    enabled: true # Chromatic awareness toggle
+    mode: "ansi256" # Color depth selection
+    dithering:
+      algorithm: "floyd-steinberg" # Error distribution pattern
+      strength: 0.8 # Diffusion intensity coefficient
+    background: "auto" # Environmental context detection
+
+  depth:
+    enabled: true # Dimensional analysis system
+    algorithm: "luminance" # Perceptual depth calculation
+    normalization: true # Range standardization
+    range: [0, 1] # Normalized value boundaries
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🎨 Renderers - Output materialization systems
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+renderers:
+  text:
+    line_ending: "\n" # Record separator sequence
+    encoding: "utf-8" # Character encoding standard
+
+  ansi:
+    color_mode: "auto" # Terminal capability detection
+    styles:
+      bold: true # Intensity emphasis
+      italic: false # Slant formatting
+      underline: false # Underline decoration
+    background: "transparent" # Background rendering mode
+
+  html:
+    css_classes: true # Style classification system
+    inline_styles: false # Style embedding toggle
+    font_family: "monospace" # Typography selection
+    responsive: true # Viewport adaptation system
+    dark_mode: "auto" # Theme context detection
+
+  svg:
+    width: "auto" # Horizontal dimension calculator
+    height: "auto" # Vertical dimension calculator
+    font_family: "monospace" # Typography specification
+    font_size: 14 # Glyph size baseline
+    line_height: 1.2 # Vertical spacing coefficient
+    include_css: true # Style embedding toggle
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🛠️ Services - Workflow orchestration engines
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# A service without efficiency is like a poem that never ends - technically complete but practically exhausting
+services:
+  image_to_ascii:
+    default_width: 80 # Output dimension anchor
+    default_renderer: "text" # Default presentation format
+    optimization_level: 2 # Processing complexity scale (0-4)
+    cache_results: true # Result memoization system
+
+  text_to_banner:
+    default_font: "standard" # Typography selection
+    alignment: "left" # Horizontal positioning
+    padding: 1 # Boundary spacing
+    width: "auto" # Content constraint mechanism
+
+  video_to_ascii_frames:
+    fps: "auto" # Frame rate detection
+    skip_frames: 0 # Temporal sampling reducer
+    max_frames: null # Processing boundary
+    preserve_aspect: true # Dimensional integrity enforcement
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔌 Plugins - Extensibility framework
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+plugins:
+  enabled: true # Extension system activation
+  paths:
+    - "./plugins"
+    - "~/.ascii_forge/plugins"
+  auto_discover: true # Automatic extension detection
+  whitelist: [] # Permitted extensions (empty = all)
+  blacklist: [] # Blocked extensions (empty = none)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🧪 Advanced Settings - Experimental capabilities
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Experimental features: innovation's sharp edge - use with awareness
+advanced:
+  enable_experimental: false # Prototype feature toggle
+  neural_mapping: false # ML-assisted character selection
+  vectorization:
+    enabled: false # Edge-to-path conversion system
+    algorithm: "potrace" # Contour tracing method
+    simplification: 0.5 # Path complexity reducer
+  cross_hatching:
+    enabled: false # Texture simulation system
+    angle_primary: 45 # Main stroke angle
+    angle_secondary: -45 # Secondary stroke angle
+    density: 0.7 # Pattern frequency coefficient
+
+  # ASCII without adaptation is like a map without scale - technically accurate but contextually wrong
+  adaptive_processing:
+    enabled: true # Content-aware processing
+    analyze_histograms: true # Tonal distribution analysis
+    detect_faces: false # Facial feature preservation
+    region_weights: # Feature significance matrix
+      edges: 1.5
+      texture: 0.8
+      shadows: 1.2
+      highlights: 1.0
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔧 Development - Implementation environment
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+development:
+  debug: false # Enhanced logging system
+  profile_performance: false # Execution timing analysis
+  hot_reload: false # Dynamic configuration updates
+  test_patterns: # Validation scenarios
+    - "basic_conversion"
+    - "edge_cases"
+    - "performance"
+
+  # The perfect optimization removes what shouldn't exist in the first place
+  metrics:
+    enabled: false # Performance data collection
+    store_history: true # Temporal pattern analysis
+    anonymous_telemetry: false # Usage pattern submission

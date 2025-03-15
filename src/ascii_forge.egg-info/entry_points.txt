@@ -1,0 +1,3 @@
+[console_scripts]
+asciify = ascii_forge.cli.asciify:main
+bannerize = ascii_forge.cli.bannerize:main

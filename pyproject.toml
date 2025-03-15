@@ -1,0 +1,204 @@
+# ⚡ ASCII FORGE CONFIGURATION ⚡
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Zero-compromise ASCII art transformation system
+# Every line serves purpose - no excess, no waste
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔧 Build System - Foundation of creation
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+] # Solid foundations prevent shaky castles
+build-backend = "setuptools.build_meta"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📦 Project Core - Identity matrix
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[project]
+name = "ascii-forge"
+version = "0.1.0" # Genesis point - expansion begins here
+description = "Hyper-optimized text, image and video-to-ASCII art converter with Eidosian principles"
+readme = "README.md"
+requires-python = ">=3.12" # Forward-facing compatibility
+license = { file = "LICENSE" }
+authors = [{ name = "Lloyd Handyside", email = "ace1928@gmail.com" }]
+maintainers = [
+    { name = "Lloyd Handyside", email = "lloyd.handyside@neuroforge.io" },
+    { name = "Eidos", email = "syntheticeidos@gmail.com" },                # The architect of principles
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Artistic Software",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+    "Topic :: Utilities",
+]
+# Each dependency earned its place through rigorous evaluation
+dependencies = [
+    "pillow>=9.0.0",   # Image processing core
+    "numpy>=1.26.0",   # Numerical operations engine
+    "pyfiglet>=0.8.0", # Text banner transformation
+    "colorama>=0.4.6", # Cross-platform color support
+    "rich>=13.7.0",    # Advanced terminal rendering
+    "typer>=0.9.0",    # CLI interface with elegance
+]
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🧩 Optional Dependencies - Specialized toolkits
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[project.optional-dependencies]
+# Developer arsenal - weapons of code perfection
+dev = [
+    "black>=22.0.0",      # Code formatting with structural integrity
+    "isort>=5.10.0",      # Import sorting with perfect alignment
+    "flake8>=4.0.0",      # Linting with exhaustive precision
+    "mypy>=0.950",        # Type checking with certainty
+    "pytest>=7.0.0",      # Testing with edge case awareness
+    "pytest-cov>=3.0.0",  # Coverage analysis for complete visibility
+    "pytest-mock>=3.8.0", # Mock framework for isolated testing
+    "build",              # Package building simplified
+    "twine",              # Publication with elegance
+    "pre-commit",         # Gateway guardian for quality
+    "bumpversion",        # Version advancement tool
+    "tox",                # Multi-environment testing
+    "bandit",             # Security scanner with depth
+    "safety",             # Dependency vulnerability checker
+    "detect-secrets",     # Sensitive data detection
+    "pyright",            # Alternative type checker
+    "debugpy",            # Debugging with precision
+]
+# Documentation system - knowledge crystallization tools
+docs = [
+    "sphinx>=8.2.3",                   # Documentation engine
+    "furo>=2024.8.6",                  # Theme with aesthetic balance
+    "sphinx-rtd-theme>=3.0.2",         # Alternative theme option
+    "myst-parser>=4.0.1",              # Markdown support
+    "sphinxcontrib-plantuml>=0.2.0",   # UML diagram integration
+    "sphinxcontrib-mermaid>=0.1.0",    # Mermaid diagram support
+    "sphinx-autoapi>=3.0.0",           # API documentation generator
+    "sphinx-copybutton>=0.5.2",        # Code block copy functionality
+    "sphinx-autodoc-typehints>=3.1.0", # Type hint integration
+    "sphinx-autobuild>=2024.10.3",     # Live preview during editing
+    "sphinx-design>=0.6.1",            # Enhanced design components
+]
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🎮 CLI Entry Points - Command interface
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[project.scripts]
+asciify = "ascii_forge.cli.asciify:main"     # Image/video transformer
+bannerize = "ascii_forge.cli.bannerize:main" # Text banner generator
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔗 Project Links - External connections
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[project.urls]
+"Homepage" = "https://github.com/Ace1928/ascii_forge"
+"Bug Tracker" = "https://github.com/Ace1928/ascii_forge/issues"
+"Documentation" = "https://ascii-forge.readthedocs.io/"
+"Organization" = "https://neuroforge.io"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📁 Package Discovery - Structure mapping
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ascii_forge*"]
+
+[tool.setuptools.package-data]
+ascii_forge = ["py.typed", "config/*.json", "resources/*.txt"]
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🧪 Testing Configuration - Validation framework
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["--strict-markers", "--color=yes"]
+markers = [
+    "unit: mark a test as a unit test",
+    "integration: marks tests that test integration between components",
+    "e2e: mark a test as an end-to-end test",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "critical: marks tests that validate core functionality",
+]
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 📊 Coverage Settings - Quality metrics
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[tool.coverage.run]
+source = ["ascii_forge"]
+omit = ["*/tests/*", "*/migrations/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+]
+required_percentage = 85 # Excellence has a threshold
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🎨 Code Style - Aesthetic standards
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[tool.black]
+line-length = 88 # Perfect balance between readability and space
+target-version = ["py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | build
+  | dist
+)/
+'''
+skip-string-normalization = true # Maintain string style integrity
+
+[tool.isort]
+profile = "black"                     # Harmony between formatting tools
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔍 Type Checking - Structural integrity
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true             # Type precision is not optional
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+
+[tool.flake8]
+ignore = ["E203", "E501", "W503"]                                   # Pragmatic exceptions
+max-line-length = 88
+exclude = [".git", "__pycache__", "build", "dist", ".venv", "venv"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false    # Test flexibility permitted
+disallow_incomplete_defs = false
+
+# "Where pixels converge to their ASCII essence" - Eidos
