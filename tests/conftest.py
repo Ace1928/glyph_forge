@@ -24,7 +24,7 @@ sys.path.insert(0, str(project_root / "src"))
 
 # ──── Logging Configuration ────────────────────────────────────────────
 # Disable unnecessary logs during tests
-logging.getLogger("ascii_forge").setLevel(logging.ERROR)
+logging.getLogger("glyph_forge").setLevel(logging.ERROR)
 
 
 # ──── Atomic Test Fixtures ───────────────────────────────────────────────
@@ -42,7 +42,7 @@ def test_images() -> Generator[Dict[str, Any], None, None]:
         Dict containing test images and their paths
     """
     # Initialize test assets directory
-    test_dir = tempfile.mkdtemp(prefix="ascii_forge_test_")
+    test_dir = tempfile.mkdtemp(prefix="glyph_forge_test_")
     
     # 1. Pure white square (100x100) - tests uniform brightness
     white_img = Image.new('L', (100, 100), 255)
@@ -84,7 +84,7 @@ def mock_alphabet_manager(monkeypatch):
     This fixture surgically isolates tests from alphabet dependencies
     by providing a controlled, deterministic character set interface.
     """
-    from ascii_forge.utils.alphabet_manager import AlphabetManager
+    from glyph_forge.utils.alphabet_manager import AlphabetManager
     
     # Define test alphabets with precise density gradients
     test_alphabets = {

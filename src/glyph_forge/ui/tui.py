@@ -1,6 +1,6 @@
-# filepath: /home/lloyd/repos/ascii_forge/src/ascii_forge/ui/tui.py
+# filepath: /home/lloyd/repos/glyph_forge/src/glyph_forge/ui/tui.py
 """
-⚡ ASCII Forge TUI ⚡
+⚡ Glyph Forge TUI ⚡
 
 Hyper-efficient terminal user interface for ASCII art transformation.
 """
@@ -13,18 +13,18 @@ from textual.reactive import reactive
 from ..api.ascii_api import get_api
 
 class ASCIIForgeApp(App):
-    """ASCII Forge TUI application with zero-compromise user experience."""
+    """Glyph Forge TUI application with zero-compromise user experience."""
     
-    TITLE = "⚡ ASCII Forge ⚡"
+    TITLE = "⚡ Glyph Forge ⚡"
     SUB_TITLE = "Eidosian ASCII Art Transformation"
-    CSS_PATH = "ascii_forge.css"
+    CSS_PATH = "glyph_forge.css"
     
     def compose(self):
         """Compose the user interface with surgical precision."""
         yield Header()
         yield Container(
             Vertical(
-                Static("Welcome to ASCII Forge", id="welcome"),
+                Static("Welcome to Glyph Forge", id="welcome"),
                 Horizontal(
                     Button("Banner Generator", id="btn_banner"),
                     Button("Image Converter", id="btn_image"),

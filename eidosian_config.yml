@@ -1,4 +1,4 @@
-# ⚡ ASCII FORGE CONFIGURATION ⚡
+# ⚡ GLYPH FORGE CONFIGURATION ⚡
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Central configuration nexus for ASCII art transformation ecosystem
 # Where every parameter serves a precise purpose - no waste, no excess
@@ -7,7 +7,7 @@
 # 🔮 Project Identity - Digital signature matrix
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 project:
-  name: "ASCII Forge"
+  name: "Glyph Forge"
   version: "0.1.0" # Foundation state - all systems operational
   description: "High-precision text, image and video-to-ASCII art converter with Eidosian principles"
   authors:
@@ -22,7 +22,7 @@ project:
   license: "MIT"
   status: "Beta" # Functional core with expansion capacity
   copyright: "Copyright 2024-2025 Neuroforge"
-  repository: "https://github.com/Ace1928/ascii_forge"
+  repository: "https://github.com/Ace1928/glyph_forge"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🎯 System Parameters - Operational framework
@@ -32,7 +32,7 @@ system:
     level: "INFO" # Signal clarity threshold
     format: "⚡ {asctime} [{levelname}] {name}: {message}"
     style: "{"
-    file: "ascii_forge.log"
+    file: "glyph_forge.log"
     max_size: 10485760 # 10MB - enough history, no bloat
     backup_count: 3 # Sufficient redundancy without excess
 
@@ -146,7 +146,7 @@ plugins:
   enabled: true # Extension system activation
   paths:
     - "./plugins"
-    - "~/.ascii_forge/plugins"
+    - "~/.glyph_forge/plugins"
   auto_discover: true # Automatic extension detection
   whitelist: [] # Permitted extensions (empty = all)
   blacklist: [] # Blocked extensions (empty = none)

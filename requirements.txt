@@ -1,4 +1,4 @@
-# ⚡ ASCII Forge Requirements ⚡
+# ⚡ Glyph Forge Requirements ⚡
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Zero-compromise ASCII art transformation system
 # Crafted with quantum precision by Neuroforge 🌀
@@ -45,6 +45,6 @@ typer>=0.9.0             # CLI framework with ergonomic perfection
 # Maintained by:
 # Lloyd Handyside <ace1928@gmail.com>
 # Eidos <syntheticeidos@gmail.com>
-# Repository: https://github.com/Ace1928/ascii_forge
+# Repository: https://github.com/Ace1928/glyph_forge
 #
 # "Where pixels converge to their ASCII essence" - Eidos

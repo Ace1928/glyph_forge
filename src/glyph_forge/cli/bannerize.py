@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-⚡ ASCII FORGE - EIDOSIAN BANNERIZER ⚡
+⚡ GLYPH FORGE - EIDOSIAN BANNERIZER ⚡
 
 Transform mundane text into extraordinary ASCII art banners
 with maximum precision and surgical efficiency.
@@ -27,8 +27,8 @@ sys.path.insert(0, str(project_root))
 
 # Core imports with path-awareness
 try:
-    from ascii_forge.api import get_api
-    from ascii_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
+    from glyph_forge.api import get_api
+    from glyph_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
 except ImportError:
     # Direct import attempt for development scenarios
     from ..api import get_api
@@ -87,23 +87,23 @@ def setup_logging(debug: bool = False) -> None:
     root_logger.addHandler(handler)
     
     # Set specific level for our module
-    logging.getLogger('ascii_forge').setLevel(level)
+    logging.getLogger('glyph_forge').setLevel(level)
     
     logging.debug("Logging initialized with level: %s", "DEBUG" if debug else "INFO")
 
 
 def print_header() -> None:
-    """Print stylish ASCII Forge header with adaptive color support."""
+    """Print stylish Glyph Forge header with adaptive color support."""
     term_width, _ = get_terminal_size()
     
     if Style.supports_color():
-        banner = Style.apply("⚡ ASCII FORGE BANNERIZER ⚡", Style.BOLD, Style.CYAN)
+        banner = Style.apply("⚡ GLYPH FORGE BANNERIZER ⚡", Style.BOLD, Style.CYAN)
         separator = Style.apply("═" * (term_width - 4), Style.BLUE)
         print(f"\n{banner.center(term_width)}")
         print(f"{separator}\n")
     else:
         # Fallback for terminals without color support
-        banner = "=== ASCII FORGE BANNERIZER ==="
+        banner = "=== GLYPH FORGE BANNERIZER ==="
         print(f"\n{banner.center(term_width)}")
         print("=" * term_width + "\n")
 
@@ -160,7 +160,7 @@ def preview_style(api, text: str, style: str) -> None:
     Generate and display a pixel-perfect style preview.
     
     Args:
-        api: The ASCII Forge API instance
+        api: The Glyph Forge API instance
         text: Sample text to render
         style: Style name to preview
     """
@@ -241,7 +241,7 @@ def generate_banner(api, args) -> None:
     Generate banner with surgical precision and maximum efficiency.
     
     Args:
-        api: ASCII Forge API instance
+        api: Glyph Forge API instance
         args: Parsed command line arguments
     
     Uses the API to generate a banner and directs output appropriately,
@@ -299,12 +299,12 @@ def parse_arguments() -> argparse.Namespace:
     options, validation, and self-documentation.
     """
     parser = argparse.ArgumentParser(
-        description='⚡ ASCII Forge - Eidosian Bannerizer ⚡',
+        description='⚡ Glyph Forge - Eidosian Bannerizer ⚡',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   bannerize "Hello World"                 # Basic usage
-  bannerize -s boxed -f big "ASCII Forge" # Custom style and font
+  bannerize -s boxed -f big "Glyph Forge" # Custom style and font
   bannerize --list-fonts                  # List available fonts
   bannerize --preview -s eidosian "Test"  # Preview eidosian style
   bannerize "Quantum" -c -o banner.txt    # Colored output to file
@@ -423,7 +423,7 @@ def show_version():
         version = importlib.metadata.version("ascii-forge")
     except (ImportError, importlib.metadata.PackageNotFoundError):
         try:
-            from ascii_forge import __version__
+            from glyph_forge import __version__
             version = __version__
         except ImportError:
             version = "unknown"
@@ -433,14 +433,14 @@ def show_version():
     platform_info = f"{platform.system()} {platform.release()}"
     
     if Style.supports_color():
-        print(Style.apply(f"\nASCII Forge v{version}", Style.BOLD, Style.GREEN))
+        print(Style.apply(f"\nGlyph Forge v{version}", Style.BOLD, Style.GREEN))
         print(f"Python {python_version} on {platform_info}")
     else:
-        print(f"\nASCII Forge v{version}")
+        print(f"\nGlyph Forge v{version}")
         print(f"Python {python_version} on {platform_info}")
     
     print("\nPart of the Eidosian Forge toolkit")
-    print("⚡ https://github.com/your-username/ascii_forge ⚡\n")
+    print("⚡ https://github.com/your-username/glyph_forge ⚡\n")
 
 
 def create_banner(text: str, font: str = "slant", style: str = "minimal") -> str:
@@ -477,7 +477,7 @@ def main() -> int:
     
     # Configure logging
     setup_logging(args.debug)
-    logging.debug("ASCII Forge Bannerizer initializing...")
+    logging.debug("Glyph Forge Bannerizer initializing...")
     
     # Show version if requested
     if args.version:

@@ -1,7 +1,7 @@
 """
-⚡ ASCII Forge API ⚡
+⚡ Glyph Forge API ⚡
 
-Public interface to the ASCII Forge library with maximum efficiency,
+Public interface to the Glyph Forge library with maximum efficiency,
 precision, and control. Designed for both simplicity and power.
 """
 

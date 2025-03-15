@@ -1,12 +1,12 @@
-# Contributing to ASCII Forge ⚡
+# Contributing to Glyph Forge ⚡
 
 > *"Where precision meets purpose and structure enhances function."*
 
-Welcome to the ASCII Forge contributor ecosystem. Your participation represents a commitment to structural integrity, algorithmic elegance, and transformative code. This document will guide you through our contribution process with exact specifications.
+Welcome to the Glyph Forge contributor ecosystem. Your participation represents a commitment to structural integrity, algorithmic elegance, and transformative code. This document will guide you through our contribution process with exact specifications.
 
 ## 🔄 Eidosian Development Principles
 
-ASCII Forge follows these core principles:
+Glyph Forge follows these core principles:
 
 1. **Contextual Integrity** - Every element must serve a precise purpose
 2. **Structure as Control** - Clean architectural boundaries with defined interfaces
@@ -18,8 +18,8 @@ ASCII Forge follows these core principles:
 
 ```bash
 # Clone repository
-git clone https://github.com/Ace1928/ascii_forge.git
-cd ascii_forge
+git clone https://github.com/Ace1928/glyph_forge.git
+cd glyph_forge
 
 # Create isolated environment
 python -m venv venv
@@ -112,7 +112,7 @@ git push -u origin feature/specific-capability-name
 
 ## 🔍 Code Style & Structure
 
-ASCII Forge maintains these standards:
+Glyph Forge maintains these standards:
 
 ### Python Style
 
@@ -223,7 +223,7 @@ Pull requests are evaluated on:
 
 ## 💡 Enhancement Focus Areas
 
-ASCII Forge welcomes these improvements:
+Glyph Forge welcomes these improvements:
 
 1. **Rendering Engine Optimizations** - Faster, more memory-efficient processing
 2. **Character Mapping Systems** - New artistically-balanced character sets
@@ -253,4 +253,4 @@ Contributors recognized in CONTRIBUTORS.md and release notes.
 ---
 
 "ASCII art without structure is just random characters with hope."
-    - ⚡ ASCII Forge Team ⚡
+    - ⚡ Glyph Forge Team ⚡

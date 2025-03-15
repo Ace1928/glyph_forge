@@ -12,15 +12,15 @@ logger = logging.getLogger(__name__)
 
 class ASCIIForgeAPI:
     """
-    Public API for the ASCII Forge library.
+    Public API for the Glyph Forge library.
     
-    Provides a streamlined, unified interface to all ASCII Forge capabilities
+    Provides a streamlined, unified interface to all Glyph Forge capabilities
     with intelligent caching, configuration management, and error handling.
     """
     
     def __init__(self):
         """Initialize the API with configuration and core components."""
-        logger.debug("Initializing ASCII Forge API")
+        logger.debug("Initializing Glyph Forge API")
         self.config = get_config()
         self._initialize_components()
     
@@ -207,7 +207,7 @@ class ASCIIForgeAPI:
             logger.error(f"Failed to save file: {str(e)}")
             return False
     
-    def preview_font(self, font: str, text: str = "ASCII Forge") -> str:
+    def preview_font(self, font: str, text: str = "Glyph Forge") -> str:
         """
         Generate a preview of a specific font.
         
@@ -221,7 +221,7 @@ class ASCIIForgeAPI:
         generator = BannerGenerator(font=font, width=self._banner_generator.width)
         return generator.generate(text)
     
-    def preview_style(self, style: str, text: str = "ASCII Forge") -> str:
+    def preview_style(self, style: str, text: str = "Glyph Forge") -> str:
         """
         Generate a preview of a specific style.
         

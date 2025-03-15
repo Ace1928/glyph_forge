@@ -2,7 +2,7 @@ import unittest
 import os
 import re
 from unittest import mock
-from ascii_forge.core.banner_generator import BannerGenerator, BannerStyle
+from glyph_forge.core.banner_generator import BannerGenerator, BannerStyle
 
 class TestBannerGenerator(unittest.TestCase):
     """

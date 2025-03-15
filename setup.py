@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # ⚡ Eidosian Setup Bridge ⚡
 """
-⚡ ASCII FORGE SETUP ⚡
+⚡ GLYPH FORGE SETUP ⚡
 ~~~~~~~~~~~~~~~~~~~~~
 
-Quantum-aligned compatibility layer for ASCII Forge.
+Quantum-aligned compatibility layer for Glyph Forge.
 
 This file bridges compatibility with legacy build tools that don't 
 support pyproject.toml. It delegates all configuration through setuptools
@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 
 def get_version():
     """Extract version from package with quantum certainty."""
-    version_file = Path("src") / "ascii_forge" / "__init__.py"
+    version_file = Path("src") / "glyph_forge" / "__init__.py"
     with open(version_file, encoding="utf-8") as f:
         version_match = re.search(r"VERSION\s*=\s*\((\d+),\s*(\d+),\s*(\d+)\)", f.read())
         if version_match:
@@ -37,11 +37,11 @@ def get_long_description():
     if readme_path.exists():
         with open(readme_path, encoding="utf-8") as f:
             return f.read()
-    return "ASCII Forge - Hyper-optimized ASCII art converter with Eidosian principles"
+    return "Glyph Forge - Hyper-optimized ASCII art converter with Eidosian principles"
 
 def get_package_metadata():
     """Extract core package metadata with perfect alignment."""
-    init_file = Path("src") / "ascii_forge" / "__init__.py"
+    init_file = Path("src") / "glyph_forge" / "__init__.py"
     metadata = {
         "name": "ascii-forge",
         "version": get_version(),
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     # 📡 Extract metadata with quantum precision
     metadata = get_package_metadata()
     
-    print("⚡ Activating ASCII Forge setup bridge...")
+    print("⚡ Activating Glyph Forge setup bridge...")
     setup(
         # Core identity
         name=metadata["name"],
@@ -128,8 +128,8 @@ if __name__ == "__main__":
         # Entry points for CLI tools
         entry_points={
             "console_scripts": [
-                "asciify=ascii_forge.cli.asciify:main",
-                "bannerize=ascii_forge.cli.bannerize:main",
+                "asciify=glyph_forge.cli.asciify:main",
+                "bannerize=glyph_forge.cli.bannerize:main",
             ],
         },
         
@@ -154,11 +154,11 @@ if __name__ == "__main__":
         
         # Project URLs for multidimensional navigation
         project_urls={
-            "Homepage": "https://github.com/Ace1928/ascii_forge",
-            "Bug Tracker": "https://github.com/Ace1928/ascii_forge/issues",
+            "Homepage": "https://github.com/Ace1928/glyph_forge",
+            "Bug Tracker": "https://github.com/Ace1928/glyph_forge/issues",
             "Documentation": "https://ascii-forge.readthedocs.io/",
             "Organization": "https://neuroforge.io",
         },
     )
     print("✨ Setup bridge executed with Eidosian precision")
-    print("🔮 Dimensional alignment complete - ASCII Forge is ready")
+    print("🔮 Dimensional alignment complete - Glyph Forge is ready")

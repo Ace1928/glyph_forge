@@ -2,9 +2,9 @@
 
 > *"History is a linked list of intentional transformations."*
 
-## ⚡ ASCII Forge Version Timeline ⚡
+## ⚡ Glyph Forge Version Timeline ⚡
 
-This document maps the evolution pathway of ASCII Forge through its structural iterations. Each release represents a precise advancement with measurable impact.
+This document maps the evolution pathway of Glyph Forge through its structural iterations. Each release represents a precise advancement with measurable impact.
 
 <!-- 
     Change classification system:

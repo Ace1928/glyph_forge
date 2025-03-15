@@ -1,5 +1,5 @@
 """
-⚡ ASCII Forge Configuration System ⚡
+⚡ Glyph Forge Configuration System ⚡
 
 Quantum-precise configuration management with zero overhead.
 This module provides hyper-optimized access to user and system settings 
@@ -106,7 +106,7 @@ class ConfigManager:
         config_paths = {}
         
         # System config path
-        system_config_dir = Path("/etc/ascii_forge")
+        system_config_dir = Path("/etc/glyph_forge")
         if not system_config_dir.exists():
             # Fallback to package directory
             package_dir = Path(__file__).parent.parent
@@ -115,13 +115,13 @@ class ConfigManager:
         
         # User config path - platform aware
         if os.name == 'nt':  # Windows
-            user_config_dir = Path(os.environ.get('APPDATA', '')) / "ASCII_Forge"
+            user_config_dir = Path(os.environ.get('APPDATA', '')) / "GLYPH_Forge"
         else:  # Unix/Linux/Mac
             xdg_config_home = os.environ.get('XDG_CONFIG_HOME', '')
             if xdg_config_home:
-                user_config_dir = Path(xdg_config_home) / "ascii_forge"
+                user_config_dir = Path(xdg_config_home) / "glyph_forge"
             else:
-                user_config_dir = Path.home() / ".config" / "ascii_forge"
+                user_config_dir = Path.home() / ".config" / "glyph_forge"
                 
         # Ensure user config directory exists
         os.makedirs(user_config_dir, exist_ok=True)

@@ -1,5 +1,5 @@
 """
-⚡ ASCII Forge CLI ⚡
+⚡ Glyph Forge CLI ⚡
 
 Precision-engineered command line interface for ASCII art transformation.
 Zero compromise between power and usability.
@@ -32,12 +32,12 @@ except ImportError as e:
     sys.path.insert(0, str(parent_dir))
     
     try:
-        from ascii_forge.cli.bannerize import app as bannerize_app
-        from ascii_forge.cli.imagize import app as imagize_app
-        from ascii_forge.config.settings import get_config, ConfigManager
+        from glyph_forge.cli.bannerize import app as bannerize_app
+        from glyph_forge.cli.imagize import app as imagize_app
+        from glyph_forge.config.settings import get_config, ConfigManager
     except ImportError as nested_e:
         logger.critical(f"Failed to import critical modules: {e} -> {nested_e}")
-        logger.critical("Please ensure ASCII Forge is correctly installed")
+        logger.critical("Please ensure Glyph Forge is correctly installed")
         sys.exit(1)
 
 # Rich library imports for surgical UI precision
@@ -49,7 +49,7 @@ from rich.style import Style
 
 # Create Typer app with pristine configuration
 app = typer.Typer(
-    help="⚡ ASCII Forge - Hyper-optimized ASCII art transformation toolkit ⚡",
+    help="⚡ Glyph Forge - Hyper-optimized ASCII art transformation toolkit ⚡",
     add_completion=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
@@ -64,7 +64,7 @@ console = Console()
 @app.callback()
 def callback():
     """
-    ASCII Forge - Where pixels become characters and images transcend their digital boundaries.
+    Glyph Forge - Where pixels become characters and images transcend their digital boundaries.
     
     The Eidosian engine ensures perfect transformation with zero compromise.
     """
@@ -72,12 +72,12 @@ def callback():
 
 @app.command()
 def version():
-    """Display the current version of ASCII Forge with environment details."""
+    """Display the current version of Glyph Forge with environment details."""
     try:
         from .. import __version__
     except ImportError:
         try:
-            from ascii_forge import __version__
+            from glyph_forge import __version__
         except ImportError:
             __version__ = "unknown"
     
@@ -86,19 +86,19 @@ def version():
     table.add_column("Property", style="cyan bold")
     table.add_column("Value", style="yellow")
     
-    table.add_row("ASCII Forge Version", f"{__version__}")
+    table.add_row("Glyph Forge Version", f"{__version__}")
     table.add_row("Python Version", sys.version.split()[0])
     table.add_row("Platform", f"{sys.platform}")
     
     # Add rich separator
     console.print(Panel("", border_style="bright_yellow", width=60))
-    console.print(Panel(Text("⚡ ASCII Forge ⚡", justify="center"), border_style="bright_yellow"))
+    console.print(Panel(Text("⚡ Glyph Forge ⚡", justify="center"), border_style="bright_yellow"))
     console.print(table)
     console.print(Panel("", border_style="bright_yellow", width=60))
 
 @app.command()
 def interactive():
-    """Launch the interactive ASCII Forge experience."""
+    """Launch the interactive Glyph Forge experience."""
     try:
         from textual.app import App
         from ..ui.tui import ASCIIForgeApp
@@ -112,14 +112,14 @@ def interactive():
 
 @app.command()
 def list_commands():
-    """Display all available ASCII Forge commands with descriptions."""
+    """Display all available Glyph Forge commands with descriptions."""
     # Create table for commands
     table = Table(title="⚡ Available Commands ⚡", show_header=True, box=True)
     table.add_column("Command", style="cyan bold")
     table.add_column("Description", style="yellow")
     
     # Add core commands
-    table.add_row("version", "Display ASCII Forge version information")
+    table.add_row("version", "Display Glyph Forge version information")
     table.add_row("interactive", "Launch the interactive TUI experience")
     table.add_row("list-commands", "Display this command list")
     
@@ -135,7 +135,7 @@ def list_commands():
 
 def main():
     """
-    Primary entry point for ASCII Forge CLI
+    Primary entry point for Glyph Forge CLI
     
     Provides intelligent flow control with perfect error handling
     and optimal user experience in all execution contexts.
@@ -158,7 +158,7 @@ def main():
         return app()
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
-        if os.environ.get("ASCII_FORGE_DEBUG"):
+        if os.environ.get("GLYPH_FORGE_DEBUG"):
             import traceback
             console.print("[bold red]Traceback:[/bold red]")
             console.print(traceback.format_exc())
@@ -166,7 +166,7 @@ def main():
 
 def display_banner():
     """
-    Display the ASCII Forge banner with perfect styling
+    Display the Glyph Forge banner with perfect styling
     
     Uses rich formatting for maximum visual impact with
     zero compromise on any terminal environment.
@@ -188,7 +188,7 @@ def display_banner():
     console.print(Panel(
         banner_text, 
         border_style="bright_yellow", 
-        title="⚡ ASCII Forge ⚡",
+        title="⚡ Glyph Forge ⚡",
         width=min(width, 100)
     ))
     

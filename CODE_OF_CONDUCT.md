@@ -1,4 +1,4 @@
-# ⚡ ASCII FORGE CODE OF CONDUCT ⚡
+# ⚡ GLYPH FORGE CODE OF CONDUCT ⚡
 
 > *"Structure in community mirrors structure in code—both require precision and purpose."*
 
@@ -8,7 +8,7 @@
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-This code establishes precise parameters for ASCII Forge ecosystem interactions. It applies universally across all project vectors: repositories, issue trackers, documentation, and communication channels. Like well-crafted functions, these standards have clear inputs, processes, and outputs—with zero ambiguity.
+This code establishes precise parameters for Glyph Forge ecosystem interactions. It applies universally across all project vectors: repositories, issue trackers, documentation, and communication channels. Like well-crafted functions, these standards have clear inputs, processes, and outputs—with zero ambiguity.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

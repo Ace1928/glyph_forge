@@ -1,4 +1,4 @@
-# 🔮 ASCII Forge Architecture Matrix
+# 🔮 Glyph Forge Architecture Matrix
 
 > *"Structure embodies intent; code manifests thought."*
 
@@ -6,7 +6,7 @@
 
 ```mermaid
 graph TD
-    Root["ascii_forge/"] --> Src["📦 src/"]
+    Root["glyph_forge/"] --> Src["📦 src/"]
     Root --> Tests["🧪 tests/"]
     Root --> Docs["📝 docs/"]
     Root --> Scripts["🔧 scripts/"]
@@ -28,9 +28,9 @@ graph TD
 ## 🧩 Component Structure
 
 ```tree
-ascii_forge/
+glyph_forge/
 ├── 📦 src/                 # Source nucleus - where thought becomes execution
-│   └── ascii_forge/        # Package domain - character transformation engine
+│   └── glyph_forge/        # Package domain - character transformation engine
 ├── 🧪 tests/               # Verification matrix - hypothesis confirmation system
 ├── 📝 docs/                # Knowledge crystallization - clarity through structure
 ├── 🔧 scripts/             # Task automata - repetition elimination system
@@ -42,7 +42,7 @@ ascii_forge/
 
 ```mermaid
 flowchart TD
-    Core["ascii_forge/"] --> Init["__init__.py\n📡 Initialization nexus"]
+    Core["glyph_forge/"] --> Init["__init__.py\n📡 Initialization nexus"]
     Core --> Typed["py.typed\n🔍 Type integrity marker"]
     
     Core --> API["api/\n🔌 Interface contracts"]
@@ -61,12 +61,12 @@ flowchart TD
 ### 📦 Implementation Blueprint
 
 ```tree
-src/ascii_forge/
+src/glyph_forge/
 ├── __init__.py             # Entry gateway - versioning and exports
 ├── py.typed                # Type sentinel - static analyzer enablement
 ├── api/                    # Interface layer - contract definitions
 │   ├── __init__.py         # API registry - capability exposure
-│   └── ascii_forge_api.py  # Core interface - functionality access points
+│   └── glyph_forge_api.py  # Core interface - functionality access points
 ├── cli/                    # Command system - terminal interaction layer
 │   ├── __init__.py         # Command registry - interaction entry points
 │   ├── asciify.py          # Image transformer - pixels to glyphs
@@ -163,7 +163,7 @@ classDiagram
 ## 🧠 Architecture Extensions
 
 ```tree
-src/ascii_forge/
+src/glyph_forge/
 ├── core/                   # Core systems - foundational components
 │   ├── protocols.py        # Interface contracts - structural patterns
 │   ├── types.py            # Type definitions - data shape specifications
@@ -182,8 +182,8 @@ src/ascii_forge/
 
 ```tree
 ├── dist/                   # Distribution packages - deployment artifacts
-│   ├── ascii_forge-0.1.0-py3-none-any.whl  # Wheel package - binary distribution
-│   └── ascii_forge-0.1.0.tar.gz            # Source archive - code distribution
+│   ├── glyph_forge-0.1.0-py3-none-any.whl  # Wheel package - binary distribution
+│   └── glyph_forge-0.1.0.tar.gz            # Source archive - code distribution
 ├── build/                  # Build artifacts - intermediate outputs
 └── .github/                # GitHub integration - automation framework
     ├── workflows/          # CI/CD pipelines - process automation
@@ -195,7 +195,7 @@ src/ascii_forge/
 ## 🧰 Resource Organization
 
 ```tree
-src/ascii_forge/resources/  # Asset storage - supporting files
+src/glyph_forge/resources/  # Asset storage - supporting files
 ├── charsets/               # Character sets - ASCII building blocks
 │   ├── standard.json       # Standard set - balanced intensity map
 │   ├── detailed.json       # Enhanced set - precision intensity map
@@ -267,7 +267,7 @@ DEFAULT_CONFIG = {
 
 ---
 
-*ASCII Forge: Where pixels crystallize into glyphs* ✨
+*Glyph Forge: Where pixels crystallize into glyphs* ✨
 
 Maintained by:
 

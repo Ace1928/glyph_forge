@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-⚡ ASCII FORGE - EIDOSIAN DEMO ⚡
+⚡ GLYPH FORGE - EIDOSIAN DEMO ⚡
 
-Showcase the full power of ASCII Forge with maximum impact.
+Showcase the full power of Glyph Forge with maximum impact.
 This script demonstrates core API capabilities through practical,
 visually stunning examples that highlight atomic precision and
 hyper-optimized performance.
@@ -16,8 +16,8 @@ from pathlib import Path
 # Add project root to Python path for absolute imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.ascii_forge.api.ascii_api import get_api
-from src.ascii_forge.utils.ascii_utils import detect_text_color_support, apply_ansi_style
+from src.glyph_forge.api.ascii_api import get_api
+from src.glyph_forge.utils.ascii_utils import detect_text_color_support, apply_ansi_style
 
 # ANSI color styling
 class Style:
@@ -54,12 +54,12 @@ def print_step(step_num, description):
 
 def banner_showcase():
     """Demonstrate banner generation capabilities."""
-    print_header("ASCII FORGE BANNER SHOWCASE")
+    print_header("GLYPH FORGE BANNER SHOWCASE")
     api = get_api()
     
     # Step 1: Basic banner
     print_step(1, "Basic banner generation")
-    banner = api.generate_banner("ASCII FORGE", font="standard")
+    banner = api.generate_banner("GLYPH FORGE", font="standard")
     print(banner)
     time.sleep(0.5)
     
@@ -89,7 +89,7 @@ def banner_showcase():
 
 def image_showcase(image_path):
     """Demonstrate image conversion capabilities."""
-    print_header("ASCII FORGE IMAGE SHOWCASE")
+    print_header("GLYPH FORGE IMAGE SHOWCASE")
     api = get_api()
     
     # Check if image exists
@@ -126,7 +126,7 @@ def image_showcase(image_path):
 
 def style_showcase():
     """Demonstrate styling capabilities."""
-    print_header("ASCII FORGE STYLE SHOWCASE")
+    print_header("GLYPH FORGE STYLE SHOWCASE")
     api = get_api()
     
     # Get available styles
@@ -143,7 +143,7 @@ def style_showcase():
 
 def font_showcase():
     """Demonstrate different fonts."""
-    print_header("ASCII FORGE FONT SHOWCASE")
+    print_header("GLYPH FORGE FONT SHOWCASE")
     api = get_api()
     
     # Some interesting fonts to showcase
@@ -164,7 +164,7 @@ def font_showcase():
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='ASCII Forge Demo - Showcase capabilities',
+        description='Glyph Forge Demo - Showcase capabilities',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     
@@ -192,7 +192,7 @@ def main():
     
     # Print title banner
     api = get_api()
-    title = api.generate_banner("ASCII FORGE", style="eidosian", color=True)
+    title = api.generate_banner("GLYPH FORGE", style="eidosian", color=True)
     print("\n" + title)
     print(Style.apply("EIDOSIAN HYPER-OPTIMIZED DEMO", Style.BOLD, Style.CYAN).center(80))
     print()

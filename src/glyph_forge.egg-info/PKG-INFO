@@ -2,10 +2,10 @@ Metadata-Version: 2.2
 Name: ascii-forge
 Version: 0.1.0
 Summary: Hyper-optimized image-to-ASCII art converter with Eidosian principles
-Author-email: ASCII Forge Team <example@example.com>
-Project-URL: Homepage, https://github.com/your-username/ascii_forge
-Project-URL: Bug Tracker, https://github.com/your-username/ascii_forge/issues
-Project-URL: Documentation, https://ascii-forge.readthedocs.io/
+Author-email: Glyph Forge Team <example@example.com>
+Project-URL: Homepage, <https://github.com/your-username/glyph_forge>
+Project-URL: Bug Tracker, <https://github.com/your-username/glyph_forge/issues>
+Project-URL: Documentation, <https://ascii-forge.readthedocs.io/>
 Classifier: Development Status :: 4 - Beta
 Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3.8
@@ -38,7 +38,7 @@ Requires-Dist: sphinx>=5.0.0; extra == "docs"
 Requires-Dist: sphinx-rtd-theme>=1.0.0; extra == "docs"
 Requires-Dist: sphinx-autodoc-typehints>=1.18.0; extra == "docs"
 
-# ⚡ ASCII Forge ⚡
+# ⚡ Glyph Forge ⚡
 
 > *"Where pixels become characters and images transcend their digital boundaries."*
 
@@ -66,15 +66,15 @@ A hyper-optimized image-to-ASCII art converter engineered with Eidosian principl
 
 ## 🔧 Installation
 
-ASCII Forge offers multiple installation options to suit your workflow:
+Glyph Forge offers multiple installation options to suit your workflow:
 
 ```bash
 # Standard installation from PyPI
 pip install ascii-forge
 
 # Install from source (for the brave and the bold)
-git clone https://github.com/your-username/ascii_forge.git
-cd ascii_forge
+git clone https://github.com/your-username/glyph_forge.git
+cd glyph_forge
 pip install -e .
 
 # Install with development dependencies (for contributors and tinkerers)
@@ -86,7 +86,7 @@ pip install -e ".[dev]"
 Transform an image into ASCII art with just a few lines of code:
 
 ```python
-from ascii_forge.services.image_to_ascii import ImageAsciiConverter
+from glyph_forge.services.image_to_ascii import ImageAsciiConverter
 
 # Create converter with default parameters
 converter = ImageAsciiConverter()
@@ -116,7 +116,7 @@ with open("masterpiece.txt", "w") as f:
 ### Basic Conversion with Size Control
 
 ```python
-from ascii_forge.services.image_to_ascii import ImageAsciiConverter
+from glyph_forge.services.image_to_ascii import ImageAsciiConverter
 
 # Create a converter with custom dimensions
 converter = ImageAsciiConverter(width=100, height=50)
@@ -145,7 +145,7 @@ result = converter.convert("portrait.png", invert=True)
 
 ```python
 import os
-from ascii_forge.services.image_to_ascii import ImageAsciiConverter
+from glyph_forge.services.image_to_ascii import ImageAsciiConverter
 
 converter = ImageAsciiConverter()
 
@@ -168,7 +168,7 @@ for filename in os.listdir(input_dir):
 
 ## ⚙️ Configuration
 
-ASCII Forge offers precision controls to fine-tune your artistic output:
+Glyph Forge offers precision controls to fine-tune your artistic output:
 
 | Parameter | Description | Default | Range |
 |-----------|-------------|---------|-------|
@@ -254,5 +254,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 <div align="center">
     <p><i>Forged with precision. Executed with style. ASCII art that transcends the ordinary.</i></p>
-    <p>© 2023 ASCII Forge Team</p>
+    <p>© 2023 Glyph Forge Team</p>
 </div>

@@ -1,5 +1,5 @@
 """
-⚡ ASCII Forge Style Manager ⚡
+⚡ Glyph Forge Style Manager ⚡
 
 Core styling engine for ASCII art text with maximum precision and efficiency.
 This module provides atomic styling operations for borders, alignment, padding,

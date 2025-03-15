@@ -1,8 +1,8 @@
 """
-⚡ Eidosian Test Suite: ASCII Forge API Integration ⚡
+⚡ Eidosian Test Suite: Glyph Forge API Integration ⚡
 
 A brutal, zero-compromise test suite that validates the complete
-ASCII Forge API with maximum coverage and surgical precision.
+Glyph Forge API with maximum coverage and surgical precision.
 Every feature is validated with atomic tests and crystal-clear assertions.
 """
 
@@ -12,15 +12,15 @@ import tempfile
 from unittest import mock
 from typing import Dict, Any, List
 
-from ascii_forge.api.ascii_api import ASCIIForgeAPI, get_api
+from glyph_forge.api.ascii_api import ASCIIForgeAPI, get_api
 
 
 @pytest.fixture
 def api():
     """Create a fresh API instance for each test."""
     # Reset singleton for test isolation
-    import ascii_forge.api.ascii_api
-    ascii_forge.api.ascii_api._api_instance = None
+    import glyph_forge.api.ascii_api
+    glyph_forge.api.ascii_api._api_instance = None
     
     # Create and return new instance
     api = ASCIIForgeAPI()
@@ -36,7 +36,7 @@ def api():
 @pytest.fixture
 def mock_banner_generator():
     """Mock the BannerGenerator for isolated testing."""
-    with mock.patch('ascii_forge.core.banner_generator.BannerGenerator') as mock_generator:
+    with mock.patch('glyph_forge.core.banner_generator.BannerGenerator') as mock_generator:
         # Configure mock
         mock_instance = mock_generator.return_value
         mock_instance.generate.return_value = "MOCK BANNER"
@@ -50,7 +50,7 @@ def mock_banner_generator():
 @pytest.fixture
 def mock_image_converter():
     """Mock the ImageAsciiConverter for isolated testing."""
-    with mock.patch('ascii_forge.services.image_to_ascii.ImageAsciiConverter') as mock_converter:
+    with mock.patch('glyph_forge.services.image_to_ascii.ImageAsciiConverter') as mock_converter:
         # Configure mock
         mock_instance = mock_converter.return_value
         mock_instance.convert.return_value = "MOCK ASCII ART"
@@ -62,7 +62,7 @@ def mock_image_converter():
 
 
 class TestASCIIForgeAPI:
-    """Comprehensive test suite for the ASCII Forge API."""
+    """Comprehensive test suite for the Glyph Forge API."""
 
     # ──── Core API Initialization Tests ───────────────────────────────
     
@@ -110,7 +110,7 @@ class TestASCIIForgeAPI:
     
     def test_generate_banner_with_custom_font(self, api, mock_banner_generator):
         """🔤 Verify banner generation with custom font creates new generator."""
-        with mock.patch('ascii_forge.api.ascii_api.BannerGenerator') as mock_bg_class:
+        with mock.patch('glyph_forge.api.ascii_api.BannerGenerator') as mock_bg_class:
             mock_bg_class.return_value = mock_banner_generator
             
             api.generate_banner("Test", font="big")
@@ -149,7 +149,7 @@ class TestASCIIForgeAPI:
         mock_converter.convert.return_value = "MOCK ASCII ART"
         
         with mock.patch.object(api, '_get_image_converter', return_value=mock_converter):
-            with mock.patch('ascii_forge.api.ascii_api.ImageAsciiConverter') as mock_constructor:
+            with mock.patch('glyph_forge.api.ascii_api.ImageAsciiConverter') as mock_constructor:
                 mock_constructor.return_value = mock_converter
                 
                 # Call with custom parameters
@@ -182,7 +182,7 @@ class TestASCIIForgeAPI:
     
     def test_get_available_styles(self, api):
         """🎨 Verify style listing works correctly."""
-        with mock.patch('ascii_forge.api.ascii_api.get_available_styles') as mock_get_styles:
+        with mock.patch('glyph_forge.api.ascii_api.get_available_styles') as mock_get_styles:
             mock_get_styles.return_value = {"minimal": {}, "boxed": {}}
             
             styles = api.get_available_styles()
@@ -191,7 +191,7 @@ class TestASCIIForgeAPI:
     
     def test_get_available_alphabets(self, api):
         """🔡 Verify alphabet listing works correctly."""
-        with mock.patch('ascii_forge.api.ascii_api.AlphabetManager') as mock_manager:
+        with mock.patch('glyph_forge.api.ascii_api.AlphabetManager') as mock_manager:
             mock_manager.list_available_alphabets.return_value = ["general", "blocks"]
             
             alphabets = api.get_available_alphabets()
@@ -247,7 +247,7 @@ class TestASCIIForgeAPI:
         mock_banner = mock.MagicMock()
         mock_banner.generate.return_value = "FONT PREVIEW"
         
-        with mock.patch('ascii_forge.api.ascii_api.BannerGenerator') as mock_generator:
+        with mock.patch('glyph_forge.api.ascii_api.BannerGenerator') as mock_generator:
             mock_generator.return_value = mock_banner
             
             result = api.preview_font("big")
@@ -261,7 +261,7 @@ class TestASCIIForgeAPI:
         with mock.patch.object(api, '_banner_generator', mock_banner_generator):
             api.preview_style("boxed")
             
-            mock_banner_generator.generate.assert_called_with("ASCII Forge", style="boxed")
+            mock_banner_generator.generate.assert_called_with("Glyph Forge", style="boxed")
     
     def test_convert_text_to_art(self, api):
         """🎯 Verify raw text conversion without styling."""
@@ -271,7 +271,7 @@ class TestASCIIForgeAPI:
         mock_banner = mock.MagicMock()
         mock_banner.figlet = mock_figlet
         
-        with mock.patch('ascii_forge.api.ascii_api.BannerGenerator') as mock_generator:
+        with mock.patch('glyph_forge.api.ascii_api.BannerGenerator') as mock_generator:
             mock_generator.return_value = mock_banner
             
             result = api.convert_text_to_art("Test")

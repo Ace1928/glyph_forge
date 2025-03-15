@@ -1,0 +1,3 @@
+[console_scripts]
+imagize = glyph_forge.cli.asciify:main
+bannerize = glyph_forge.cli.bannerize:main

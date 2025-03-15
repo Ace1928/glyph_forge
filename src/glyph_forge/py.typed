@@ -1,4 +1,4 @@
-# ⚡ ASCII FORGE TYPE MARKER ⚡
+# ⚡ GLYPH FORGE TYPE MARKER ⚡
 # ～～～～～～～～～～～～～～～～～～～～
 # This file intentionally contains no code.
 # Its mere existence signals PEP 561 compliance.
@@ -13,7 +13,7 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 📦 Package Identity
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Name: ASCII Forge
+# Name: Glyph Forge
 # Version: 0.1.0
 # Description: Hyper-optimized text, image and video-to-ASCII art converter
 # License: MIT

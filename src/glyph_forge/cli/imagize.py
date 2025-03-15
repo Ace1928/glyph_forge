@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-⚡ ASCII FORGE - EIDOSIAN IMAGIZER ⚡
+⚡ GLYPH FORGE - EIDOSIAN IMAGIZER ⚡
 
 Transform ordinary images into extraordinary ASCII art
 with surgical precision and maximum efficiency.
 
 This module provides a hyper-optimized command-line interface to the 
-ASCII Forge image-to-ASCII conversion engine with zero compromises
+Glyph Forge image-to-ASCII conversion engine with zero compromises
 on performance, features, or user experience.
 
 Designed with Eidosian principles:
@@ -35,17 +35,17 @@ sys.path.insert(0, str(project_root))
 
 # Handle imports with fallback mechanisms for maximum resilience
 try:
-    from ascii_forge.api.ascii_api import get_api
-    from ascii_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
-    from ascii_forge.services.image_to_ascii import ColorMode, ImageAsciiConverter
-    from ascii_forge.utils.alphabet_manager import AlphabetManager
+    from glyph_forge.api.ascii_api import get_api
+    from glyph_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
+    from glyph_forge.services.image_to_ascii import ColorMode, ImageAsciiConverter
+    from glyph_forge.utils.alphabet_manager import AlphabetManager
 except ImportError:
     # Direct import attempt for development scenarios
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-    from src.ascii_forge.api.ascii_api import get_api
-    from src.ascii_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
-    from src.ascii_forge.services.image_to_ascii import ImageAsciiConverter
-    from src.ascii_forge.utils.alphabet_manager import AlphabetManager
+    from src.glyph_forge.api.ascii_api import get_api
+    from src.glyph_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
+    from src.glyph_forge.services.image_to_ascii import ImageAsciiConverter
+    from src.glyph_forge.utils.alphabet_manager import AlphabetManager
 
 
 # ─── ADVANCED STYLING ENGINE ──────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ def setup_logging(debug: bool = False) -> None:
     root_logger.addHandler(handler)
     
     # Set specific level for our module
-    logging.getLogger('ascii_forge').setLevel(level)
+    logging.getLogger('glyph_forge').setLevel(level)
     
     # Suppress unnecessary noise from dependencies
     logging.getLogger('PIL').setLevel(logging.WARNING)
@@ -155,7 +155,7 @@ def setup_logging(debug: bool = False) -> None:
 
 def print_header() -> None:
     """
-    Print stylish ASCII Forge header with adaptive color support.
+    Print stylish Glyph Forge header with adaptive color support.
     
     Automatically adjusts to terminal capabilities and dimensions,
     ensuring optimal visual impact on any system.
@@ -163,13 +163,13 @@ def print_header() -> None:
     term_width, _ = get_terminal_size()
     
     if Style.supports_color():
-        banner = Style.apply("⚡ ASCII FORGE IMAGIZER ⚡", Style.BOLD, Style.CYAN)
+        banner = Style.apply("⚡ GLYPH FORGE IMAGIZER ⚡", Style.BOLD, Style.CYAN)
         separator = Style.apply("═" * (term_width - 4), Style.BLUE)
         print(f"\n{banner.center(term_width)}")
         print(f"{separator}\n")
     else:
         # Fallback for terminals without color support
-        banner = "=== ASCII FORGE IMAGIZER ==="
+        banner = "=== GLYPH FORGE IMAGIZER ==="
         print(f"\n{banner.center(term_width)}")
         print("=" * term_width + "\n")
 
@@ -339,7 +339,7 @@ def convert_image(
                  image_path, charset, width, color_mode)
     
     # Import here to avoid circular imports
-    from src.ascii_forge.services.image_to_ascii import ImageAsciiConverter
+    from src.glyph_forge.services.image_to_ascii import ImageAsciiConverter
     
     # Validate image exists
     if not os.path.exists(image_path):
@@ -457,7 +457,7 @@ def parse_arguments() -> argparse.Namespace:
         Parsed argument namespace with validated values
     """
     parser = argparse.ArgumentParser(
-        description='ASCII Forge - Eidosian Image Converter 🚀',
+        description='Glyph Forge - Eidosian Image Converter 🚀',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -627,7 +627,7 @@ def show_version() -> None:
         version = importlib.metadata.version("ascii-forge")
     except (ImportError, ModuleNotFoundError):
         try:
-            from ascii_forge import __version__
+            from glyph_forge import __version__
             version = __version__
         except ImportError:
             version = "1.0.0-eidosian"
@@ -637,15 +637,15 @@ def show_version() -> None:
     platform_info = f"{platform.system()} {platform.release()}"
     
     if Style.supports_color():
-        print(Style.apply("\nASCII Forge Imagizer", Style.BOLD, Style.CYAN))
+        print(Style.apply("\nGlyph Forge Imagizer", Style.BOLD, Style.CYAN))
         print(Style.apply(f"Version {version}", Style.GREEN))
         print(f"Python {python_version} on {platform_info}")
     else:
-        print(f"\nASCII Forge Imagizer v{version}")
+        print(f"\nGlyph Forge Imagizer v{version}")
         print(f"Python {python_version} on {platform_info}")
     
     print("\nPart of the Eidosian Forge toolkit")
-    print("⚡ https://github.com/username/ascii_forge ⚡\n")
+    print("⚡ https://github.com/username/glyph_forge ⚡\n")
 
 
 # ─── MAIN ENTRY POINT ────────────────────────────────────────────────────────────
@@ -672,7 +672,7 @@ def main() -> int:
     
     # Configure logging
     setup_logging(args.debug)
-    logging.debug("ASCII Forge Imagizer initializing...")
+    logging.debug("Glyph Forge Imagizer initializing...")
     
     # Show version if requested
     if args.version:
@@ -684,7 +684,7 @@ def main() -> int:
     
     # Handle special command modes
     if args.list_charsets:
-        from src.ascii_forge.utils.alphabet_manager import AlphabetManager
+        from src.glyph_forge.utils.alphabet_manager import AlphabetManager
         charsets = AlphabetManager.list_available_alphabets()
         list_items(charsets, "Available Character Sets")
         return 0

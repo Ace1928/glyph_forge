@@ -1,4 +1,4 @@
-# ⚡ ASCII FORGE CONFIGURATION ⚡
+# ⚡ GLYPH FORGE CONFIGURATION ⚡
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Zero-compromise ASCII art transformation system
 # Every line serves purpose - no excess, no waste
@@ -90,15 +90,15 @@ docs = [
 # 🎮 CLI Entry Points - Command interface
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [project.scripts]
-asciify = "ascii_forge.cli.asciify:main"     # Image/video transformer
-bannerize = "ascii_forge.cli.bannerize:main" # Text banner generator
+asciify = "glyph_forge.cli.asciify:main"     # Image/video transformer
+bannerize = "glyph_forge.cli.bannerize:main" # Text banner generator
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔗 Project Links - External connections
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [project.urls]
-"Homepage" = "https://github.com/Ace1928/ascii_forge"
-"Bug Tracker" = "https://github.com/Ace1928/ascii_forge/issues"
+"Homepage" = "https://github.com/Ace1928/glyph_forge"
+"Bug Tracker" = "https://github.com/Ace1928/glyph_forge/issues"
 "Documentation" = "https://ascii-forge.readthedocs.io/"
 "Organization" = "https://neuroforge.io"
 
@@ -107,10 +107,10 @@ bannerize = "ascii_forge.cli.bannerize:main" # Text banner generator
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["ascii_forge*"]
+include = ["glyph_forge*"]
 
 [tool.setuptools.package-data]
-ascii_forge = ["py.typed", "config/*.json", "resources/*.txt"]
+glyph_forge = ["py.typed", "config/*.json", "resources/*.txt"]
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🧪 Testing Configuration - Validation framework
@@ -133,7 +133,7 @@ markers = [
 # 📊 Coverage Settings - Quality metrics
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [tool.coverage.run]
-source = ["ascii_forge"]
+source = ["glyph_forge"]
 omit = ["*/tests/*", "*/migrations/*"]
 
 [tool.coverage.report]

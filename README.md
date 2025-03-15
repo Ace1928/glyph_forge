@@ -1,4 +1,4 @@
-# ⚡ ASCII Forge ⚡
+# ⚡ Glyph Forge ⚡
 
 > *"Where characters and pixels merge with structural integrity."*
 
@@ -29,8 +29,8 @@ ASCII art transformation toolkit built on Eidosian principles. Transform images,
 pip install ascii-forge
 
 # Development version
-git clone https://github.com/Ace1928/ascii_forge.git
-cd ascii_forge
+git clone https://github.com/Ace1928/glyph_forge.git
+cd glyph_forge
 pip install -e .
 
 # With extensions
@@ -42,14 +42,14 @@ pip install -e ".[docs]"   # Documentation system
 ## 🚀 Quick Start
 
 ```python
-from ascii_forge import image_to_ascii
+from glyph_forge import image_to_ascii
 
 # Minimal approach
 print(image_to_ascii("cat.jpg"))
 
 # Precision control
-from ascii_forge.transformers import ImageTransformer
-from ascii_forge.renderers import ANSIRenderer
+from glyph_forge.transformers import ImageTransformer
+from glyph_forge.renderers import ANSIRenderer
 
 transformer = ImageTransformer(width=80, char_set="block")
 renderer = ANSIRenderer(color_mode="truecolor")
@@ -71,7 +71,7 @@ print(ascii_art)  # Behold the transformation ✨
 ### Transform Image to ASCII
 
 ```python
-from ascii_forge.services import image_to_ascii
+from glyph_forge.services import image_to_ascii
 
 # Simple conversion
 result = image_to_ascii("photo.jpg")
@@ -90,10 +90,10 @@ result = image_to_ascii(
 ### Create Text Banners
 
 ```python
-from ascii_forge.services import text_to_banner
+from glyph_forge.services import text_to_banner
 
 # Quick title generation
-print(text_to_banner("ASCII FORGE"))
+print(text_to_banner("GLYPH FORGE"))
 
 # Custom styling
 banner = text_to_banner(
@@ -109,7 +109,7 @@ print(banner)
 ### Process Video Frames
 
 ```python
-from ascii_forge.services import video_to_ascii_frames
+from glyph_forge.services import video_to_ascii_frames
 import time
 
 # Video to ASCII sequence
@@ -162,7 +162,7 @@ Original        ASCII Representation
 
 ## 🤝 Contributing
 
-ASCII Forge welcomes your contributions:
+Glyph Forge welcomes your contributions:
 
 1. Fork the repository
 2. Create branch: `git checkout -b feature/new-capability`
@@ -179,7 +179,7 @@ Security is a priority. See our [Security Policy](SECURITY.md) for vulnerability
 
 ## 📜 License
 
-ASCII Forge is licensed under the MIT License.
+Glyph Forge is licensed under the MIT License.
 
 Copyright (c) 2024-2025 Lloyd Handyside, Neuroforge
 

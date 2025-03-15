@@ -8,7 +8,7 @@
 
 ## 🛡️ Reporting a Vulnerability
 
-To report a security vulnerability in ASCII Forge, please:
+To report a security vulnerability in Glyph Forge, please:
 
 1. **Email**: Send details to <ace1928@gmail.com> or <lloyd.handyside@neuroforge.io>
 2. **Include**:
@@ -32,7 +32,7 @@ We aim to respond within 48 hours and coordinate with you throughout the resolut
 
 ## 🛠️ Security Measures
 
-ASCII Forge implements advanced security practices:
+Glyph Forge implements advanced security practices:
 
 - Automated dependency scanning with temporal precision
 - Static analysis with pattern recognition
@@ -51,7 +51,7 @@ ASCII Forge implements advanced security practices:
 
 ## ⚙️ Security Development Lifecycle
 
-ASCII Forge follows a structured Security Development Lifecycle:
+Glyph Forge follows a structured Security Development Lifecycle:
 
 1. **Design** - Threat modeling with comprehensive awareness
 2. **Implement** - Secure coding with integrity patterns
@@ -81,4 +81,4 @@ We regularly audit dependencies using:
 
 ---
 
-*ASCII Forge security updates align across all environments with precision. Our security policy evolves continuously as we refine our practices.*
+*Glyph Forge security updates align across all environments with precision. Our security policy evolves continuously as we refine our practices.*

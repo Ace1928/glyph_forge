@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ⚡ Eidosian ASCII Transformation System ⚡
 """
-⚡ ASCII FORGE ⚡
+⚡ GLYPH FORGE ⚡
 ~~~~~~~~~~~~~~~~
 
 Zero-compromise ASCII art transformation toolkit with Eidosian precision.
@@ -43,14 +43,14 @@ __copyright__ = "Copyright 2023-2024 Neuroforge"
 
 # Configure root logger before anything else - structural foundation
 logging.basicConfig(
-    level=os.environ.get("ASCII_FORGE_LOG_LEVEL", "INFO"),
+    level=os.environ.get("GLYPH_FORGE_LOG_LEVEL", "INFO"),
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
 # Package logger with namespace isolation
-logger = logging.getLogger("ascii_forge")
-logger.debug(f"ASCII Forge v{__version__} initializing - structural integrity check")
+logger = logging.getLogger("glyph_forge")
+logger.debug(f"Glyph Forge v{__version__} initializing - structural integrity check")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🏗️ Project information - The architecture of our universe
@@ -78,21 +78,21 @@ class ProjectInfo(TypedDict):
 
 # Project information - single source of truth
 PROJECT: Final[ProjectInfo] = {
-    "name": "ASCII Forge",
+    "name": "Glyph Forge",
     "description": "Zero-compromise ASCII art transformation toolkit with Eidosian precision",
     "version": VERSION,
     "author": __author__,
     "email": __email__,
     "organization": "Neuroforge",
     "org_email": __maintainer_email__,
-    "url": "https://github.com/Ace1928/ascii_forge",
+    "url": "https://github.com/Ace1928/glyph_forge",
     "license": __license__,
     "copyright": __copyright__,
     "maintainers": [
         {"name": __maintainer__, "email": __maintainer_email__},
         {"name": "Eidos", "email": "syntheticeidos@gmail.com"}
     ],
-    "repository": "https://github.com/Ace1928/ascii_forge",
+    "repository": "https://github.com/Ace1928/glyph_forge",
     "status": __status__
 }
 
@@ -138,7 +138,7 @@ class SystemCapabilities(TypedDict, total=False):
     terminal_size: Tuple[int, int]
     python_version: tuple
     platform: str
-    ascii_forge_version: str
+    glyph_forge_version: str
     has_pillow: bool
     has_numpy: bool
     has_rich: bool
@@ -171,11 +171,11 @@ DEFAULT_CONFIG: Final[Dict[str, Any]] = {
     ],
     "edge_detection": True,  # Preserve structural boundaries
     "structure_path": {
-        "temp": Path(os.path.expanduser("~/.ascii_forge/temp")),
-        "cache": Path(os.path.expanduser("~/.ascii_forge/cache")), 
-        "output": Path(os.path.expanduser("~/.ascii_forge/output")),
+        "temp": Path(os.path.expanduser("~/.glyph_forge/temp")),
+        "cache": Path(os.path.expanduser("~/.glyph_forge/cache")), 
+        "output": Path(os.path.expanduser("~/.glyph_forge/output")),
         "resources": Path(__file__).parent / "resources",
-        "config": Path(os.path.expanduser("~/.ascii_forge/config"))
+        "config": Path(os.path.expanduser("~/.glyph_forge/config"))
     }
 }
 
@@ -230,7 +230,7 @@ def get_config(profile: str = None) -> Dict[str, Any]:
     """Get configuration with adaptive precision. ⚙️
     
     Configuration follows this hierarchy (highest to lowest precedence):
-    1. Environment variables (ASCII_FORGE_*)
+    1. Environment variables (GLYPH_FORGE_*)
     2. User profile selection
     3. System defaults
     
@@ -268,7 +268,7 @@ def get_config(profile: str = None) -> Dict[str, Any]:
             config["entropy_preservation"] = True
     
     # Override with environment variables - environment trumps defaults
-    prefix = "ASCII_FORGE_"
+    prefix = "GLYPH_FORGE_"
     for key, value in config.items():
         env_key = f"{prefix}{key.upper()}"
         if env_key in os.environ:
@@ -297,7 +297,7 @@ def get_project_info() -> ProjectInfo:
     Example:
         >>> info = get_project_info()
         >>> print(f"Using {info['name']} v{'.'.join(map(str, info['version']))}")
-        Using ASCII Forge v0.1.0
+        Using Glyph Forge v0.1.0
     """
     return PROJECT
 
@@ -323,7 +323,7 @@ def get_system_capabilities() -> SystemCapabilities:
             "terminal_size": term_size,
             "python_version": sys.version_info,
             "platform": sys.platform,
-            "ascii_forge_version": __version__,
+            "glyph_forge_version": __version__,
             "has_pillow": _has_module("PIL"),
             "has_numpy": _has_module("numpy"),
             "has_rich": _has_module("rich"),
@@ -336,7 +336,7 @@ def get_system_capabilities() -> SystemCapabilities:
         "terminal_size": os.get_terminal_size() if sys.stdout.isatty() else (80, 24),
         "python_version": sys.version_info,
         "platform": sys.platform,
-        "ascii_forge_version": __version__,
+        "glyph_forge_version": __version__,
         "has_pillow": _has_module("PIL"),
         "has_numpy": _has_module("numpy"),
         "has_rich": _has_module("rich"),
@@ -432,7 +432,7 @@ if sys.platform != "win32":
         logger.warning(f"Signal handler registration failed: {e}")
 
 # Log successful initialization
-logger.info(f"ASCII Forge v{__version__} initialized ⚡")
+logger.info(f"Glyph Forge v{__version__} initialized ⚡")
 
 # "A blank screen without ASCII art is like code without documentation—
 #  technically functional but missing the context that gives it meaning." -Eidos

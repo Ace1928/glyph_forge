@@ -1,10 +1,10 @@
-# ⚡ ASCII Forge: Architecture & Domain Map ⚡
+# ⚡ Glyph Forge: Architecture & Domain Map ⚡
 
 > *"Precision-mapped characters that transform pixels into structural poetry."*
 
 ## 🔀 Core Machinery
 
-ASCII Forge maps visual information to typographic elements through algorithmic precision. The transformation engine handles:
+Glyph Forge maps visual information to typographic elements through algorithmic precision. The transformation engine handles:
 
 - 🖼️ **Images** → Character-density mappings with edge preservation
 - 📝 **Text** → Multi-dimensional typographic structures
@@ -68,7 +68,7 @@ Essential processing components:
 
 ## 🧠 Implementation Philosophy
 
-ASCII Forge embodies three core Eidosian principles:
+Glyph Forge embodies three core Eidosian principles:
 
 1. **Contextual Integrity** — Each element exists for a precise purpose
 2. **Humor as Cognitive Leverage** — "ASCII art without structure is like a function without parameters—accepting everything, controlling nothing"
@@ -78,7 +78,7 @@ ASCII Forge embodies three core Eidosian principles:
 
 ```mermaid
 graph LR
-    Input["Visual Complexity"] --> ASCIIForge["ASCII Forge"]
+    Input["Visual Complexity"] --> ASCIIForge["Glyph Forge"]
     ASCIIForge --> Output["Character Precision"]
     style ASCIIForge fill:#f5f5f5,stroke:#333,stroke-width:2px
 ```

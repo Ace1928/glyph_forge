@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ASCII Forge - A super user friendly stylish UX interactive experience for ASCII art
+Glyph Forge - A super user friendly stylish UX interactive experience for ASCII art
 """
 
 import sys
@@ -47,7 +47,7 @@ class Style:
         return result
 
 class Config:
-    """Configuration manager for ASCII Forge."""
+    """Configuration manager for Glyph Forge."""
     DEFAULT_CONFIG = {
         "theme": "default",
         "animation_speed": 0.02,
@@ -146,14 +146,14 @@ def setup_environment():
     atexit.register(readline.write_history_file, history_file)
 
 def print_header(config=None):
-    """Print stylish ASCII Forge header."""
+    """Print stylish Glyph Forge header."""
     if config is None:
         config = Config.load()
 
     # Try to use the bannerize function if available
     try:
-        from .src.ascii_forge.cli import bannerize
-        banner = bannerize.create_banner("ASCII FORGE", font=config["banner_font"])
+        from .src.glyph_forge.cli import bannerize
+        banner = bannerize.create_banner("GLYPH FORGE", font=config["banner_font"])
         if config["color_scheme"] == "rainbow":
             banner = Style.rainbow(banner)
         else:
@@ -161,7 +161,7 @@ def print_header(config=None):
         print("\n" + banner)
     except ImportError:
         # Fallback if bannerize module not available
-        print(Style.apply("\n⚡ ASCII FORGE ⚡\n", Style.BOLD, Style.CYAN))
+        print(Style.apply("\n⚡ GLYPH FORGE ⚡\n", Style.BOLD, Style.CYAN))
     
     term_width, _ = get_terminal_size()
     print(Style.apply("=" * term_width, Style.CYAN))
@@ -171,38 +171,38 @@ def load_subcommands():
     subcommands = {
         "bannerize": {
             "help": "Generate ASCII text banners with various styles and fonts",
-            "module": "ascii_forge.cli.bannerize",
+            "module": "glyph_forge.cli.bannerize",
             "description": "Create stunning ASCII text banners with customizable fonts and effects"
         },
         "imagize": {
             "help": "Convert images to ASCII art with advanced options",
-            "module": "ascii_forge.cli.imagize",
+            "module": "glyph_forge.cli.imagize",
             "description": "Transform images into ASCII art with full color support and various styles"
         },
         "animate": {
             "help": "Create animated ASCII art sequences",
-            "module": "ascii_forge.cli.animate",
+            "module": "glyph_forge.cli.animate",
             "description": "Generate animated ASCII art sequences for terminals and HTML output"
         },
         "colorize": {
             "help": "Apply color schemes to ASCII art",
-            "module": "ascii_forge.cli.colorize",
+            "module": "glyph_forge.cli.colorize",
             "description": "Add vibrant colors to existing ASCII art with multiple palette options"
         },
         "config": {
-            "help": "Configure ASCII Forge settings",
-            "module": "ascii_forge.cli.config_cmd",
-            "description": "Customize the behavior and appearance of ASCII Forge"
+            "help": "Configure Glyph Forge settings",
+            "module": "glyph_forge.cli.config_cmd",
+            "description": "Customize the behavior and appearance of Glyph Forge"
         },
         "gallery": {
             "help": "Browse and manage your ASCII art collection",
-            "module": "ascii_forge.cli.gallery",
+            "module": "glyph_forge.cli.gallery",
             "description": "View, organize, and share your ASCII art creations"
         },
         "demo": {
-            "help": "Run demos showcasing ASCII Forge capabilities",
+            "help": "Run demos showcasing Glyph Forge capabilities",
             "module": "scripts.demo",
-            "description": "See examples of what ASCII Forge can do with guided demonstrations"
+            "description": "See examples of what Glyph Forge can do with guided demonstrations"
         }
     }
     
@@ -254,7 +254,7 @@ def interactive_ui():
         clear_screen()
         print_header(config)
         
-        animated_print("Welcome to the ASCII Forge interactive experience!", 
+        animated_print("Welcome to the Glyph Forge interactive experience!", 
                       config["animation_speed"], Style.YELLOW)
         print()
         
@@ -270,13 +270,13 @@ def interactive_ui():
             print(f"{number} {command}: {cmd_info['help']}")
         
         print(Style.apply("─" * get_terminal_size()[0], Style.GREEN))
-        print(f"{Style.apply('[q]', Style.BOLD, Style.YELLOW)} {Style.apply('quit', Style.BOLD, Style.RED)}: Exit ASCII Forge")
+        print(f"{Style.apply('[q]', Style.BOLD, Style.YELLOW)} {Style.apply('quit', Style.BOLD, Style.RED)}: Exit Glyph Forge")
         print(f"{Style.apply('[c]', Style.BOLD, Style.YELLOW)} {Style.apply('config', Style.BOLD, Style.MAGENTA)}: Configure settings")
         
         choice = input(f"\n{Style.apply('Choose a command (1-{len(subcommands)}, q, c): ', Style.CYAN)}")
         
         if choice.lower() == 'q':
-            print(Style.apply("\nThank you for using ASCII Forge! Goodbye!", Style.CYAN))
+            print(Style.apply("\nThank you for using Glyph Forge! Goodbye!", Style.CYAN))
             return 0
         elif choice.lower() == 'c':
             configure_settings(config)
@@ -307,11 +307,11 @@ def interactive_ui():
             input()
 
 def configure_settings(config):
-    """Allow user to configure ASCII Forge settings."""
+    """Allow user to configure Glyph Forge settings."""
     while True:
         clear_screen()
         print_header(config)
-        print(Style.apply("\nASCII FORGE CONFIGURATION", Style.BOLD, Style.MAGENTA))
+        print(Style.apply("\nGLYPH FORGE CONFIGURATION", Style.BOLD, Style.MAGENTA))
         print(Style.apply("─" * get_terminal_size()[0], Style.MAGENTA))
         
         print(f"1. Theme: {Style.apply(config['theme'], Style.CYAN)}")
@@ -364,13 +364,13 @@ def configure_settings(config):
             input("Press Enter to continue...")
 
 def main():
-    """Main entry point for ASCII Forge CLI."""
+    """Main entry point for Glyph Forge CLI."""
     setup_environment()
     config = Config.load()
     
     # Main parser
     parser = argparse.ArgumentParser(
-        description="ASCII Forge - Create and manipulate ASCII art with style",
+        description="Glyph Forge - Create and manipulate ASCII art with style",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     

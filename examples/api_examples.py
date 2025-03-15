@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-⚡ ASCII Forge API Examples ⚡
+⚡ Glyph Forge API Examples ⚡
 
-This module demonstrates the proper usage of the ASCII Forge API
+This module demonstrates the proper usage of the Glyph Forge API
 through clear, concise, and practical examples with Eidosian precision.
 """
 import os
@@ -12,7 +12,7 @@ from pathlib import Path
 # Add the project root to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.ascii_forge.api import get_api
+from src.glyph_forge.api import get_api
 
 
 def example_banner_generation():
@@ -143,6 +143,6 @@ def run_all_examples():
 
 
 if __name__ == "__main__":
-    print("⚡ ASCII FORGE API EXAMPLES ⚡\n")
+    print("⚡ GLYPH FORGE API EXAMPLES ⚡\n")
     run_all_examples()
     print("\nExamples completed!")

@@ -1,5 +1,5 @@
 """
-⚡ ASCII Forge Banner Generator ⚡
+⚡ Glyph Forge Banner Generator ⚡
 
 Core engine for transforming ordinary text into extraordinary ASCII art banners.
 This module implements the atomic operations necessary for banner generation
@@ -39,7 +39,7 @@ class BannerStyle(Enum):
 
 class BannerGenerator:
     """
-    Core banner generation engine for ASCII Forge.
+    Core banner generation engine for Glyph Forge.
     
     Transforms text into ASCII art banners with customizable styles through
     a hyper-optimized rendering pipeline. Each generated banner maintains
@@ -577,12 +577,12 @@ class BannerGenerator:
         """
         return sorted(self.figlet.getFonts())
     
-    def preview_fonts(self, text: str = "ASCII Forge", limit: int = 5) -> str:
+    def preview_fonts(self, text: str = "Glyph Forge", limit: int = 5) -> str:
         """
         Generate previews of multiple fonts using sample text.
         
         Args:
-            text: Sample text to render (default: "ASCII Forge")
+            text: Sample text to render (default: "Glyph Forge")
             limit: Maximum number of fonts to preview (default: 5)
             
         Returns:
@@ -649,11 +649,11 @@ class BannerGenerator:
 
 # Execute self-diagnostic when module is run directly
 if __name__ == "__main__":
-    print("🔥 ASCII Forge Banner Generator Self-Test 🔥")
+    print("🔥 Glyph Forge Banner Generator Self-Test 🔥")
     banner = BannerGenerator(font="slant", width=80)
     
     # Generate sample banner with default settings
-    print(banner.generate("ASCII FORGE", style="boxed"))
+    print(banner.generate("GLYPH FORGE", style="boxed"))
     
     # Show available fonts
     print(f"Available fonts: {len(banner.available_fonts())}")

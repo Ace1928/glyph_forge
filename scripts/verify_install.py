@@ -2,7 +2,7 @@
 """
 Eidosian Installation Verification Protocol
 
-This script performs a comprehensive verification of the ASCII Forge
+This script performs a comprehensive verification of the Glyph Forge
 installation to ensure all components are correctly installed and
 operational with zero compromise.
 """
@@ -38,7 +38,7 @@ def run_verification() -> Tuple[bool, Dict[str, List[str]]]:
     }
     
     # Core dependencies
-    core_deps = ["numpy", "PIL", "ascii_forge"]
+    core_deps = ["numpy", "PIL", "glyph_forge"]
     for dep in core_deps:
         if verify_module(dep):
             results["success"].append(f"Core dependency: {dep}")
@@ -53,23 +53,23 @@ def run_verification() -> Tuple[bool, Dict[str, List[str]]]:
         else:
             results["failure"].append(f"Test dependency: {dep}")
     
-    # Verify specific ASCII Forge modules are importable
+    # Verify specific Glyph Forge modules are importable
     forge_modules = [
-        "ascii_forge.services.image_to_ascii",
-        "ascii_forge.utils.alphabet_manager",
+        "glyph_forge.services.image_to_ascii",
+        "glyph_forge.utils.alphabet_manager",
     ]
     for module in forge_modules:
         if verify_module(module):
-            results["success"].append(f"ASCII Forge module: {module}")
+            results["success"].append(f"Glyph Forge module: {module}")
         else:
-            results["failure"].append(f"ASCII Forge module: {module}")
+            results["failure"].append(f"Glyph Forge module: {module}")
     
     return len(results["failure"]) == 0, results
 
 
 def main() -> int:
     """Main entry point for verification script."""
-    print(f"\n{BOLD}{BLUE}⚡ ASCII FORGE: INSTALLATION VERIFICATION ⚡{RESET}\n")
+    print(f"\n{BOLD}{BLUE}⚡ GLYPH FORGE: INSTALLATION VERIFICATION ⚡{RESET}\n")
     
     # Run verification
     success, results = run_verification()

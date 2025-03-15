@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-⚡ ASCII FORGE TEST EXECUTOR ⚡
+⚡ GLYPH FORGE TEST EXECUTOR ⚡
 
-Quantum-precise test runner for the ASCII Forge ecosystem.
+Quantum-precise test runner for the Glyph Forge ecosystem.
 Executes tests with surgical precision, maximum parallelism,
 and zero-compromise reporting.
 
@@ -73,7 +73,7 @@ class TestResult:
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments with zero redundancy."""
     parser = argparse.ArgumentParser(
-        description="ASCII Forge Test Executor",
+        description="Glyph Forge Test Executor",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__.split("\n\nOptions:")[0]
     )
@@ -160,7 +160,7 @@ def build_pytest_command(args: argparse.Namespace) -> List[str]:
     # Add coverage
     if args.coverage:
         cmd.extend([
-            "--cov=src/ascii_forge",
+            "--cov=src/glyph_forge",
             "--cov-report=term-missing",
             "--cov-report=xml:coverage/coverage.xml"
         ])
@@ -303,7 +303,7 @@ def parse_test_results(stdout: str, stderr: str, junit_path: Optional[str] = Non
 def display_results(result: TestResult) -> None:
     """Display test results with maximum clarity."""
     print("\n" + "=" * 50)
-    print(Style.apply(" ASCII FORGE TEST RESULTS ", Style.BOLD, Style.CYAN))
+    print(Style.apply(" GLYPH FORGE TEST RESULTS ", Style.BOLD, Style.CYAN))
     print("=" * 50)
     
     # Summary
@@ -387,7 +387,7 @@ def main() -> int:
     args = parse_arguments()
     
     # Print banner
-    print(Style.apply("\n⚡ ASCII FORGE TEST EXECUTOR ⚡\n", Style.BOLD, Style.CYAN))
+    print(Style.apply("\n⚡ GLYPH FORGE TEST EXECUTOR ⚡\n", Style.BOLD, Style.CYAN))
     
     # Check environment
     if not ensure_test_environment():

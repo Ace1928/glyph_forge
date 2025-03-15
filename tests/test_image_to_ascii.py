@@ -1,4 +1,4 @@
-# filepath: /home/lloyd/repos/ascii_forge/tests/test_image_to_ascii.py
+# filepath: /home/lloyd/repos/glyph_forge/tests/test_image_to_ascii.py
 """
 ⚡ Eidosian Test Suite: ImageAsciiConverter ⚡
 
@@ -14,7 +14,7 @@ from PIL import Image
 import tempfile
 import shutil
 
-from ascii_forge.services.image_to_ascii import ImageAsciiConverter, ColorMode
+from glyph_forge.services.image_to_ascii import ImageAsciiConverter, ColorMode
 
 
 @pytest.fixture(scope="class")
@@ -58,7 +58,7 @@ def test_images() -> dict:
 @pytest.fixture
 def mock_alphabet_manager() -> mock.MagicMock:
     """Mock the AlphabetManager to provide deterministic outputs."""
-    with mock.patch('ascii_forge.services.image_to_ascii.AlphabetManager') as mock_manager:
+    with mock.patch('glyph_forge.services.image_to_ascii.AlphabetManager') as mock_manager:
         mock_manager.list_available_alphabets.return_value = ["standard", "blocks"]
         mock_manager.get_alphabet.return_value = "$@B%8&WM"
         yield mock_manager
@@ -161,7 +161,7 @@ class TestImageAsciiConverter:
         assert img.mode == 'L'  # Grayscale
         assert img.size == (100, 100)
     
-    @mock.patch('ascii_forge.services.image_to_ascii.shutil.get_terminal_size')
+    @mock.patch('glyph_forge.services.image_to_ascii.shutil.get_terminal_size')
     def test_terminal_scaling(self, mock_get_terminal_size: mock.MagicMock) -> None:
         """📏 Verify output auto-scales to terminal dimensions."""
         mock_get_terminal_size.return_value = (50, 25)  # Width, height
@@ -210,7 +210,7 @@ class TestImageAsciiConverter:
         assert len(lines) == 10  # Output height matches specification
         assert len(lines[0]) == 20  # Output width matches specification
     
-    @mock.patch('ascii_forge.services.image_to_ascii.ThreadPoolExecutor')
+    @mock.patch('glyph_forge.services.image_to_ascii.ThreadPoolExecutor')
     def test_parallel_conversion(self, mock_executor: mock.MagicMock) -> None:
         """⚡ Verify multi-threaded processing for large images."""
         mock_map = mock.MagicMock()

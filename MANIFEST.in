@@ -1,4 +1,4 @@
-# ⚡ ASCII FORGE MANIFEST ⚡
+# ⚡ GLYPH FORGE MANIFEST ⚡
 # ~~~~~~~~~~~~~~~~~~~~~~~~
 # Package inclusion specification - precise file selection matrix.
 # Every path serves purpose - structural integrity maintained at each level.
@@ -21,8 +21,8 @@ include project_scope.md  # Domain definition - functional boundaries
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ASCII without examples is like a function without a return value - technically complete but practically useless
 recursive-include examples *.py *.txt *.md *.jpg *.png  # Usage demonstrations
-recursive-include src/ascii_forge/config *.json *.yaml *.yml *.toml  # Control parameters
-recursive-include src/ascii_forge/resources *.txt *.json *.dat  # Asset library
+recursive-include src/glyph_forge/config *.json *.yaml *.yml *.toml  # Control parameters
+recursive-include src/glyph_forge/resources *.txt *.json *.dat  # Asset library
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🧪 Test Framework - Verification matrix
@@ -49,7 +49,7 @@ recursive-include docs/ai_docs *.md *.rst             # Enhanced content
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 include .gitignore       # Exclusion patterns - signal preservation
 include .editorconfig    # Editor standards - consistency enforcement
-include src/ascii_forge/py.typed  # Type hint marker - static analysis enabler
+include src/glyph_forge/py.typed  # Type hint marker - static analysis enabler
 recursive-include scripts *.py *.sh  # Automation tools - workflow accelerators
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
