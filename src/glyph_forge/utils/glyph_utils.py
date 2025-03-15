@@ -1,9 +1,9 @@
 """
-⚡ ASCII Forge Utilities ⚡
+⚡ Glyph Forge Utilities ⚡
 
-Core utilities for ASCII art transformation and manipulation.
+Core utilities for Glyph art transformation and manipulation.
 This module provides atomic operations for text processing,
-style resolution, and ASCII art manipulation.
+style resolution, and Glyph art manipulation.
 """
 
 import re
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def sanitize_text(text: str) -> str:
     """
-    Sanitize input text for safe ASCII art conversion.
+    Sanitize input text for safe Glyph art conversion.
     
     Removes potentially problematic characters and normalizes
     line endings for consistent processing.
@@ -77,7 +77,7 @@ def resolve_style(style_name: str) -> Dict[str, Any]:
             "effects": []
         },
         "retro": {
-            "border": "ascii",
+            "border": "Glyph",
             "padding": (1, 3),
             "alignment": "center", 
             "effects": []
@@ -113,13 +113,13 @@ def resolve_style(style_name: str) -> Dict[str, Any]:
 
 def trim_margins(text: str) -> str:
     """
-    Remove excessive whitespace from the margins of ASCII art.
+    Remove excessive whitespace from the margins of Glyph art.
     
     Args:
-        text: ASCII art text
+        text: Glyph art text
         
     Returns:
-        Trimmed ASCII art with minimal margins
+        Trimmed Glyph art with minimal margins
     """
     if not text:
         return ""
@@ -148,16 +148,16 @@ def trim_margins(text: str) -> str:
     return '\n'.join(lines)
 
 
-def center_ascii_art(art: str, width: int) -> str:
+def center_Glyph_art(art: str, width: int) -> str:
     """
-    Center ASCII art within a specified width.
+    Center Glyph art within a specified width.
     
     Args:
-        art: ASCII art text
+        art: Glyph art text
         width: Target width to center within
         
     Returns:
-        Centered ASCII art
+        Centered Glyph art
     """
     lines = art.split('\n')
     centered_lines = []
@@ -174,12 +174,12 @@ def center_ascii_art(art: str, width: int) -> str:
     return '\n'.join(centered_lines)
 
 
-def measure_ascii_art(art: str) -> Tuple[int, int]:
+def measure_Glyph_art(art: str) -> Tuple[int, int]:
     """
-    Measure the dimensions of ASCII art.
+    Measure the dimensions of Glyph art.
     
     Args:
-        art: ASCII art text
+        art: Glyph art text
         
     Returns:
         Tuple of (width, height) in characters
@@ -192,10 +192,10 @@ def measure_ascii_art(art: str) -> Tuple[int, int]:
 
 def detect_box_borders(art: str) -> Optional[str]:
     """
-    Detect if ASCII art has box borders and identify style.
+    Detect if Glyph art has box borders and identify style.
     
     Args:
-        art: ASCII art text
+        art: Glyph art text
         
     Returns:
         Name of detected border style or None
@@ -213,7 +213,7 @@ def detect_box_borders(art: str) -> Optional[str]:
     elif '╔' in first_line and '╗' in first_line and '╚' in last_line and '╝' in last_line:
         return "double"
     elif '+' in first_line and '+' in last_line:
-        return "ascii"
+        return "Glyph"
         
     return None
 

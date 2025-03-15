@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# ⚡ Eidosian ASCII Transformation System ⚡
+# ⚡ Eidosian Glyph Transformation System ⚡
 """
 ⚡ GLYPH FORGE ⚡
 ~~~~~~~~~~~~~~~~
 
-Zero-compromise ASCII art transformation toolkit with Eidosian precision.
+Zero-compromise Glyph art transformation toolkit with Eidosian precision.
 Where structure embodies meaning and each character serves purpose.
 
 🔥 Core capabilities:
@@ -22,6 +22,8 @@ from typing import Dict, List, Union, Callable, TypeVar, Protocol, Any, Tuple
 from typing import TypedDict, Final, Literal
 from pathlib import Path
 from functools import lru_cache
+
+from .services import image_to_glyph
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 📊 Version and identity - The essence of our being
@@ -79,7 +81,7 @@ class ProjectInfo(TypedDict):
 # Project information - single source of truth
 PROJECT: Final[ProjectInfo] = {
     "name": "Glyph Forge",
-    "description": "Zero-compromise ASCII art transformation toolkit with Eidosian precision",
+    "description": "Zero-compromise Glyph art transformation toolkit with Eidosian precision",
     "version": VERSION,
     "author": __author__,
     "email": __email__,
@@ -103,7 +105,7 @@ PROJECT: Final[ProjectInfo] = {
 # Type definitions with structural precision - no ambiguity tolerated
 TransformerMap = Dict[str, Callable[[bytes], bytes]]
 RenderOptions = Dict[str, Union[str, int, float, bool]]
-AsciiMatrix = List[List[str]]
+GlyphMatrix = List[List[str]]
 T = TypeVar('T')  # Generic output type
 R = TypeVar('R')  # Return type variant
 
@@ -118,19 +120,19 @@ DitherAlgorithm = Literal[
 class Renderer(Protocol[T]):
     """Protocol defining core rendering capabilities.
     
-    A renderer transforms AsciiMatrix data into output of type T.
+    A renderer transforms GlyphMatrix data into output of type T.
     This abstraction allows for multiple output formats while
     maintaining a consistent interface.
     """
-    def render(self, matrix: AsciiMatrix, options: RenderOptions) -> T: ...
+    def render(self, matrix: GlyphMatrix, options: RenderOptions) -> T: ...
 
 class Transformer(Protocol):
     """Protocol defining core transformation capabilities.
     
-    Transforms input data into an AsciiMatrix representation.
+    Transforms input data into an GlyphMatrix representation.
     Each transformer specializes in specific input formats.
     """
-    def transform(self, source: Any, **options: Any) -> AsciiMatrix: ...
+    def transform(self, source: Any, **options: Any) -> GlyphMatrix: ...
 
 class SystemCapabilities(TypedDict, total=False):
     """System environment detection results."""
@@ -151,7 +153,7 @@ class SystemCapabilities(TypedDict, total=False):
 # Configuration with sane defaults and overridable parameters
 DEFAULT_CONFIG: Final[Dict[str, Any]] = {
     "char_sets": {
-        "standard": " .:-=+*#%@",  # Classic ASCII density gradient
+        "standard": " .:-=+*#%@",  # Classic Glyph density gradient
         "detailed": " .'`^\",:;Il!i><~+_-?][}{1)(|/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",  # High-fidelity mapping
         "block": "░▒▓█",  # Block-based density representation
         "minimal": " ._|/\\#",  # Minimal set for constrained environments
@@ -184,7 +186,7 @@ DEFAULT_CONFIG: Final[Dict[str, Any]] = {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 try:
     # Core API with clean entrypoints
-    from .api import get_api, ASCIIForgeAPI
+    from .api import get_api, GlyphForgeAPI
 
     # Rendering engines for diverse output formats
     from .renderers import TextRenderer, HTMLRenderer, ANSIRenderer, SVGRenderer
@@ -196,7 +198,7 @@ try:
     from .utils import setup_logger, configure, measure_performance, detect_capabilities
 
     # Integration services for common workflows
-    from .services import image_to_ascii, text_to_banner, video_to_ascii_frames
+    from .services import text_to_banner, video_to_Glyph_frames
 except ImportError as e:
     # Handle partial installations with grace - no component left behind
     logger.warning(f"Module initialization incomplete: {e}")
@@ -204,7 +206,7 @@ except ImportError as e:
     
     # Create stub definitions for type checking
     def get_api(*args: Any, **kwargs: Any) -> Any: ...
-    class ASCIIForgeAPI: ...
+    class GlyphForgeAPI: ...
     class TextRenderer: ...
     class HTMLRenderer: ...
     class ANSIRenderer: ...
@@ -217,9 +219,9 @@ except ImportError as e:
     def configure(*args: Any, **kwargs: Any) -> None: ...
     def measure_performance(func: Callable[..., R]) -> Callable[..., R]: return func
     def detect_capabilities() -> Dict[str, Any]: return {}
-    def image_to_ascii(*args: Any, **kwargs: Any) -> str: return ""
+    def image_to_glyph(*args: Any, **kwargs: Any) -> str: return ""
     def text_to_banner(*args: Any, **kwargs: Any) -> str: return ""
-    def video_to_ascii_frames(*args: Any, **kwargs: Any) -> List[str]: return []
+    def video_to_Glyph_frames(*args: Any, **kwargs: Any) -> List[str]: return []
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔧 Core functions - Essential operational capabilities
@@ -367,7 +369,7 @@ def _has_module(module_name: str) -> bool:
 
 __all__: List[str] = [
     # Core API
-    "get_api", "ASCIIForgeAPI",
+    "get_api", "GlyphForgeAPI",
     
     # Renderers
     "TextRenderer", "HTMLRenderer", "ANSIRenderer", "SVGRenderer",
@@ -379,10 +381,10 @@ __all__: List[str] = [
     "setup_logger", "configure", "measure_performance", "detect_capabilities",
     
     # Services
-    "image_to_ascii", "text_to_banner", "video_to_ascii_frames",
+    "image_to_glyph", "text_to_banner", "video_to_Glyph_frames",
     
     # Type definitions
-    "TransformerMap", "RenderOptions", "AsciiMatrix", "Renderer", "Transformer",
+    "TransformerMap", "RenderOptions", "GlyphMatrix", "Renderer", "Transformer",
     "SystemCapabilities", "ColorMode", "DitherAlgorithm",
     
     # Global functions
@@ -434,5 +436,5 @@ if sys.platform != "win32":
 # Log successful initialization
 logger.info(f"Glyph Forge v{__version__} initialized ⚡")
 
-# "A blank screen without ASCII art is like code without documentation—
+# "A blank screen without Glyph art is like code without documentation—
 #  technically functional but missing the context that gives it meaning." -Eidos

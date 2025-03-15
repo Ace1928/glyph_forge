@@ -69,7 +69,7 @@ src/glyph_forge/
 │   └── glyph_forge_api.py  # Core interface - functionality access points
 ├── cli/                    # Command system - terminal interaction layer
 │   ├── __init__.py         # Command registry - interaction entry points
-│   ├── asciify.py          # Image transformer - pixels to glyphs
+│   ├── glyphfy.py          # Image transformer - pixels to glyphs
 │   └── bannerize.py        # Text enhancer - typography system
 ├── config/                 # Settings matrix - behavior control center
 │   ├── __init__.py         # Config registry - parameter discovery
@@ -88,9 +88,9 @@ src/glyph_forge/
 │   └── edge_detector.py    # Edge engine - boundary identification
 ├── services/               # Workflow directors - high-level operations
 │   ├── __init__.py         # Service registry - workflow discovery
-│   ├── image_to_ascii.py   # Image pipeline - photo transformation
+│   ├── image_to_glyph.py   # Image pipeline - photo transformation
 │   ├── text_to_banner.py   # Text pipeline - banner generation
-│   └── video_to_ascii_frames.py # Video pipeline - motion conversion
+│   └── video_to_glyph_frames.py # Video pipeline - motion conversion
 └── utils/                  # Support tools - cross-cutting functions
     ├── __init__.py         # Utility registry - helper discovery
     ├── setup_logger.py     # Logging system - event recording
@@ -196,7 +196,7 @@ src/glyph_forge/
 
 ```tree
 src/glyph_forge/resources/  # Asset storage - supporting files
-├── charsets/               # Character sets - ASCII building blocks
+├── charsets/               # Character sets - glyph building blocks
 │   ├── standard.json       # Standard set - balanced intensity map
 │   ├── detailed.json       # Enhanced set - precision intensity map
 │   ├── block.json          # Block set - geometric intensity map

@@ -21,7 +21,7 @@ This document maps the evolution pathway of Glyph Forge through its structural i
 
 ## [0.1.0] - 2024-11-15
 
-> *"Initial implementation—where pixels find their ASCII essence."*
+> *"Initial implementation—where pixels find their glyph essence."*
 
 ### ✨ Added
 
@@ -29,7 +29,7 @@ This document maps the evolution pathway of Glyph Forge through its structural i
 - Multi-format renderer ecosystem (Text, ANSI, HTML, SVG)
 - Terminal-aware color system with fallback pathways
 - Image processing pipeline with density mapping
-- CLI entry points: `asciify` and `bannerize`
+- CLI entry points: `glyphfy` and `bannerize`
 - Comprehensive type annotations across all interfaces
 - Documentation system with practical examples
 
@@ -60,7 +60,7 @@ This document maps the evolution pathway of Glyph Forge through its structural i
 
 ## [Unreleased]
 
-> *"Functionality expands like ASCII itself—simple elements creating complex structures."*
+> *"Functionality expands like glyph itself—simple elements creating complex structures."*
 
 ### 🔮 Development Vector
 
@@ -75,4 +75,4 @@ This document maps the evolution pathway of Glyph Forge through its structural i
 
 © 2023-2024 [Lloyd Handyside](mailto:ace1928@gmail.com) & [Eidos](mailto:syntheticeidos@gmail.com) — Maintained by [Neuroforge](https://neuroforge.io).
 
-"A changelog is like ASCII art—structured information that tells a complete story."
+"A changelog is like glyph art—structured information that tells a complete story."

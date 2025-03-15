@@ -132,14 +132,14 @@ Glyph Forge maintains these standards:
 ### Implementation Example
 
 ```python
-def map_luminance_to_ascii(
+def map_luminance_to_glyph(
     values: np.ndarray,
     charset: str,
     invert: bool = False,
     contrast: float = 1.0
 ) -> str:
     """
-    Map luminance values to ASCII characters with controlled density.
+    Map luminance values to glyph characters with controlled density.
     
     Args:
         values: Array of luminance values (0-255)
@@ -148,7 +148,7 @@ def map_luminance_to_ascii(
         contrast: Contrast adjustment factor
         
     Returns:
-        ASCII string representation
+        glyph string representation
         
     Raises:
         ValueError: If charset is empty or contrast invalid
@@ -185,21 +185,21 @@ Tests must be:
 
 ```python
 # Example test structure
-def test_map_luminance_to_ascii():
+def test_map_luminance_to_glyph():
     # Setup
     values = np.array([0, 128, 255])
     charset = ".#@"
     
     # Core functionality
-    result = map_luminance_to_ascii(values, charset)
+    result = map_luminance_to_glyph(values, charset)
     assert result == ".#@"
     
     # Edge cases
-    assert map_luminance_to_ascii(np.array([]), charset) == ""
+    assert map_luminance_to_glyph(np.array([]), charset) == ""
     
     # Input validation
     with pytest.raises(ValueError, match="Character set cannot be empty"):
-        map_luminance_to_ascii(values, "")
+        map_luminance_to_glyph(values, "")
 ```
 
 ## 📝 Documentation Standards
@@ -252,5 +252,5 @@ Contributors recognized in CONTRIBUTORS.md and release notes.
 
 ---
 
-"ASCII art without structure is just random characters with hope."
+"glyph art without structure is just random characters with hope."
     - ⚡ Glyph Forge Team ⚡

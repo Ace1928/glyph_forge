@@ -2,7 +2,7 @@
 """
 ⚡ GLYPH FORGE - EIDOSIAN BANNERIZER ⚡
 
-Transform mundane text into extraordinary ASCII art banners
+Transform mundane text into extraordinary Glyph art banners
 with maximum precision and surgical efficiency.
 
 Entry point for the bannerize command line tool.
@@ -28,11 +28,11 @@ sys.path.insert(0, str(project_root))
 # Core imports with path-awareness
 try:
     from glyph_forge.api import get_api
-    from glyph_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
+    from glyph_forge.utils.glyph_utils import detect_text_color_support, get_terminal_size
 except ImportError:
     # Direct import attempt for development scenarios
     from ..api import get_api
-    from ..utils.ascii_utils import detect_text_color_support, get_terminal_size
+    from ..utils.glyph_utils import detect_text_color_support, get_terminal_size
 
 
 # ANSI color codes for terminal output - Zero waste, maximum impact
@@ -316,7 +316,7 @@ Examples:
         'text', 
         type=str,
         nargs='?',
-        help='Text to transform into ASCII art'
+        help='Text to transform into Glyph art'
     )
 
     # Customization options
@@ -420,7 +420,7 @@ def show_version():
     """Display version information with precision."""
     try:
         import importlib.metadata
-        version = importlib.metadata.version("ascii-forge")
+        version = importlib.metadata.version("glyph-forge")
     except (ImportError, importlib.metadata.PackageNotFoundError):
         try:
             from glyph_forge import __version__
@@ -493,12 +493,12 @@ def main() -> int:
     # Handle information commands
     if args.list_fonts:
         fonts = api.get_available_fonts()
-        list_items(fonts, "Available ASCII Fonts", columns=3)
+        list_items(fonts, "Available Glyph Fonts", columns=3)
         return 0
 
     if args.list_styles:
         styles = api.get_available_styles()
-        list_items(list(styles.keys()), "Available ASCII Styles", columns=3)
+        list_items(list(styles.keys()), "Available Glyph Styles", columns=3)
         return 0
     
     # Preview mode

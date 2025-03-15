@@ -14,8 +14,8 @@ from ..utils.alphabet_manager import AlphabetManager
 PixelArray = NDArray[np.uint8]  # Type for grayscale/RGB pixel arrays
 Shape = Tuple[int, ...]         # Array dimensions
 T = TypeVar('T')                # Generic type for flexible functions
-AsciiRow = List[str]            # Type for rows of ASCII characters
-AsciiArt = List[str]            # Type for complete ASCII art (list of strings)
+GlyphRow = List[str]            # Type for rows of Glyph characters
+GlyphArt = List[str]            # Type for complete Glyph art (list of strings)
 
 class ColorMode(Enum):
     """Supported color output formats."""
@@ -24,21 +24,21 @@ class ColorMode(Enum):
     NONE = "none"  # Fallback to standard grayscale
 
 
-class ImageAsciiConverter:
+class ImageGlyphConverter:
     """
-    # ImageAsciiConverter
-    A high-performance image-to-ASCII art converter that transforms visual data into textual representations with precision and flexibility.
+    # ImageGlyphConverter
+    A high-performance image-to-Glyph art converter that transforms visual data into textual representations with precision and flexibility.
     ## Overview
-    `ImageAsciiConverter` provides comprehensive functionality to convert images into ASCII art using various character sets, processing techniques, and output formats. The converter supports grayscale and color output, with options for adjusting dimensions, brightness, contrast, and applying effects like dithering.
+    `ImageGlyphConverter` provides comprehensive functionality to convert images into Glyph art using various character sets, processing techniques, and output formats. The converter supports grayscale and color output, with options for adjusting dimensions, brightness, contrast, and applying effects like dithering.
     ## Features
     - **Multiple character sets** - Use built-in or custom character sets for different artistic styles
     - **Adaptive rendering** - Maintains aspect ratio and can auto-scale to terminal dimensions
     - **Multi-threaded processing** - Parallel conversion for large images with configurable thread count
     - **Image adjustments** - Controls for brightness, contrast, and dithering
     - **Color output** - Support for ANSI (terminal) and HTML color formats
-    - **Styling options** - Apply visual styles to the resulting ASCII art
+    - **Styling options** - Apply visual styles to the resulting Glyph art
     ## Usage
-    ⚡ Hyper-optimized image-to-ASCII converter with Eidosian principles ⚡
+    ⚡ Hyper-optimized image-to-Glyph converter with Eidosian principles ⚡
     
     Transforms visual data into textual art with surgical precision.
     Features adaptive rendering, multi-threaded processing, and specialized character sets.
@@ -59,7 +59,7 @@ class ImageAsciiConverter:
         
         Args:
             charset: Name of character set to use or custom charset string
-            width: Width of output ASCII art in characters
+            width: Width of output Glyph art in characters
             height: Optional height (maintains aspect ratio if None)
             invert: Whether to invert the brightness of the output
             brightness: Brightness adjustment factor (0.0-2.0)
@@ -97,29 +97,29 @@ class ImageAsciiConverter:
                 output_path: Optional[str] = None,
                 style: Optional[str] = None) -> str:
         """
-        Convert an image to ASCII art with advanced processing.
+        Convert an image to Glyph art with advanced processing.
         
         Args:
             image_path: Path to the image file or PIL Image object
-            output_path: Optional path to save the ASCII art
+            output_path: Optional path to save the Glyph art
             style: Optional style to apply to the output
             
         Returns:
-            ASCII art as a string
+            Glyph art as a string
         """
         try:
             # Load image (handle both file paths and PIL Image objects)
             img = self._load_image(image_path)
             
             # Process the image
-            ascii_art = self._process_image(img, style)
+            Glyph_art = self._process_image(img, style)
             
             # Save to file if requested
             if output_path:
-                self._save_to_file(ascii_art, output_path)
-                self.logger.info(f"ASCII art saved to: {output_path}")
+                self._save_to_file(Glyph_art, output_path)
+                self.logger.info(f"Glyph art saved to: {output_path}")
             
-            return ascii_art
+            return Glyph_art
             
         except Exception as e:
             self.logger.error(f"Error converting image: {str(e)}", exc_info=True)
@@ -168,20 +168,20 @@ class ImageAsciiConverter:
         # Convert to numpy array for faster processing
         pixels = np.array(img)
         
-        # Generate ASCII art (with parallel processing for large images)
+        # Generate Glyph art (with parallel processing for large images)
         if new_height > 100 and self.threads > 1:
             # Process rows in parallel
-            ascii_art = self._parallel_conversion(pixels)
+            Glyph_art = self._parallel_conversion(pixels)
         else:
             # Single-threaded processing
-            ascii_art = self._convert_pixels(pixels)
+            Glyph_art = self._convert_pixels(pixels)
         
         # Apply style if requested
         if style:
             from ..core.style_manager import apply_style
-            ascii_art = apply_style(ascii_art, style_name=style)
+            Glyph_art = apply_style(Glyph_art, style_name=style)
         
-        return ascii_art
+        return Glyph_art
     
     def _apply_terminal_scaling(self, new_width: int, new_height: int) -> tuple[int, int]:
         """Scale dimensions to fit the terminal window."""
@@ -233,30 +233,30 @@ class ImageAsciiConverter:
         
     def _convert_pixels(self, pixels: PixelArray) -> str:
         """
-        Convert pixel array to ASCII art (single-threaded implementation).
+        Convert pixel array to Glyph art (single-threaded implementation).
         
         Args:
             pixels: Numpy array of grayscale pixel values
             
         Returns:
-            ASCII art string
+            Glyph art string
         """
-        ascii_art: AsciiArt = []
+        Glyph_art: GlyphArt = []
         for row in pixels:
-            ascii_row = "".join(self.density_map[int(pixel_value)] for pixel_value in row)
-            ascii_art.append(ascii_row)
+            Glyph_row = "".join(self.density_map[int(pixel_value)] for pixel_value in row)
+            Glyph_art.append(Glyph_row)
         
-        return "\n".join(ascii_art)
+        return "\n".join(Glyph_art)
     
     def _parallel_conversion(self, pixels: PixelArray) -> str:
         """
-        Convert pixel array to ASCII art using parallel processing.
+        Convert pixel array to Glyph art using parallel processing.
         
         Args:
             pixels: Numpy array of grayscale pixel values
             
         Returns:
-            ASCII art string
+            Glyph art string
         """
         chunk_size = max(1, len(pixels) // self.threads)
         chunks = [pixels[i:i+chunk_size] for i in range(0, len(pixels), chunk_size)]
@@ -266,8 +266,8 @@ class ImageAsciiConverter:
             
         return "\n".join(results)
     
-    def _save_to_file(self, ascii_art: str, output_path: str) -> None:
-        """Save ASCII art to a file with proper directory creation."""
+    def _save_to_file(self, Glyph_art: str, output_path: str) -> None:
+        """Save Glyph art to a file with proper directory creation."""
         try:
             # Ensure directory exists
             dirname = os.path.dirname(output_path)
@@ -276,7 +276,7 @@ class ImageAsciiConverter:
                 
             # Write with UTF-8 encoding for maximum compatibility
             with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(ascii_art)
+                f.write(Glyph_art)
                 
             self.logger.debug(f"Saved output to {output_path}")
         except Exception as e:
@@ -342,7 +342,7 @@ class ImageAsciiConverter:
                       output_path: Optional[str] = None,
                       color_mode: str = "ansi") -> str:
         """
-        Convert image to color ASCII art using ANSI or HTML color codes.
+        Convert image to color Glyph art using ANSI or HTML color codes.
         
         Args:
             image_path: Path to image or PIL Image object
@@ -350,7 +350,7 @@ class ImageAsciiConverter:
             color_mode: Color output format ("ansi", "html", or "none")
             
         Returns:
-            ASCII art with color formatting
+            Glyph art with color formatting
         """
         try:
             # Load image
@@ -384,30 +384,30 @@ class ImageAsciiConverter:
             pixels_rgb = np.array(img)
             pixels_gray = np.array(gray_img)
             
-            # Generate color ASCII art based on mode
+            # Generate color Glyph art based on mode
             if color_mode.lower() == "ansi":
-                ascii_art = self._generate_ansi_color(pixels_rgb, pixels_gray)
+                Glyph_art = self._generate_ansi_color(pixels_rgb, pixels_gray)
             elif color_mode.lower() == "html":
-                ascii_art = self._generate_html_color(pixels_rgb, pixels_gray)
+                Glyph_art = self._generate_html_color(pixels_rgb, pixels_gray)
             else:
                 # Fallback to standard grayscale conversion
                 return self.convert(gray_img, output_path)
             
             # Save to file if requested
             if output_path:
-                self._save_to_file(ascii_art, output_path)
+                self._save_to_file(Glyph_art, output_path)
             
-            return ascii_art
+            return Glyph_art
             
         except Exception as e:
             self.logger.error(f"Color conversion error: {e}", exc_info=True)
             return f"Error converting color image: {str(e)}"
     
     def _generate_ansi_color(self, pixels_rgb: PixelArray, pixels_gray: PixelArray) -> str:
-        """Generate ASCII art with ANSI color codes."""
-        ascii_art: AsciiArt = []
+        """Generate Glyph art with ANSI color codes."""
+        Glyph_art: GlyphArt = []
         for y in range(len(pixels_gray)):
-            row: AsciiRow = []
+            row: GlyphRow = []
             for x in range(len(pixels_gray[y])):
                 # Get character based on brightness
                 char = self.density_map[int(pixels_gray[y][x])]
@@ -416,12 +416,12 @@ class ImageAsciiConverter:
                 # Create ANSI color sequence
                 color_code = f"\033[38;2;{r};{g};{b}m{char}\033[0m"
                 row.append(color_code)
-            ascii_art.append("".join(row))
-        return "\n".join(ascii_art)
+            Glyph_art.append("".join(row))
+        return "\n".join(Glyph_art)
     
     def _generate_html_color(self, pixels_rgb: PixelArray, pixels_gray: PixelArray) -> str:
-        """Generate ASCII art with HTML color tags."""
-        ascii_art: AsciiArt = ["<pre style='line-height:1; letter-spacing:0'>"]
+        """Generate Glyph art with HTML color tags."""
+        Glyph_art: GlyphArt = ["<pre style='line-height:1; letter-spacing:0'>"]
         for y in range(len(pixels_gray)):
             row_parts: List[str] = []
             for x in range(len(pixels_gray[y])):
@@ -434,10 +434,10 @@ class ImageAsciiConverter:
                 row_parts.append(f"<span style='color:{color_hex}'>{char}</span>")
             
             # Join row and add line break
-            ascii_art.append("".join(row_parts))
-            ascii_art.append("<br>")
+            Glyph_art.append("".join(row_parts))
+            Glyph_art.append("<br>")
         
         # Close container
-        ascii_art.append("</pre>")
+        Glyph_art.append("</pre>")
         
-        return "".join(ascii_art)
+        return "".join(Glyph_art)

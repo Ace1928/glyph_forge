@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Glyph Forge - A super user friendly stylish UX interactive experience for ASCII art
+Glyph Forge - A super user friendly stylish UX interactive experience for Glyph art
 """
 
 import sys
@@ -62,7 +62,7 @@ class Config:
     @staticmethod
     def get_config_dir():
         """Get the configuration directory."""
-        config_dir = Path.home() / ".config" / "ascii-forge"
+        config_dir = Path.home() / ".config" / "Glyph-forge"
         config_dir.mkdir(parents=True, exist_ok=True)
         return config_dir
     
@@ -170,24 +170,24 @@ def load_subcommands():
     """Load and return available subcommands."""
     subcommands = {
         "bannerize": {
-            "help": "Generate ASCII text banners with various styles and fonts",
+            "help": "Generate Glyph text banners with various styles and fonts",
             "module": "glyph_forge.cli.bannerize",
-            "description": "Create stunning ASCII text banners with customizable fonts and effects"
+            "description": "Create stunning Glyph text banners with customizable fonts and effects"
         },
         "imagize": {
-            "help": "Convert images to ASCII art with advanced options",
+            "help": "Convert images to Glyph art with advanced options",
             "module": "glyph_forge.cli.imagize",
-            "description": "Transform images into ASCII art with full color support and various styles"
+            "description": "Transform images into Glyph art with full color support and various styles"
         },
         "animate": {
-            "help": "Create animated ASCII art sequences",
+            "help": "Create animated Glyph art sequences",
             "module": "glyph_forge.cli.animate",
-            "description": "Generate animated ASCII art sequences for terminals and HTML output"
+            "description": "Generate animated Glyph art sequences for terminals and HTML output"
         },
         "colorize": {
-            "help": "Apply color schemes to ASCII art",
+            "help": "Apply color schemes to Glyph art",
             "module": "glyph_forge.cli.colorize",
-            "description": "Add vibrant colors to existing ASCII art with multiple palette options"
+            "description": "Add vibrant colors to existing Glyph art with multiple palette options"
         },
         "config": {
             "help": "Configure Glyph Forge settings",
@@ -195,9 +195,9 @@ def load_subcommands():
             "description": "Customize the behavior and appearance of Glyph Forge"
         },
         "gallery": {
-            "help": "Browse and manage your ASCII art collection",
+            "help": "Browse and manage your Glyph art collection",
             "module": "glyph_forge.cli.gallery",
-            "description": "View, organize, and share your ASCII art creations"
+            "description": "View, organize, and share your Glyph art creations"
         },
         "demo": {
             "help": "Run demos showcasing Glyph Forge capabilities",
@@ -239,9 +239,9 @@ def show_command_help(command_name, command_info):
     print(f"\n{Style.apply('Description:', Style.BOLD)}")
     print(f"  {command_info['description']}")
     print(f"\n{Style.apply('Usage:', Style.BOLD)}")
-    print(f"  ascii-forge {command_name} [options]")
+    print(f"  Glyph-forge {command_name} [options]")
     print(f"\n{Style.apply('For detailed help:', Style.BOLD)}")
-    print(f"  ascii-forge {command_name} -h")
+    print(f"  Glyph-forge {command_name} -h")
     
     print(f"\n{Style.apply('Press Enter to continue...', Style.CYAN)}")
     input()
@@ -370,7 +370,7 @@ def main():
     
     # Main parser
     parser = argparse.ArgumentParser(
-        description="Glyph Forge - Create and manipulate ASCII art with style",
+        description="Glyph Forge - Create and manipulate Glyph art with style",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -411,7 +411,7 @@ def main():
     # No command or invalid command
     if len(sys.argv) > 1 and sys.argv[1] not in ('-h', '--help', '-i', '--interactive'):
         print(Style.apply(f"Unknown command: {sys.argv[1]}", Style.RED))
-        print(Style.apply("Try 'ascii-forge --help' for more information.", Style.YELLOW))
+        print(Style.apply("Try 'Glyph-forge --help' for more information.", Style.YELLOW))
         return 1
     
     # Default to interactive UI or use the default command from config

@@ -19,7 +19,7 @@ include project_scope.md  # Domain definition - functional boundaries
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🎭 Examples & Templates - Implementation patterns
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ASCII without examples is like a function without a return value - technically complete but practically useless
+# glyph without examples is like a function without a return value - technically complete but practically useless
 recursive-include examples *.py *.txt *.md *.jpg *.png  # Usage demonstrations
 recursive-include src/glyph_forge/config *.json *.yaml *.yml *.toml  # Control parameters
 recursive-include src/glyph_forge/resources *.txt *.json *.dat  # Asset library
@@ -27,7 +27,7 @@ recursive-include src/glyph_forge/resources *.txt *.json *.dat  # Asset library
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🧪 Test Framework - Verification matrix
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Untested code is assumed buggy; untested ASCII is just hopeful pixels
+# Untested code is assumed buggy; untested glyph is just hopeful pixels
 recursive-include tests *.py                          # Test suite
 recursive-include tests/fixtures *.json *.yaml *.yml  # Test parameters
 recursive-include tests/test_images *.jpg *.png *.gif *.bmp *.webp  # Visual targets
@@ -35,7 +35,7 @@ recursive-include tests/test_images *.jpg *.png *.gif *.bmp *.webp  # Visual tar
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 📚 Documentation - Knowledge crystallization
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Well-crafted documentation is like precise ASCII art - structure itself conveys meaning
+# Well-crafted documentation is like precise glyph art - structure itself conveys meaning
 recursive-include docs *.md *.py *.rst *.txt          # Core documentation
 recursive-include docs/_static *.css *.js *.png *.jpg *.svg  # Visual elements
 recursive-include docs/_templates *.html *.rst        # Structure patterns
@@ -70,7 +70,7 @@ recursive-include benchmarks/data *.jpg *.png *.txt  # Benchmark samples
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔍 Explicit exclusions - Signal focus
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# In both code and ASCII art, what you omit is as important as what you include
+# In both code and glyph art, what you omit is as important as what you include
 global-exclude .DS_Store *.pyc *.pyo __pycache__ *.so .*.swp  # System artifacts
 global-exclude *.egg-info* *.egg .coverage .pytest_cache .tox  # Build artifacts
 prune .github            # CI workflow configuration

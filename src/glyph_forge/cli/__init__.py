@@ -1,7 +1,7 @@
 """
 ⚡ Glyph Forge CLI ⚡
 
-Precision-engineered command line interface for ASCII art transformation.
+Precision-engineered command line interface for Glyph art transformation.
 Zero compromise between power and usability.
 """
 import typer
@@ -49,14 +49,14 @@ from rich.style import Style
 
 # Create Typer app with pristine configuration
 app = typer.Typer(
-    help="⚡ Glyph Forge - Hyper-optimized ASCII art transformation toolkit ⚡",
+    help="⚡ Glyph Forge - Hyper-optimized Glyph art transformation toolkit ⚡",
     add_completion=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
-# Add CLI submodules - no asciify, only imagize (the replacement)
+# Add CLI submodules - no Glyphfy, only imagize (the replacement)
 app.add_typer(bannerize_app, name="bannerize", help="Generate stylized text banners")
-app.add_typer(imagize_app, name="imagize", help="Transform images into ASCII art masterpieces")
+app.add_typer(imagize_app, name="imagize", help="Transform images into Glyph art masterpieces")
 
 # Initialize console with full capability detection
 console = Console()
@@ -101,10 +101,10 @@ def interactive():
     """Launch the interactive Glyph Forge experience."""
     try:
         from textual.app import App
-        from ..ui.tui import ASCIIForgeApp
+        from ..ui.tui import GlyphForgeApp
         
         console.print("[bold cyan]Launching interactive mode...[/bold cyan]")
-        ASCIIForgeApp().run()
+        GlyphForgeApp().run()
     except ImportError:
         console.print("[bold red]Error:[/bold red] Textual library not available.")
         console.print("Install with: [bold green]pip install textual[/bold green]")
@@ -127,9 +127,9 @@ def list_commands():
     table.add_section()
     table.add_row("bannerize", "Generate stylized text banners")
     
-    # Add imagize subcommands (the replacement for asciify)
+    # Add imagize subcommands (the replacement for Glyphfy)
     table.add_section()
-    table.add_row("imagize", "Transform images into ASCII art masterpieces")
+    table.add_row("imagize", "Transform images into Glyph art masterpieces")
     
     console.print(table)
 
@@ -198,10 +198,10 @@ def display_banner():
     
     # Print usage instructions
     console.print("\nCommands:")
-    console.print("  [cyan]ascii-forge imagize[/cyan]   - Transform images to ASCII art")
-    console.print("  [cyan]ascii-forge bannerize[/cyan] - Generate text banners")
-    console.print("  [cyan]ascii-forge interactive[/cyan] - Launch TUI interface")
-    console.print("\nType [cyan]ascii-forge --help[/cyan] for more information\n")
+    console.print("  [cyan]glyph-forge imagize[/cyan]   - Transform images to Glyph art")
+    console.print("  [cyan]glyph-forge bannerize[/cyan] - Generate text banners")
+    console.print("  [cyan]glyph-forge interactive[/cyan] - Launch TUI interface")
+    console.print("\nType [cyan]glyph-forge --help[/cyan] for more information\n")
 
 def check_for_external_dependencies() -> Dict[str, bool]:
     """

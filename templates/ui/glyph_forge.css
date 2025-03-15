@@ -12,7 +12,7 @@
  * - Minimal Surface Area: Maximum impact with fewest declarations
  * - Fractal Coherence: Visual patterns that reinforce system identity
  * 
- * 🧠 "Style without structure is like ASCII without pattern recognition—
+ * 🧠 "Style without structure is like Glyph without pattern recognition—
  *     technically visible but fundamentally meaningless." - Eidos
  *
  * 📝 Maintained by:
@@ -24,7 +24,7 @@
 /* 🏗️ Core structural elements - Terminal foundation */
 Screen {
     background: #0f0f23;
-    /* Deep space - 16:1 contrast ratio for ASCII art */
+    /* Deep space - 16:1 contrast ratio for Glyph art */
     --layers: base overlay notifications;
     /* Three-tier z-index system */
     scrollbar-color: #3f3f74 #0f0f23;
@@ -256,7 +256,7 @@ FileInput.-invalid {
     /* Prevents overwhelming */
     margin: 1 0;
     background: #1a1a2a;
-    /* ASCII display surface */
+    /* Glyph display surface */
     border: panel #333366;
     /* Content container */
     overflow: auto;
@@ -265,7 +265,7 @@ FileInput.-invalid {
     color: #e0e0ff;
     /* Optimal text visibility */
     font-family: monospace;
-    /* ASCII alignment */
+    /* Glyph alignment */
     white-space: pre;
     /* Preserves formatting */
 }
@@ -303,19 +303,19 @@ FileInput.-invalid {
     /* Edge smoothing */
 }
 
-/* 🎨 ASCII output - Core content presentation */
-.ascii_banner {
+/* 🎨 Glyph output - Core content presentation */
+.Glyph_banner {
     color: #00ffaa;
     /* High-visibility primary content */
     background: #1a1a2a;
     border: panel #333366;
     padding: 1;
     min-height: 5;
-    /* Accommodates ASCII height */
+    /* Accommodates Glyph height */
     font-family: monospace;
     /* Character alignment */
     white-space: pre;
-    /* Preserves ASCII structure */
+    /* Preserves Glyph structure */
     text-shadow: 0 0 5px rgba(0, 255, 170, 0.3);
     /* Subtle glow effect */
 }
@@ -477,7 +477,7 @@ FileInput.-invalid {
 
 /* Dark mode optimization */
 @media (prefers-color-scheme: dark) {
-    .ascii_banner {
+    .Glyph_banner {
         color: #00ffaa;
         /* Enhanced visibility */
         text-shadow: 0 0 8px rgba(0, 255, 170, 0.4);
@@ -500,6 +500,6 @@ FileInput.-invalid {
 }
 
 /* 
- * 🔮 "The best CSS is like perfect ASCII art—
+ * 🔮 "The best CSS is like perfect Glyph art—
  *     every character placed with intention, nothing wasted." - Eidos 
  */

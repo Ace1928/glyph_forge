@@ -16,8 +16,8 @@ from pathlib import Path
 # Add project root to Python path for absolute imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.glyph_forge.api.ascii_api import get_api
-from src.glyph_forge.utils.ascii_utils import detect_text_color_support, apply_ansi_style
+from src.glyph_forge.api.glyph_api import get_api
+from src.glyph_forge.utils.glyph_utils import detect_text_color_support, apply_ansi_style
 
 # ANSI color styling
 class Style:
@@ -99,26 +99,26 @@ def image_showcase(image_path):
     
     # Step 1: Basic conversion
     print_step(1, "Basic image conversion")
-    result = api.image_to_ascii(image_path, width=60)
+    result = api.image_to_Glyph(image_path, width=60)
     print(result)
     time.sleep(1)
     
     # Step 2: Different character set
     print_step(2, "Alternative character set (blocks)")
-    result = api.image_to_ascii(image_path, width=60, charset="blocks")
+    result = api.image_to_Glyph(image_path, width=60, charset="blocks")
     print(result)
     time.sleep(1)
     
     # Step 3: Inverted
     print_step(3, "Inverted brightness")
-    result = api.image_to_ascii(image_path, width=60, invert=True)
+    result = api.image_to_Glyph(image_path, width=60, invert=True)
     print(result)
     time.sleep(1)
     
     # Step 4: With color (if supported)
     if detect_text_color_support() > 0:
         print_step(4, "With ANSI color")
-        result = api.image_to_ascii(image_path, width=60, color_mode="ansi")
+        result = api.image_to_Glyph(image_path, width=60, color_mode="ansi")
         print(result)
     else:
         print(Style.apply("Terminal does not support color output", Style.YELLOW))
@@ -133,7 +133,7 @@ def style_showcase():
     styles = list(api.get_available_styles().keys())
     
     # Generate sample text
-    text = "ASCII"
+    text = "Glyph"
     for i, style in enumerate(styles[:5]):  # Show first 5 styles
         print_step(i+1, f"Style: {style}")
         banner = api.generate_banner(text, style=style)

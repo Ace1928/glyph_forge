@@ -30,10 +30,10 @@ Essential processing components:
 
 | Layer | Components | Purpose |
 |-------|------------|---------|
-| API | `ASCIIForgeAPI`, `get_api()` | Unified access with context awareness |
+| API | `glyphForgeAPI`, `get_api()` | Unified access with context awareness |
 | Renderers | `TextRenderer`, `ANSIRenderer`, `HTMLRenderer`, `SVGRenderer` | Format-specific presentation systems |
 | Transformers | `ImageTransformer`, `ColorMapper`, `DepthAnalyzer`, `EdgeDetector` | Media processing algorithms |
-| Services | `image_to_ascii()`, `text_to_banner()`, `video_to_ascii_frames()` | Streamlined workflow interfaces |
+| Services | `image_to_glyph()`, `text_to_banner()`, `video_to_glyph_frames()` | Streamlined workflow interfaces |
 | Utils | `setup_logger()`, `configure()`, `measure_performance()`, `detect_capabilities()` | Cross-cutting infrastructure |
 
 ## 🔧 Technical Requirements
@@ -47,7 +47,7 @@ Essential processing components:
   - `colorama` → Cross-platform color handling
   - `typer` → CLI interface framework
 - **Performance**: 0.09s average image processing time
-- **Commands**: `asciify` & `bannerize` entry points
+- **Commands**: `glyphfy` & `bannerize` entry points
 - **Configuration**: Runtime-adaptable parameters
 
 ## 📈 Release Timeline
@@ -71,16 +71,16 @@ Essential processing components:
 Glyph Forge embodies three core Eidosian principles:
 
 1. **Contextual Integrity** — Each element exists for a precise purpose
-2. **Humor as Cognitive Leverage** — "ASCII art without structure is like a function without parameters—accepting everything, controlling nothing"
+2. **Humor as Cognitive Leverage** — "glyph art without structure is like a function without parameters—accepting everything, controlling nothing"
 3. **Exhaustive But Concise** — Complete functionality in minimal space
 
 ## 🎯 Transformation Goals
 
 ```mermaid
 graph LR
-    Input["Visual Complexity"] --> ASCIIForge["Glyph Forge"]
-    ASCIIForge --> Output["Character Precision"]
-    style ASCIIForge fill:#f5f5f5,stroke:#333,stroke-width:2px
+    Input["Visual Complexity"] --> glyphForge["Glyph Forge"]
+    glyphForge --> Output["Character Precision"]
+    style glyphForge fill:#f5f5f5,stroke:#333,stroke-width:2px
 ```
 
 Each transformation preserves:

@@ -1,6 +1,6 @@
 # ⚡ GLYPH FORGE CONFIGURATION ⚡
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Central configuration nexus for ASCII art transformation ecosystem
+# Central configuration nexus for glyph art transformation ecosystem
 # Where every parameter serves a precise purpose - no waste, no excess
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -9,7 +9,7 @@
 project:
   name: "Glyph Forge"
   version: "0.1.0" # Foundation state - all systems operational
-  description: "High-precision text, image and video-to-ASCII art converter with Eidosian principles"
+  description: "High-precision text, image and video-to-glyph art converter with Eidosian principles"
   authors:
     - name: "Lloyd Handyside"
       email: "ace1928@gmail.com"
@@ -47,7 +47,7 @@ system:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # A character set is like a vocabulary - its limits become your limits
 character_sets:
-  standard: ".:-=+*#%@" # Universal ASCII baseline
+  standard: ".:-=+*#%@" # Universal glyph baseline
   detailed: ".'\"^,;Il!i><~+_-?][}{1)(|/tfj\\\"\\\\|/\\\\|\\_\\+\\-=\\><i\\!lI;:,\\\"^\\`'. " # High-fidelity rendering
   block: "░▒▓█" # Density blocks - clean gradients
   minimal: ".:*#" # Core elements only - maximum compatibility
@@ -121,7 +121,7 @@ renderers:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # A service without efficiency is like a poem that never ends - technically complete but practically exhausting
 services:
-  image_to_ascii:
+  image_to_glyph:
     default_width: 80 # Output dimension anchor
     default_renderer: "text" # Default presentation format
     optimization_level: 2 # Processing complexity scale (0-4)
@@ -133,7 +133,7 @@ services:
     padding: 1 # Boundary spacing
     width: "auto" # Content constraint mechanism
 
-  video_to_ascii_frames:
+  video_to_glyph_frames:
     fps: "auto" # Frame rate detection
     skip_frames: 0 # Temporal sampling reducer
     max_frames: null # Processing boundary
@@ -168,7 +168,7 @@ advanced:
     angle_secondary: -45 # Secondary stroke angle
     density: 0.7 # Pattern frequency coefficient
 
-  # ASCII without adaptation is like a map without scale - technically accurate but contextually wrong
+  # glyph without adaptation is like a map without scale - technically accurate but contextually wrong
   adaptive_processing:
     enabled: true # Content-aware processing
     analyze_histograms: true # Tonal distribution analysis

@@ -59,7 +59,7 @@ def example_multiple_fonts():
 
 
 def example_image_conversion(image_path):
-    """Example: Converting an image to ASCII art."""
+    """Example: Converting an image to Glyph art."""
     print("\nExample: Image conversion")
     print("-" * 40)
     
@@ -70,12 +70,12 @@ def example_image_conversion(image_path):
     api = get_api()
     
     # Basic conversion
-    result = api.image_to_ascii(image_path, width=60)
+    result = api.image_to_Glyph(image_path, width=60)
     print(result)
     
     # With different character set
     print("\nWith 'blocks' character set:")
-    result = api.image_to_ascii(image_path, width=60, charset="blocks")
+    result = api.image_to_Glyph(image_path, width=60, charset="blocks")
     print(result)
 
 

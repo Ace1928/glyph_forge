@@ -37,15 +37,15 @@ def get_long_description():
     if readme_path.exists():
         with open(readme_path, encoding="utf-8") as f:
             return f.read()
-    return "Glyph Forge - Hyper-optimized ASCII art converter with Eidosian principles"
+    return "Glyph Forge - Hyper-optimized glyph art converter with Eidosian principles"
 
 def get_package_metadata():
     """Extract core package metadata with perfect alignment."""
     init_file = Path("src") / "glyph_forge" / "__init__.py"
     metadata = {
-        "name": "ascii-forge",
+        "name": "glyph-forge",
         "version": get_version(),
-        "description": "Hyper-optimized text, image and video-to-ASCII art converter with Eidosian principles",
+        "description": "Hyper-optimized text, image and video-to-glyph art converter with Eidosian principles",
         "author": "Lloyd Handyside",
         "author_email": "ace1928@gmail.com",
         "license": "MIT",
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         # Entry points for CLI tools
         entry_points={
             "console_scripts": [
-                "asciify=glyph_forge.cli.asciify:main",
+                "glyphfy=glyph_forge.cli.glyphfy:main",
                 "bannerize=glyph_forge.cli.bannerize:main",
             ],
         },
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         project_urls={
             "Homepage": "https://github.com/Ace1928/glyph_forge",
             "Bug Tracker": "https://github.com/Ace1928/glyph_forge/issues",
-            "Documentation": "https://ascii-forge.readthedocs.io/",
+            "Documentation": "https://glyph-forge.readthedocs.io/",
             "Organization": "https://neuroforge.io",
         },
     )

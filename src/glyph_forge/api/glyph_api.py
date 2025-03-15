@@ -4,13 +4,13 @@ import logging
 
 from ..core.banner_generator import BannerGenerator
 from ..core.style_manager import get_available_styles
-from ..services.image_to_ascii import ImageAsciiConverter
+from ..services.image_to_glyph import ImageGlyphConverter
 from ..utils.alphabet_manager import AlphabetManager
 from ..config.settings import get_config
 
 logger = logging.getLogger(__name__)
 
-class ASCIIForgeAPI:
+class GlyphForgeAPI:
     """
     Public API for the Glyph Forge library.
     
@@ -36,13 +36,13 @@ class ASCIIForgeAPI:
         
         logger.debug(f"Core components initialized with font='{default_font}', width={default_width}")
     
-    def _get_image_converter(self) -> ImageAsciiConverter:
+    def _get_image_converter(self) -> ImageGlyphConverter:
         """Get or lazily initialize image converter."""
         if self._image_converter is None:
             # Default image converter settings
             default_charset = self.config.get('image', 'default_charset', 'general')
             default_width = self.config.get('image', 'default_width', 100)
-            self._image_converter = ImageAsciiConverter(
+            self._image_converter = ImageGlyphConverter(
                 charset=default_charset,
                 width=default_width
             )
@@ -58,7 +58,7 @@ class ASCIIForgeAPI:
                        effects: Optional[List[str]] = None,
                        color: bool = False) -> str:
         """
-        Generate an ASCII art banner from text with intelligent parameter handling.
+        Generate an Glyph art banner from text with intelligent parameter handling.
         
         Args:
             text: Text to convert into banner
@@ -69,7 +69,7 @@ class ASCIIForgeAPI:
             color: Whether to apply ANSI color to output
         
         Returns:
-            ASCII art banner
+            Glyph art banner
         """
         # Use defaults from config if not specified
         if style is None:
@@ -90,7 +90,7 @@ class ASCIIForgeAPI:
             color=color
         )
     
-    def image_to_ascii(self, 
+    def image_to_Glyph(self, 
                       image_path: str, 
                       output_path: Optional[str] = None,
                       charset: Optional[str] = None, 
@@ -102,7 +102,7 @@ class ASCIIForgeAPI:
                       dithering: bool = False,
                       color_mode: str = "none") -> str:
         """
-        Convert an image to ASCII art with comprehensive parameter support.
+        Convert an image to Glyph art with comprehensive parameter support.
         
         Args:
             image_path: Path to the image file
@@ -117,7 +117,7 @@ class ASCIIForgeAPI:
             color_mode: Color output mode ("none", "ansi", "html")
         
         Returns:
-            ASCII art representation of the image
+            Glyph art representation of the image
         """
         # Get or create image converter
         converter = self._get_image_converter()
@@ -127,7 +127,7 @@ class ASCIIForgeAPI:
             # Create a new converter with specified parameters
             temp_charset = charset if charset is not None else converter.charset
             temp_width = width if width is not None else converter.width
-            converter = ImageAsciiConverter(
+            converter = ImageGlyphConverter(
                 charset=temp_charset,
                 width=temp_width,
                 height=height,
@@ -182,12 +182,12 @@ class ASCIIForgeAPI:
         """
         return AlphabetManager.list_available_alphabets()
     
-    def save_to_file(self, ascii_art: str, file_path: str) -> bool:
+    def save_to_file(self, Glyph_art: str, file_path: str) -> bool:
         """
-        Save ASCII art to a file with proper directory creation.
+        Save Glyph art to a file with proper directory creation.
         
         Args:
-            ascii_art: ASCII art text to save
+            Glyph_art: Glyph art text to save
             file_path: Path to save the file
         
         Returns:
@@ -199,9 +199,9 @@ class ASCIIForgeAPI:
             
             # Write file with UTF-8 encoding for maximum compatibility
             with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(ascii_art)
+                f.write(Glyph_art)
                 
-            logger.debug(f"Saved ASCII art to {file_path}")
+            logger.debug(f"Saved Glyph art to {file_path}")
             return True
         except (IOError, OSError) as e:
             logger.error(f"Failed to save file: {str(e)}")
@@ -216,7 +216,7 @@ class ASCIIForgeAPI:
             text: Text to use for preview
         
         Returns:
-            ASCII art using specified font
+            Glyph art using specified font
         """
         generator = BannerGenerator(font=font, width=self._banner_generator.width)
         return generator.generate(text)
@@ -230,20 +230,20 @@ class ASCIIForgeAPI:
             text: Text to use for preview
         
         Returns:
-            ASCII art using specified style
+            Glyph art using specified style
         """
         return self._banner_generator.generate(text, style=style)
     
     def convert_text_to_art(self, text: str, font: str = "standard") -> str:
         """
-        Convert plain text to ASCII art without additional styling.
+        Convert plain text to Glyph art without additional styling.
         
         Args:
             text: Text to convert
             font: Font to use
         
         Returns:
-            ASCII art representation
+            Glyph art representation
         """
         generator = BannerGenerator(font=font, width=self._banner_generator.width)
         return generator.figlet.renderText(text)
@@ -252,14 +252,14 @@ class ASCIIForgeAPI:
 # Singleton API instance
 _api_instance = None
 
-def get_api() -> ASCIIForgeAPI:
+def get_api() -> GlyphForgeAPI:
     """
-    Get the ASCIIForgeAPI singleton instance with zero redundant initialization.
+    Get the GlyphForgeAPI singleton instance with zero redundant initialization.
     
     Returns:
-        ASCIIForgeAPI instance
+        GlyphForgeAPI instance
     """
     global _api_instance
     if _api_instance is None:
-        _api_instance = ASCIIForgeAPI()
+        _api_instance = GlyphForgeAPI()
     return _api_instance

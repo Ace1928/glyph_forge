@@ -2,7 +2,7 @@
 
 > *"Where characters and pixels merge with structural integrity."*
 
-ASCII art transformation toolkit built on Eidosian principles. Transform images, text, and video into ASCII with precision-engineered algorithms.
+glyph art transformation toolkit built on Eidosian principles. Transform images, text, and video into glyph with precision-engineered algorithms.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.12%2B-brightgreen.svg)
@@ -26,7 +26,7 @@ ASCII art transformation toolkit built on Eidosian principles. Transform images,
 
 ```bash
 # Standard install
-pip install ascii-forge
+pip install glyph-forge
 
 # Development version
 git clone https://github.com/Ace1928/glyph_forge.git
@@ -42,10 +42,10 @@ pip install -e ".[docs]"   # Documentation system
 ## 🚀 Quick Start
 
 ```python
-from glyph_forge import image_to_ascii
+from glyph_forge import image_to_glyph
 
 # Minimal approach
-print(image_to_ascii("cat.jpg"))
+print(image_to_glyph("cat.jpg"))
 
 # Precision control
 from glyph_forge.transformers import ImageTransformer
@@ -53,13 +53,13 @@ from glyph_forge.renderers import ANSIRenderer
 
 transformer = ImageTransformer(width=80, char_set="block")
 renderer = ANSIRenderer(color_mode="truecolor")
-ascii_art = transformer.transform("portrait.jpg", renderer=renderer)
-print(ascii_art)  # Behold the transformation ✨
+glyph_art = transformer.transform("portrait.jpg", renderer=renderer)
+print(glyph_art)  # Behold the transformation ✨
 ```
 
 ## ✨ Features
 
-- **🔄 Multi-format conversion** - Images, text, videos → ASCII art
+- **🔄 Multi-format conversion** - Images, text, videos → glyph art
 - **🎭 Intelligent mapping** - Context-aware character density with edge detection
 - **🌈 Color support** - True color with graceful terminal fallbacks
 - **⚙️ Fine-grained control** - Customize every aspect of transformation
@@ -68,16 +68,16 @@ print(ascii_art)  # Behold the transformation ✨
 
 ## 🔬 Usage
 
-### Transform Image to ASCII
+### Transform Image to glyph
 
 ```python
-from glyph_forge.services import image_to_ascii
+from glyph_forge.services import image_to_glyph
 
 # Simple conversion
-result = image_to_ascii("photo.jpg")
+result = image_to_glyph("photo.jpg")
 
 # Advanced configuration
-result = image_to_ascii(
+result = image_to_glyph(
     "nebula.png",
     width=120,
     char_set="detailed",
@@ -109,11 +109,11 @@ print(banner)
 ### Process Video Frames
 
 ```python
-from glyph_forge.services import video_to_ascii_frames
+from glyph_forge.services import video_to_glyph_frames
 import time
 
-# Video to ASCII sequence
-frames = video_to_ascii_frames(
+# Video to glyph sequence
+frames = video_to_glyph_frames(
     "clip.mp4",
     width=100,
     fps=15,
@@ -141,9 +141,9 @@ for frame in frames:
 
 ## 🖼️ Examples
 
-Input image → ASCII output:
+Input image → glyph output:
 
-Original        ASCII Representation
+Original        glyph Representation
 🌄  →  ░░░░░░▒▒▓▓▓▓▓▓▓█████▓▓▒▒▒░░░░░
             ░░░▒▒▓▓▓██████████████▓▒░░
             ░▒▒▓▓███████████████████▓▒░

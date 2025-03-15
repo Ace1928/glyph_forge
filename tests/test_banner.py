@@ -8,7 +8,7 @@ class TestBannerGenerator(unittest.TestCase):
     """
     Eidosian test suite for the BannerGenerator component.
     
-    Tests the core functionality of ASCII banner generation with
+    Tests the core functionality of Glyph banner generation with
     surgical precision and zero redundancy.
     """
     

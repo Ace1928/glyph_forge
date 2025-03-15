@@ -1,7 +1,7 @@
 """
 ⚡ Glyph Forge Style Manager ⚡
 
-Core styling engine for ASCII art text with maximum precision and efficiency.
+Core styling engine for Glyph art text with maximum precision and efficiency.
 This module provides atomic styling operations for borders, alignment, padding,
 and specialized visual effects with zero bloat.
 
@@ -25,7 +25,7 @@ class BorderStyle(Enum):
     DOUBLE = "double"
     ROUNDED = "rounded"
     BOLD = "bold"
-    ASCII = "ascii"
+    Glyph = "Glyph"
     CUSTOM = "custom"
 
 
@@ -63,8 +63,8 @@ STYLE_PRESETS = {
         "padding": 1,
         "alignment": "center",
     },
-    "ascii": {
-        "border": "ascii",
+    "Glyph": {
+        "border": "Glyph",
         "padding": 1,
         "alignment": "center",
     },
@@ -99,32 +99,32 @@ BORDERS = {
         "bottom_left": "┗", "bottom_right": "┛", 
         "horizontal": "━", "vertical": "┃",
     },
-    "ascii": {
+    "Glyph": {
         "top_left": "+", "top_right": "+",
         "bottom_left": "+", "bottom_right": "+",
         "horizontal": "-", "vertical": "|",
     }
 }
 
-# ASCII fallback mapping for terminals without Unicode support
-ASCII_FALLBACK = {
-    "single": "ascii",
-    "double": "ascii",
-    "rounded": "ascii",
-    "bold": "ascii",
+# Glyph fallback mapping for terminals without Unicode support
+Glyph_FALLBACK = {
+    "single": "Glyph",
+    "double": "Glyph",
+    "rounded": "Glyph",
+    "bold": "Glyph",
 }
 
 
-def apply_style(ascii_art: str, style_name: str = "minimal", **kwargs: Any) -> str:
+def apply_style(Glyph_art: str, style_name: str = "minimal", **kwargs: Any) -> str:
     """
-    Apply visual styling to ASCII art text with atomic precision.
+    Apply visual styling to Glyph art text with atomic precision.
     
-    This function transforms plain ASCII art by applying borders, padding,
+    This function transforms plain Glyph art by applying borders, padding,
     alignment adjustments and other visual enhancements according to a
     named style preset or custom parameters.
     
     Args:
-        ascii_art: The ASCII art text to style
+        Glyph_art: The Glyph art text to style
         style_name: Name of the style preset to apply
         **kwargs: Override specific style parameters:
             - border: Border style name or None
@@ -133,10 +133,10 @@ def apply_style(ascii_art: str, style_name: str = "minimal", **kwargs: Any) -> s
             - border_chars: Custom border characters for "custom" border type
     
     Returns:
-        Styled ASCII art string with all transformations applied
+        Styled Glyph art string with all transformations applied
     
     Examples:
-        >>> art = figlet.renderText("ASCII")
+        >>> art = figlet.renderText("Glyph")
         >>> # Apply boxed style
         >>> styled = apply_style(art, "boxed")
         >>> # Apply minimal style with custom padding
@@ -151,7 +151,7 @@ def apply_style(ascii_art: str, style_name: str = "minimal", **kwargs: Any) -> s
             style[key] = value
     
     # Split input into lines for processing
-    lines = ascii_art.split('\n')
+    lines = Glyph_art.split('\n')
     max_line_length = max((len(line) for line in lines), default=0)
     
     # Process padding - handle both integer and tuple forms
@@ -297,10 +297,10 @@ def register_border(name: str, border_config: Dict[str, str]) -> None:
 
 def detect_border_style(text: str) -> Optional[str]:
     """
-    Detect border style of existing ASCII art.
+    Detect border style of existing Glyph art.
     
     Args:
-        text: ASCII art text to analyze
+        text: Glyph art text to analyze
         
     Returns:
         Detected border style name or None if no border detected
@@ -331,13 +331,13 @@ def detect_border_style(text: str) -> Optional[str]:
 
 def remove_border(text: str) -> str:
     """
-    Remove border from ASCII art text.
+    Remove border from Glyph art text.
     
     Args:
-        text: ASCII art text with border
+        text: Glyph art text with border
         
     Returns:
-        ASCII art with border removed
+        Glyph art with border removed
     """
     lines = text.split('\n')
     if len(lines) < 3:

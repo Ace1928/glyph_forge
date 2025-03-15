@@ -1,6 +1,6 @@
 # ⚡ GLYPH FORGE CONFIGURATION ⚡
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Zero-compromise ASCII art transformation system
+# Zero-compromise glyph art transformation system
 # Every line serves purpose - no excess, no waste
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -17,9 +17,9 @@ build-backend = "setuptools.build_meta"
 # 📦 Project Core - Identity matrix
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [project]
-name = "ascii-forge"
+name = "glyph-forge"
 version = "0.1.0" # Genesis point - expansion begins here
-description = "Hyper-optimized text, image and video-to-ASCII art converter with Eidosian principles"
+description = "Hyper-optimized text, image and video-to-glyph art converter with Eidosian principles"
 readme = "README.md"
 requires-python = ">=3.12" # Forward-facing compatibility
 license = { file = "LICENSE" }
@@ -90,7 +90,7 @@ docs = [
 # 🎮 CLI Entry Points - Command interface
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [project.scripts]
-asciify = "glyph_forge.cli.asciify:main"     # Image/video transformer
+glyphfy = "glyph_forge.cli.glyphfy:main"     # Image/video transformer
 bannerize = "glyph_forge.cli.bannerize:main" # Text banner generator
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -99,7 +99,7 @@ bannerize = "glyph_forge.cli.bannerize:main" # Text banner generator
 [project.urls]
 "Homepage" = "https://github.com/Ace1928/glyph_forge"
 "Bug Tracker" = "https://github.com/Ace1928/glyph_forge/issues"
-"Documentation" = "https://ascii-forge.readthedocs.io/"
+"Documentation" = "https://glyph-forge.readthedocs.io/"
 "Organization" = "https://neuroforge.io"
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -201,4 +201,4 @@ module = "tests.*"
 disallow_untyped_defs = false    # Test flexibility permitted
 disallow_incomplete_defs = false
 
-# "Where pixels converge to their ASCII essence" - Eidos
+# "Where pixels converge to their glyph essence" - Eidos

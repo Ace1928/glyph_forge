@@ -1,9 +1,9 @@
-# filepath: /home/lloyd/repos/glyph_forge/tests/test_image_to_ascii.py
+# filepath: /home/lloyd/repos/glyph_forge/tests/test_image_to_Glyph.py
 """
-⚡ Eidosian Test Suite: ImageAsciiConverter ⚡
+⚡ Eidosian Test Suite: ImageGlyphConverter ⚡
 
 A brutally efficient, surgically precise test suite that validates
-every aspect of the ASCII art conversion pipeline with zero redundancy.
+every aspect of the Glyph art conversion pipeline with zero redundancy.
 Each test serves a specific purpose with crystalline clarity.
 """
 import pytest
@@ -14,7 +14,7 @@ from PIL import Image
 import tempfile
 import shutil
 
-from glyph_forge.services.image_to_ascii import ImageAsciiConverter, ColorMode
+from glyph_forge.services.image_to_glyph import ImageGlyphConverter, ColorMode
 
 
 @pytest.fixture(scope="class")
@@ -58,17 +58,17 @@ def test_images() -> dict:
 @pytest.fixture
 def mock_alphabet_manager() -> mock.MagicMock:
     """Mock the AlphabetManager to provide deterministic outputs."""
-    with mock.patch('glyph_forge.services.image_to_ascii.AlphabetManager') as mock_manager:
+    with mock.patch('glyph_forge.services.image_to_Glyph.AlphabetManager') as mock_manager:
         mock_manager.list_available_alphabets.return_value = ["standard", "blocks"]
         mock_manager.get_alphabet.return_value = "$@B%8&WM"
         yield mock_manager
 
 
-class TestImageAsciiConverter:
+class TestImageGlyphConverter:
     """
-    Surgical verification of the ImageAsciiConverter class.
+    Surgical verification of the ImageGlyphConverter class.
     
-    This test suite methodically dissects every component of the ASCII conversion
+    This test suite methodically dissects every component of the Glyph conversion
     pipeline to ensure flawless performance, handling edge cases with precision
     and validating core functionality with maximum efficiency.
     """
@@ -77,7 +77,7 @@ class TestImageAsciiConverter:
     
     def test_init_default_parameters(self, mock_alphabet_manager: mock.MagicMock) -> None:
         """🎛️ Verify default parameters initialize correctly."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         
         assert converter.width == 100
         assert converter.height is None
@@ -91,7 +91,7 @@ class TestImageAsciiConverter:
     
     def test_init_custom_parameters(self, mock_alphabet_manager: mock.MagicMock) -> None:
         """🎮 Verify custom parameters are precisely applied."""
-        converter = ImageAsciiConverter(
+        converter = ImageGlyphConverter(
             charset="@#$%",
             width=80,
             height=40,
@@ -114,7 +114,7 @@ class TestImageAsciiConverter:
     
     def test_parameter_bounds(self, mock_alphabet_manager: mock.MagicMock) -> None:
         """🛡️ Verify input sanitization enforces parameter boundaries."""
-        converter = ImageAsciiConverter(
+        converter = ImageGlyphConverter(
             width=-10,         # Should clamp to 1
             height=0,          # Should clamp to 1
             brightness=3.0,    # Should clamp to 2.0
@@ -128,15 +128,15 @@ class TestImageAsciiConverter:
     
     def test_invert_charset(self, mock_alphabet_manager: mock.MagicMock) -> None:
         """🔄 Verify charset inversion for brightness reversal."""
-        normal = ImageAsciiConverter(charset="ABCDE", invert=False)
-        inverted = ImageAsciiConverter(charset="ABCDE", invert=True)
+        normal = ImageGlyphConverter(charset="ABCDE", invert=False)
+        inverted = ImageGlyphConverter(charset="ABCDE", invert=True)
         
         assert normal.charset == "ABCDE"
         assert inverted.charset == "EDCBA"
     
     def test_predefined_charset(self, mock_alphabet_manager: mock.MagicMock) -> None:
         """📚 Verify predefined charset loading from AlphabetManager."""
-        converter = ImageAsciiConverter(charset="standard")
+        converter = ImageGlyphConverter(charset="standard")
         
         mock_alphabet_manager.get_alphabet.assert_called_with("standard")
         assert converter.charset is not None
@@ -145,7 +145,7 @@ class TestImageAsciiConverter:
     
     def test_load_image_from_path(self, test_images: dict) -> None:
         """📂 Verify image loading from filesystem path."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         img = converter._load_image(test_images['white']['path'])
         
         assert isinstance(img, Image.Image)
@@ -154,19 +154,19 @@ class TestImageAsciiConverter:
     
     def test_load_image_from_pil(self, test_images: dict) -> None:
         """🖼️ Verify image loading from PIL Image object."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         img = converter._load_image(test_images['white']['img'])
         
         assert isinstance(img, Image.Image)
         assert img.mode == 'L'  # Grayscale
         assert img.size == (100, 100)
     
-    @mock.patch('glyph_forge.services.image_to_ascii.shutil.get_terminal_size')
+    @mock.patch('glyph_forge.services.image_to_Glyph.shutil.get_terminal_size')
     def test_terminal_scaling(self, mock_get_terminal_size: mock.MagicMock) -> None:
         """📏 Verify output auto-scales to terminal dimensions."""
         mock_get_terminal_size.return_value = (50, 25)  # Width, height
         
-        converter = ImageAsciiConverter(width=100, auto_scale=True)
+        converter = ImageGlyphConverter(width=100, auto_scale=True)
         scaled_width, scaled_height = converter._apply_terminal_scaling(100, 50)
         
         assert scaled_width == 48  # 50-2 for margin
@@ -174,7 +174,7 @@ class TestImageAsciiConverter:
     
     def test_brightness_contrast_adjustment(self, test_images: dict) -> None:
         """🔆 Verify brightness and contrast transforms pixel values."""
-        converter = ImageAsciiConverter(brightness=1.5, contrast=1.2)
+        converter = ImageGlyphConverter(brightness=1.5, contrast=1.2)
         
         adjusted = converter._apply_image_adjustments(test_images['gradient']['img'])
         
@@ -189,7 +189,7 @@ class TestImageAsciiConverter:
     
     def test_convert_basic(self, test_images: dict) -> None:
         """✨ Verify end-to-end conversion of uniform image."""
-        converter = ImageAsciiConverter(width=10, height=5, auto_scale=False)
+        converter = ImageGlyphConverter(width=10, height=5, auto_scale=False)
         
         # Force deterministic output with single-character map
         converter.charset = "@"
@@ -202,7 +202,7 @@ class TestImageAsciiConverter:
     
     def test_image_processing_pipeline(self, test_images: dict) -> None:
         """⚙️ Verify dimension calculations in processing pipeline."""
-        converter = ImageAsciiConverter(width=20, height=10, auto_scale=False)
+        converter = ImageGlyphConverter(width=20, height=10, auto_scale=False)
         
         result = converter._process_image(test_images['gradient']['img'])
         lines = result.strip().split('\n')
@@ -210,14 +210,14 @@ class TestImageAsciiConverter:
         assert len(lines) == 10  # Output height matches specification
         assert len(lines[0]) == 20  # Output width matches specification
     
-    @mock.patch('glyph_forge.services.image_to_ascii.ThreadPoolExecutor')
+    @mock.patch('glyph_forge.services.image_to_Glyph.ThreadPoolExecutor')
     def test_parallel_conversion(self, mock_executor: mock.MagicMock) -> None:
         """⚡ Verify multi-threaded processing for large images."""
         mock_map = mock.MagicMock()
         mock_map.return_value = ["line1", "line2", "line3"]
         mock_executor.return_value.__enter__.return_value.map = mock_map
         
-        converter = ImageAsciiConverter(threads=3)
+        converter = ImageGlyphConverter(threads=3)
         pixels = np.zeros((100, 50), dtype=np.uint8)
         
         result = converter._parallel_conversion(pixels)
@@ -229,10 +229,10 @@ class TestImageAsciiConverter:
     
     def test_save_to_file(self) -> None:
         """💾 Verify file output with proper encoding."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_path = os.path.join(tmp_dir, "output.txt")
-            test_content = "Test ASCII Art with Unicode: ░▒▓█"
+            test_content = "Test Glyph Art with Unicode: ░▒▓█"
             
             converter._save_to_file(test_content, output_path)
             
@@ -244,9 +244,9 @@ class TestImageAsciiConverter:
     @mock.patch('os.makedirs')
     def test_save_creates_directory(self, mock_makedirs: mock.MagicMock) -> None:
         """📁 Verify directory creation when saving to new path."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         output_path = "/some/new/path/output.txt"
-        test_content = "Test ASCII Art"
+        test_content = "Test Glyph Art"
         
         converter._save_to_file(test_content, output_path)
         
@@ -256,7 +256,7 @@ class TestImageAsciiConverter:
     
     def test_set_charset(self) -> None:
         """🔡 Verify charset reconfiguration after initialization."""
-        converter = ImageAsciiConverter(charset="ABC")
+        converter = ImageGlyphConverter(charset="ABC")
         
         # Set a new charset with inversion
         converter.set_charset("XYZ", invert=True)
@@ -265,7 +265,7 @@ class TestImageAsciiConverter:
     
     def test_set_image_params(self) -> None:
         """⚙️ Verify runtime parameter updates."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         
         # Update all parameters at once
         converter.set_image_params(
@@ -291,7 +291,7 @@ class TestImageAsciiConverter:
     
     def test_color_conversion_ansi(self, test_images: dict) -> None:
         """🌈 Verify ANSI color code generation."""
-        converter = ImageAsciiConverter(width=5, height=5, auto_scale=False)
+        converter = ImageGlyphConverter(width=5, height=5, auto_scale=False)
         
         # Force predictable character output
         converter.charset = "#"
@@ -305,7 +305,7 @@ class TestImageAsciiConverter:
     
     def test_color_conversion_html(self, test_images: dict) -> None:
         """🖥️ Verify HTML color formatting."""
-        converter = ImageAsciiConverter(width=5, height=5, auto_scale=False)
+        converter = ImageGlyphConverter(width=5, height=5, auto_scale=False)
         
         # Force predictable character output
         converter.charset = "#"
@@ -321,7 +321,7 @@ class TestImageAsciiConverter:
     
     def test_color_conversion_none(self, test_images: dict) -> None:
         """⚪ Verify grayscale fallback for 'none' color mode."""
-        converter = ImageAsciiConverter(width=5, height=5, auto_scale=False)
+        converter = ImageGlyphConverter(width=5, height=5, auto_scale=False)
         
         with mock.patch.object(converter, 'convert') as mock_convert:
             mock_convert.return_value = "standard conversion"
@@ -336,14 +336,14 @@ class TestImageAsciiConverter:
     @mock.patch('builtins.open', side_effect=IOError("Simulated IO error"))
     def test_save_error_handling(self, mock_open: mock.MagicMock) -> None:
         """❌ Verify appropriate error propagation on file save failure."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         
         with pytest.raises(Exception):
             converter._save_to_file("content", "test_path")
     
     def test_error_handling_invalid_image_path(self) -> None:
         """⚠️ Verify graceful handling of nonexistent image paths."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         result = converter.convert("nonexistent_image.png")
         
         assert result.startswith("Error converting image")
@@ -352,7 +352,7 @@ class TestImageAsciiConverter:
     @mock.patch('PIL.Image.open', side_effect=IOError("Simulated IO error"))
     def test_convert_error_handling(self, mock_open: mock.MagicMock) -> None:
         """🛡️ Verify conversion failures produce informative messages."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         result = converter.convert("test.png")
         
         assert result.startswith("Error converting image")
@@ -362,7 +362,7 @@ class TestImageAsciiConverter:
     
     def test_get_available_charsets(self) -> None:
         """📋 Verify charset list retrieval with copy protection."""
-        converter = ImageAsciiConverter()
+        converter = ImageGlyphConverter()
         converter._available_charsets = ["standard", "blocks", "detailed"]
         
         charsets = converter.get_available_charsets()

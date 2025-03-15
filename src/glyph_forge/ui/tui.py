@@ -2,7 +2,7 @@
 """
 ⚡ Glyph Forge TUI ⚡
 
-Hyper-efficient terminal user interface for ASCII art transformation.
+Hyper-efficient terminal user interface for Glyph art transformation.
 """
 from textual.app import App
 from textual.widgets import Header, Footer, Static, Button, Input, FileInput
@@ -10,13 +10,13 @@ from textual.containers import Container, Horizontal, Vertical, Grid
 from textual.screen import Screen
 from textual.reactive import reactive
 
-from ..api.ascii_api import get_api
+from ..api.glyph_api import get_api
 
-class ASCIIForgeApp(App):
+class GlyphForgeApp(App):
     """Glyph Forge TUI application with zero-compromise user experience."""
     
     TITLE = "⚡ Glyph Forge ⚡"
-    SUB_TITLE = "Eidosian ASCII Art Transformation"
+    SUB_TITLE = "Eidosian Glyph Art Transformation"
     CSS_PATH = "glyph_forge.css"
     
     def compose(self):
@@ -90,7 +90,7 @@ class ImageConverterScreen(Screen):
         yield Header()
         yield Container(
             Vertical(
-                Static("Image to ASCII Converter", classes="screen_title"),
+                Static("Image to Glyph Converter", classes="screen_title"),
                 FileInput(id="image_file"),
                 Horizontal(
                     Button("Convert", id="btn_convert"),
@@ -112,7 +112,7 @@ class ImageConverterScreen(Screen):
             if file_path:
                 api = get_api()
                 try:
-                    result = api.image_to_ascii(file_path, width=80)
+                    result = api.image_to_Glyph(file_path, width=80)
                     self.query_one("#image_output").update(result)
                 except Exception as e:
                     self.query_one("#image_output").update(f"Error: {str(e)}")

@@ -1,7 +1,7 @@
 """
 ⚡ Glyph Forge Banner Generator ⚡
 
-Core engine for transforming ordinary text into extraordinary ASCII art banners.
+Core engine for transforming ordinary text into extraordinary Glyph art banners.
 This module implements the atomic operations necessary for banner generation
 with maximum efficiency and surgical precision.
 
@@ -41,7 +41,7 @@ class BannerGenerator:
     """
     Core banner generation engine for Glyph Forge.
     
-    Transforms text into ASCII art banners with customizable styles through
+    Transforms text into Glyph art banners with customizable styles through
     a hyper-optimized rendering pipeline. Each generated banner maintains
     pixel-perfect proportions while allowing for extensive customization.
     
@@ -59,7 +59,7 @@ class BannerGenerator:
         "double": "╔╗╝╚║═",      # ╔═══╗
         "rounded": "╭╮╯╰│─",     # ╭───╮
         "heavy": "┏┓┛┗┃━",       # ┏━━━┓
-        "ascii": "++-+||"        # +---+
+        "Glyph": "++-+||"        # +---+
     }
     
     # Predefined style configurations
@@ -195,13 +195,13 @@ class BannerGenerator:
                 effects: Optional[List[str]] = None,
                 color: bool = False) -> str:
         """
-        Generate an ASCII art banner from input text.
+        Generate an Glyph art banner from input text.
         
-        This function performs the core text-to-ASCII-art transformation
+        This function performs the core text-to-Glyph-art transformation
         with precise style application and optimized rendering.
         
         Args:
-            text: Input text to transform into ASCII art
+            text: Input text to transform into Glyph art
             style: Style preset name (default: "minimal")
             padding: Custom (vertical, horizontal) padding
             border: Border style override
@@ -210,13 +210,13 @@ class BannerGenerator:
             color: Enable ANSI color output
             
         Returns:
-            Fully styled and processed ASCII art banner
+            Fully styled and processed Glyph art banner
             
         Raises:
             ValueError: For invalid style or configuration parameters
         """
         # Input validation and sanitization
-        from ..utils.ascii_utils import sanitize_text
+        from ..utils.glyph_utils import sanitize_text
         clean_text = sanitize_text(text)
         
         # Performance optimization via caching
@@ -231,12 +231,12 @@ class BannerGenerator:
             self._maintain_cache()
         
         # Core rendering process
-        ascii_art = self.figlet.renderText(clean_text)
+        Glyph_art = self.figlet.renderText(clean_text)
         self._render_count += 1
         
         # Style application
         styled_art = self._apply_styling(
-            ascii_art,
+            Glyph_art,
             style=style,
             custom_padding=padding,
             custom_border=border,
@@ -302,17 +302,17 @@ class BannerGenerator:
         logger.debug(f"Cache maintenance: removed {len(expired_keys)} expired entries")
     
     def _apply_styling(self, 
-                      ascii_art: str, 
+                      Glyph_art: str, 
                       style: str,
                       custom_padding: Optional[Tuple[int, int]] = None,
                       custom_border: Optional[str] = None,
                       custom_alignment: Optional[str] = None,
                       custom_effects: List[str] = None) -> str:
         """
-        Apply comprehensive styling to raw ASCII art.
+        Apply comprehensive styling to raw Glyph art.
         
         Args:
-            ascii_art: Raw ASCII art text
+            Glyph_art: Raw Glyph art text
             style: Style preset name
             custom_padding: Override for padding
             custom_border: Override for border style
@@ -320,13 +320,13 @@ class BannerGenerator:
             custom_effects: Override for special effects
             
         Returns:
-            Styled ASCII art
+            Styled Glyph art
         """
         # Get style configuration (preset or custom)
         if style in self.STYLE_PRESETS:
             style_config = self.STYLE_PRESETS[style].copy()
         else:
-            from ..utils.ascii_utils import resolve_style
+            from ..utils.glyph_utils import resolve_style
             style_config = resolve_style(style)
         
         # Apply overrides if provided
@@ -340,7 +340,7 @@ class BannerGenerator:
             style_config["effects"] = custom_effects
             
         # Process the art with each styling component
-        processed_art = ascii_art
+        processed_art = Glyph_art
         
         # Apply alignment
         processed_art = self._align_text(processed_art, style_config["alignment"])
@@ -407,9 +407,9 @@ class BannerGenerator:
         # Get border characters
         tl, tr, br, bl, v, h = self.BORDER_SETS[border_style]
         
-        # If using Unicode and terminal doesn't support it, fall back to ASCII
+        # If using Unicode and terminal doesn't support it, fall back to Glyph
         if not self._unicode_supported and any(ord(c) > 127 for c in self.BORDER_SETS[border_style]):
-            tl, tr, br, bl, v, h = "++-+||"  # ASCII fallback
+            tl, tr, br, bl, v, h = "++-+||"  # Glyph fallback
         
         bordered_lines = []
         # Top border

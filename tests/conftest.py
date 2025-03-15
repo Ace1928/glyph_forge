@@ -35,7 +35,7 @@ def test_images() -> Generator[Dict[str, Any], None, None]:
     Generate pristine test images for conversion validation.
     
     This fixture creates the absolute minimum set of test images needed to
-    comprehensively verify the ASCII conversion pipeline - a white square, 
+    comprehensively verify the Glyph conversion pipeline - a white square, 
     a gradient, and an RGB test pattern.
     
     Returns:

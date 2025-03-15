@@ -2,11 +2,11 @@
 """
 ⚡ GLYPH FORGE - EIDOSIAN IMAGIZER ⚡
 
-Transform ordinary images into extraordinary ASCII art
+Transform ordinary images into extraordinary Glyph art
 with surgical precision and maximum efficiency.
 
 This module provides a hyper-optimized command-line interface to the 
-Glyph Forge image-to-ASCII conversion engine with zero compromises
+Glyph Forge image-to-Glyph conversion engine with zero compromises
 on performance, features, or user experience.
 
 Designed with Eidosian principles:
@@ -35,16 +35,16 @@ sys.path.insert(0, str(project_root))
 
 # Handle imports with fallback mechanisms for maximum resilience
 try:
-    from glyph_forge.api.ascii_api import get_api
-    from glyph_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
-    from glyph_forge.services.image_to_ascii import ColorMode, ImageAsciiConverter
+    from glyph_forge.api.glyph_api import get_api
+    from glyph_forge.utils.glyph_utils import detect_text_color_support, get_terminal_size
+    from glyph_forge.services.image_to_glyph import ColorMode, ImageGlyphConverter
     from glyph_forge.utils.alphabet_manager import AlphabetManager
 except ImportError:
     # Direct import attempt for development scenarios
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-    from src.glyph_forge.api.ascii_api import get_api
-    from src.glyph_forge.utils.ascii_utils import detect_text_color_support, get_terminal_size
-    from src.glyph_forge.services.image_to_ascii import ImageAsciiConverter
+    from src.glyph_forge.api.glyph_api import get_api
+    from src.glyph_forge.utils.glyph_utils import detect_text_color_support, get_terminal_size
+    from glyph_forge.services.image_to_glyph import ImageGlyphConverter
     from src.glyph_forge.utils.alphabet_manager import AlphabetManager
 
 
@@ -83,8 +83,8 @@ class Style:
 
 class OutputFormat(Enum):
     """Supported output formats with descriptions for user discovery."""
-    TEXT = "plain ASCII in .txt file"
-    ANSI = "terminal-colored ASCII with ANSI codes"
+    TEXT = "plain Glyph in .txt file"
+    ANSI = "terminal-colored Glyph with ANSI codes"
     HTML = "web-friendly HTML with CSS styling"
     
     def __str__(self) -> str:
@@ -310,9 +310,9 @@ def convert_image(
     optimize_contrast: bool = False
 ) -> str:
     """
-    Convert image to ASCII with atomic precision and intelligent defaults.
+    Convert image to Glyph with atomic precision and intelligent defaults.
     
-    This core function handles all image-to-ASCII conversion with maximum
+    This core function handles all image-to-Glyph conversion with maximum
     parameter flexibility and zero redundant operations.
     
     Args:
@@ -329,7 +329,7 @@ def convert_image(
         optimize_contrast: Whether to auto-optimize contrast
         
     Returns:
-        ASCII art as string
+        Glyph art as string
     
     Raises:
         ValueError: If image cannot be loaded or processed
@@ -339,14 +339,14 @@ def convert_image(
                  image_path, charset, width, color_mode)
     
     # Import here to avoid circular imports
-    from src.glyph_forge.services.image_to_ascii import ImageAsciiConverter
+    from glyph_forge.services.image_to_glyph import ImageGlyphConverter
     
     # Validate image exists
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image file not found: {image_path}")
     
     # Create converter with specified parameters
-    converter = ImageAsciiConverter(
+    converter = ImageGlyphConverter(
         charset=charset or "general",
         width=width or 100,
         height=height,
@@ -624,7 +624,7 @@ def show_version() -> None:
     """
     try:
         import importlib.metadata
-        version = importlib.metadata.version("ascii-forge")
+        version = importlib.metadata.version("glyph-forge")
     except (ImportError, ModuleNotFoundError):
         try:
             from glyph_forge import __version__
@@ -702,7 +702,7 @@ def main() -> int:
             print(error_msg, file=sys.stderr)
         return 1
     
-    # Generate ASCII art from image
+    # Generate Glyph art from image
     try:
         # Calculate dimensions if needed
         width = args.width
@@ -762,7 +762,7 @@ if __name__ == "__main__":
 
 # Create the Typer app instance that's imported in __init__.py
 app = typer.Typer(
-    help="Transform images into ASCII art with zero compromise",
+    help="Transform images into Glyph art with zero compromise",
     add_completion=True,
 )
 
@@ -778,7 +778,7 @@ def convert(
     output: str = typer.Option(None, "--output", "-o", help="Save to file"),
     optimize: bool = typer.Option(False, "--optimize", help="Auto-optimize contrast"),
 ):
-    """Convert an image into spectacular ASCII art."""
+    """Convert an image into spectacular Glyph art."""
     try:
         result = convert_image(
             image_path=image,
@@ -795,7 +795,7 @@ def convert(
         if not output:
             print(result)
         else:
-            print(f"ASCII art saved to {output}")
+            print(f"Glyph art saved to {output}")
             
     except Exception as e:
         print(f"Error: {str(e)}")

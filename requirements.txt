@@ -1,6 +1,6 @@
 # ⚡ Glyph Forge Requirements ⚡
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Zero-compromise ASCII art transformation system
+# Zero-compromise glyph art transformation system
 # Crafted with quantum precision by Neuroforge 🌀
 
 # 🖼️ Core imaging & processing
@@ -8,7 +8,7 @@ pillow>=9.0.0            # Image processing with adaptive precision
 numpy>=1.26.0            # N-dimensional array operations at quantum speed
 
 # 🎨 Terminal rendering & interaction
-pyfiglet>=0.8.0          # Text-to-ASCII art transformation
+pyfiglet>=0.8.0          # Text-to-glyph art transformation
 colorama>=0.4.6          # Cross-platform ANSI color support
 rich>=13.7.0             # Terminal formatting with contextual intelligence
 typer>=0.9.0             # CLI framework with ergonomic perfection
@@ -47,4 +47,4 @@ typer>=0.9.0             # CLI framework with ergonomic perfection
 # Eidos <syntheticeidos@gmail.com>
 # Repository: https://github.com/Ace1928/glyph_forge
 #
-# "Where pixels converge to their ASCII essence" - Eidos
+# "Where pixels converge to their glyph essence" - Eidos
