@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""
-Glyph Stream - Dimensional Unicode Art Transmutation Engine.
+"""Glyph Stream - Dimensional Unicode Art Transmutation Engine.
 
-A hyper-dimensional terminal rendering system for transforming visual content
-into prismatic Unicode art with adaptive quality, edge detection, and real-time
-streaming capabilities.
+A high-performance terminal rendering system for transforming visual content into
+elegant Unicode art with adaptive quality, edge detection, and real-time streaming.
+
+Features:
+    - Multi-algorithm edge detection with directional awareness
+    - Adaptive quality scaling based on system capabilities
+    - Real-time performance monitoring and optimization
+    - Concurrent processing with intelligent resource management
+    - Comprehensive caching for enhanced performance
 
 Attributes:
     THREAD_POOL: Global executor for concurrent operations
@@ -12,67 +17,75 @@ Attributes:
 """
 from __future__ import annotations
 
-import collections
-import functools
-import io
-import json
-import math
+# Standard library imports - organized by functionality
 import os
-import platform
-import re
-import shlex
-import shutil
-import socket
-import argparse
-import subprocess
 import sys
+import re
+import io
+import math
+import json
+import time
+import uuid
+import shlex
+import socket
+import shutil
+import platform
 import tempfile
 import threading
-import time
 import traceback
+import functools
 import unicodedata
-import uuid
+import collections
+import subprocess
+import argparse
+from datetime import datetime
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum, IntEnum, auto
 from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any, Dict, List, Literal, Mapping, NamedTuple, 
-    Optional, Tuple, TypedDict, TypeVar, Union, cast, Callable
+    Optional, Tuple, TypedDict, TypeVar, Union, cast
 )
 
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+# Third-party imports - with robust error handling
+try:
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+    print("Warning: PIL/Pillow not found. Image processing disabled.")
 
-# Optimized thread pool with adaptive worker count based on system capabilities
+# Create optimized thread pool with system-aware worker count
 THREAD_POOL = ThreadPoolExecutor(
     max_workers=min(32, (os.cpu_count() or 4) * 2),
     thread_name_prefix="glyph_worker"
 )
 
-# Type variables for generic operations
-T = TypeVar('T')
-R = TypeVar('R')
-
-# Domain-specific type aliases for semantic clarity
-Milliseconds = float
-Seconds = float
-Density = float  # 0.0-1.0 normalized value
-RGB = Tuple[int, int, int]
-GradientMap = Dict[str, str]
+# Type definitions for enhanced clarity and type checking
+T = TypeVar('T')  # Generic type
+R = TypeVar('R')  # Return type
+Milliseconds = float  # Time in milliseconds
+Seconds = float       # Time in seconds
+Density = float       # Normalized value between 0.0-1.0
+RGB = Tuple[int, int, int]  # RGB color components
+GradientMap = Dict[str, str]  # Character gradient mapping
 
 
 class EdgeDetector(Enum):
     """Edge detection algorithms optimized for different visual characteristics.
     
+    Each algorithm provides specific advantages for different image types,
+    automatically optimizing parameters based on content and system capabilities.
+    
     Attributes:
-        SOBEL: Balanced sensitivity, good general purpose
-        PREWITT: Enhanced noise stability, better for high-contrast images
-        SCHARR: Superior rotational symmetry for detecting diagonal edges
-        LAPLACIAN: Omnidirectional detection with detail preservation
-        CANNY: Maximum precision with hysteresis thresholding
+        SOBEL: Balanced sensitivity with good all-around performance
+        PREWITT: Improved noise handling for high-contrast images
+        SCHARR: Enhanced diagonal edge detection with rotational symmetry
+        LAPLACIAN: Omnidirectional edge detection with detail preservation
+        CANNY: Maximum precision with hysteresis thresholding and noise filtering
     """
     SOBEL = auto()
     PREWITT = auto()
@@ -82,13 +95,16 @@ class EdgeDetector(Enum):
 
 
 class GradientResult(TypedDict):
-    """Edge detection result with normalized gradient components.
+    """Comprehensive edge detection result with vectorized components.
     
-    Args:
-        magnitude: Normalized edge magnitude array [0-255]
-        gradient_x: X-component gradient vector array
-        gradient_y: Y-component gradient vector array
-        direction: Gradient direction in radians array
+    Contains complete edge detection data including magnitude, directional
+    components and gradient vectors for advanced rendering techniques.
+    
+    Attributes:
+        magnitude: Normalized edge intensity array (0-255)
+        gradient_x: Horizontal gradient component array
+        gradient_y: Vertical gradient component array
+        direction: Angular direction array in radians
     """
     magnitude: np.ndarray
     gradient_x: np.ndarray
@@ -97,14 +113,17 @@ class GradientResult(TypedDict):
 
 
 class QualityLevel(IntEnum):
-    """Quality levels for adaptive rendering with performance optimization.
+    """Quality presets for adaptive rendering with performance optimization.
+    
+    Provides standardized quality levels for dynamic adjustment based on
+    system capabilities and real-time performance metrics.
     
     Attributes:
-        MINIMAL: Lowest quality, maximum performance
-        LOW: Reduced quality for constrained systems
-        STANDARD: Balanced quality/performance for typical use
-        HIGH: Enhanced quality for capable systems
-        MAXIMUM: Highest quality, performance intensive
+        MINIMAL: Lowest quality, maximum performance for constrained systems
+        LOW: Reduced quality with better performance
+        STANDARD: Balanced quality/performance for typical usage
+        HIGH: Enhanced quality with more detail for capable systems
+        MAXIMUM: Highest quality with maximum detail, more resource-intensive
     """
     MINIMAL = 0
     LOW = 1
@@ -114,15 +133,18 @@ class QualityLevel(IntEnum):
 
 
 class VideoInfo(NamedTuple):
-    """Video metadata with validated fields for consistent stream handling.
+    """Video metadata container with normalized fields for stream handling.
+    
+    Provides comprehensive metadata for video sources with validation
+    and normalization to ensure consistent stream processing.
     
     Attributes:
-        url: Optional source URL for remote streams
-        title: Video title or identifier
-        duration: Duration in seconds
-        format: Media format identifier
-        width: Video width in pixels
-        height: Video height in pixels
+        url: Source URL for remote streams
+        title: Video title or identifier string
+        duration: Total duration in seconds
+        format: Media format identifier string
+        width: Video frame width in pixels
+        height: Video frame height in pixels
         fps: Frames per second
     """
     url: Optional[str] = None
@@ -135,48 +157,58 @@ class VideoInfo(NamedTuple):
 
     @classmethod
     def from_capture(cls, capture: Any, source_name: str, stream_format: str) -> VideoInfo:
-        """Create VideoInfo from capture device with validated metadata.
+        """Extract metadata from capture device with validation.
+        
+        Creates a VideoInfo instance from an OpenCV capture object with
+        safe extraction and normalization of properties.
         
         Args:
-            capture: OpenCV capture object
-            source_name: Name of the source (URL/device)
-            stream_format: Format identifier
+            capture: OpenCV video capture object
+            source_name: Source identifier string
+            stream_format: Format identifier string
         
         Returns:
-            VideoInfo: Validated instance with device metadata
+            VideoInfo: Normalized metadata instance
         """
+        width, height, fps = None, None, None
+        
         try:
             import cv2
             width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = float(capture.get(cv2.CAP_PROP_FPS))
             
-            # Normalize values with validation
-            fps = 30.0 if fps <= 0 or fps > 1000 else fps
+            # Validate and normalize values
+            width = width if width > 0 else None
+            height = height if height > 0 else None
+            fps = fps if 0 < fps < 1000 else 30.0
+        except Exception:
+            pass
             
-            return cls(
-                title=str(source_name),
-                format=stream_format,
-                width=width if width > 0 else None,
-                height=height if height > 0 else None,
-                fps=fps
-            )
-        except (ImportError, AttributeError, ValueError):
-            return cls(title=str(source_name), format=stream_format)
+        return cls(
+            title=str(source_name),
+            format=stream_format,
+            width=width,
+            height=height,
+            fps=fps
+        )
 
 
 @dataclass(frozen=True)
 class PerformanceStats:
-    """Performance metrics for runtime analysis and optimization.
+    """Immutable performance metrics for analytics and optimization.
+    
+    Contains comprehensive performance data for monitoring, analysis,
+    and adaptive quality management with consistent metrics.
     
     Attributes:
-        avg_render_time: Average rendering time in milliseconds
-        avg_fps: Average frames per second
-        effective_fps: Overall frames per second
-        total_frames: Total number of frames processed
-        dropped_frames: Number of frames dropped
-        drop_ratio: Ratio of dropped frames (0.0-1.0)
-        stability: Rendering consistency rating (0.0-1.0)
+        avg_render_time: Mean rendering duration in milliseconds
+        avg_fps: Mean frames per second over sample window
+        effective_fps: Overall frames per second across entire runtime
+        total_frames: Total successfully processed frames
+        dropped_frames: Number of frames that couldn't be processed in time
+        drop_ratio: Proportion of dropped frames (0.0-1.0)
+        stability: Consistency rating for frame timing (0.0-1.0)
     """
     avg_render_time: float
     avg_fps: float
@@ -187,7 +219,7 @@ class PerformanceStats:
     stability: float
 
 
-# Standard color mapping with normalized RGB values
+# Standard color mapping with semantic names and normalized RGB values
 COLOR_MAP: Mapping[str, RGB] = {
     "red": (255, 0, 0),
     "green": (0, 255, 0),
@@ -204,90 +236,75 @@ COLOR_MAP: Mapping[str, RGB] = {
 }
 
 
-class ModuleRegistry:
-    """Thread-safe registry for dynamic module imports with optimized caching.
-    
-    Provides efficient access to optional dependencies with graceful fallbacks
-    and comprehensive error handling. Ensures modules are loaded only when
-    needed and shared across threads with proper synchronization.
-    """
-    _cache: Dict[str, Any] = {}
-    _lock = threading.RLock()
-    
-    @classmethod
-    def import_module(cls, module_name: str, package: Optional[str] = None) -> Any:
-        """Import module with thread-safe caching and error handling.
-        
-        Args:
-            module_name: Module name to import
-            package: Optional specific package from module
-            
-        Returns:
-            Any: Imported module/attribute or None if unavailable
-        """
-        cache_key = f"{module_name}.{package}" if package else module_name
-        
-        # Fast path for cached modules
-        with cls._lock:
-            if cache_key in cls._cache:
-                return cls._cache[cache_key]
-        
-        # Import with comprehensive error handling
-        try:
-            if package:
-                module = __import__(module_name, fromlist=[package])
-                result = getattr(module, package)
-            else:
-                result = __import__(module_name)
-            
-            # Cache successful result
-            with cls._lock:
-                cls._cache[cache_key] = result
-            return result
-        except (ImportError, AttributeError):
-            # Cache failure to prevent repeated attempts
-            with cls._lock:
-                cls._cache[cache_key] = None
-            return None
+# Dynamic module imports with availability flags
+try:
+    import cv2
+    HAS_CV2 = True
+except ImportError:
+    cv2 = None
+    HAS_CV2 = False
 
+try:
+    import pyfiglet
+    HAS_PYFIGLET = True
+except ImportError:
+    pyfiglet = None
+    HAS_PYFIGLET = False
 
-# Optimized imports for core dependencies
-cv2 = ModuleRegistry.import_module("cv2")
-pyfiglet = ModuleRegistry.import_module("pyfiglet") 
-yt_dlp = ModuleRegistry.import_module("yt_dlp")
-colorama = ModuleRegistry.import_module("colorama")
-rich = ModuleRegistry.import_module("rich")
-psutil = ModuleRegistry.import_module("psutil")
-pyvirtualdisplay = ModuleRegistry.import_module("pyvirtualdisplay")
+try:
+    import yt_dlp
+    HAS_YT_DLP = True
+except ImportError:
+    yt_dlp = None
+    HAS_YT_DLP = False
 
-# Initialize terminal environment with cross-platform color support
-if colorama:
+try:
+    import colorama
     colorama.init(strip=False, convert=True)
+    HAS_COLORAMA = True
+except ImportError:
+    colorama = None
+    HAS_COLORAMA = False
 
-# Rich console initialization with graceful fallbacks
-if rich:
-    try:
-        from rich.console import Console, Group
-        from rich.panel import Panel
-        from rich.table import Table
-        from rich.text import Text
-        from rich.align import Align
-        from rich.prompt import Prompt, Confirm
-        CONSOLE = Console(highlight=True)
-    except ImportError:
-        CONSOLE = None
-else:
+try:
+    from rich.console import Console, Group
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+    from rich.align import Align
+    from rich.prompt import Prompt, Confirm
+    CONSOLE = Console(highlight=True)
+    HAS_RICH = True
+except ImportError:
     CONSOLE = None
+    HAS_RICH = False
+
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    psutil = None
+    HAS_PSUTIL = False
+
+try:
+    import pyvirtualdisplay
+    HAS_VIRTUAL_DISPLAY = True
+except ImportError:
+    pyvirtualdisplay = None
+    HAS_VIRTUAL_DISPLAY = False
 
 
 class TextStyle(Enum):
-    """Text rendering style presets for consistent formatting.
+    """Text rendering style presets with consistent parameter sets.
+    
+    Defines configurable style presets for text art generation with
+    comprehensive formatting parameters for various visual effects.
     
     Attributes:
-        SIMPLE: Basic text without effects
-        STYLED: Text with standard formatting
-        RAINBOW: Multi-color gradient effect
-        RANDOM: Randomized styling parameters
+        SIMPLE: Basic text without embellishments
+        STYLED: Text with standard formatting and borders
+        RAINBOW: Multi-color gradient effect with enhanced visuals
+        RANDOM: Randomized styling parameters for creative variation
     """
     SIMPLE = auto()
     STYLED = auto()
