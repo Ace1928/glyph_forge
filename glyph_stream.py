@@ -25,7 +25,6 @@ import re
 import shlex
 import shutil
 import socket
-import statistics
 import argparse
 import subprocess
 import sys
@@ -41,14 +40,9 @@ from datetime import datetime
 from enum import Enum, IntEnum, auto
 from functools import lru_cache
 from pathlib import Path
-from typing import (Any, Callable, Dict, List, Literal, NamedTuple, Optional, 
-                   Set, Tuple, TypedDict, TypeVar, Union, cast)
+from typing import Any, Dict, List, Literal, Mapping, NamedTuple, Optional, Tuple, TypedDict, TypeVar, Union
 
-from enum import Enum, auto
-from typing import Dict, List, Literal, Mapping, Optional, Tuple, Union, cast
 import random
-from typing import Dict, Literal, Optional, Protocol, Tuple, TypedDict, Union, cast, overload
-from enum import Enum, auto
 import numpy as np
 from PIL import Image
 import functools
@@ -69,12 +63,12 @@ class GradientResult(TypedDict):
     gradient_x: np.ndarray # X-component of gradient vector
     gradient_y: np.ndarray # Y-component of gradient vector
     direction: np.ndarray  # Gradient direction in radians (optional)
-
-
-class TextStyle(Enum):
-    """Standardized text rendering presets for consistent application."""
-    SIMPLE = auto()    # Basic text without decoration
-    STYLED = auto()    # Enhanced with color and borders
+class GradientResult(TypedDict):
+    """Edge detection result with normalized components."""
+    magnitude: np.ndarray[Any, np.dtype[np.uint8]]  # Normalized edge magnitude [0-255]
+    gradient_x: np.ndarray[Any, np.dtype[np.float64]]  # X-component of gradient vector
+    gradient_y: np.ndarray[Any, np.dtype[np.float64]]  # Y-component of gradient vector
+    direction: np.ndarray[Any, np.dtype[np.float64]]  # Gradient direction in radians (optional)
     RAINBOW = auto()   # Multi-color gradient effect
     RANDOM = auto()    # Randomized styling parameters
 
@@ -119,12 +113,18 @@ class VideoInfo(NamedTuple):
     title: str = "Unknown"
     duration: Optional[int] = None
     format: str = "unknown"
+class VideoInfo(NamedTuple):
+    """Immutable video metadata with validated fields."""
+    url: Optional[str] = None
+    title: str = "Unknown"
+    duration: Optional[int] = None
+    format: str = "unknown"
     width: Optional[int] = None
     height: Optional[int] = None
     fps: Optional[float] = None
 
     @classmethod
-    def from_capture(cls, capture, source_name: str, stream_format: str) -> 'VideoInfo':
+    def from_capture(cls, capture: Any, source_name: str, stream_format: str) -> 'VideoInfo':
         """Factory constructor to create VideoInfo from capture device.
         
         Args:
@@ -135,9 +135,12 @@ class VideoInfo(NamedTuple):
         Returns:
             Validated VideoInfo instance
         """
+        if cv2 is None:
+            return cls(title=str(source_name), format=stream_format)
+            
         width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = capture.get(cv2.CAP_PROP_FPS)
+        fps = float(capture.get(cv2.CAP_PROP_FPS))
         
         # Normalize values with validation
         fps = 30.0 if fps <= 0 or fps > 1000 else fps
@@ -149,12 +152,6 @@ class VideoInfo(NamedTuple):
             height=height if height > 0 else None,
             fps=fps
         )
-
-
-class PerformanceStats(TypedDict):
-    """Rich statistical performance metrics."""
-    avg_render_time: float
-    avg_fps: float
     effective_fps: float
     total_frames: int
     dropped_frames: int
@@ -236,19 +233,27 @@ if colorama:
 # Rich console initialization with fail-safe behavior
 if HAS_RICH:
     try:
+# Rich console initialization with fail-safe behavior
+if HAS_RICH:
+    try:
         from rich.console import Console, Group
         from rich.panel import Panel
         from rich.table import Table
         from rich.text import Text
         from rich.align import Align
         from rich.prompt import Prompt, Confirm
-        CONSOLE = Console(highlight=True)
+        console = Console(highlight=True)
+        CONSOLE = console  # For backward compatibility
     except ImportError:
+        console = None
         CONSOLE = None
 else:
+    console = None
     CONSOLE = None
 
-# System context singleton for global environment awareness
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ 🌌 Global System Context & Capability Analysis               
+# ╚══════════════════════════════════════════════════════════════╝
 class SystemContext:
     """Global system context with environment detection and capability analysis.
     
@@ -5446,22 +5451,38 @@ def main() -> None:
         SystemExit: With exit code 0 for clean exit, 1 for errors
     """
     try:
-        # Configure process for optimal performance
+        # Parse arguments or launch interactive menu
         options = parse_command_args() if len(sys.argv) > 1 else show_interactive_menu()
         
         # Exit if help requested or invalid args provided
         if not options:
             return
             
-        # Prepare output handlers in parallel
-        save_handler = THREAD_POOL.submit(
-            lambda: open(options["save_path"], 'w', encoding='utf-8') 
-            if "save_path" in options else None
-        ) if "save_path" in options else None
+        # Initialize output handler in parallel if saving to file
+        save_handler = (THREAD_POOL.submit(lambda: open(options["save_path"], 'w', encoding='utf-8'))
+                       if "save_path" in options else None)
         
-        # Dynamic dispatch based on source type
-        if options.get("video", False):
-            # Stream processing with optimized parameters
+        # Dynamic dispatch based on content type
+        if "text_content" in options:
+            # Text art rendering path
+            unicode_art = text_to_art(
+                text=options["text_content"],
+                font=options.get("font", "standard"),
+                color=options.get("color_name") if options.get("color", True) else None,
+                width=options.get("max_width", ENV.terminal["width"] - 4),
+                align=options.get("align", "center")
+            )
+            
+            # Apply border if requested
+            if options.get("add_border", False):
+                unicode_art = add_unicode_border(
+                    unicode_art, 
+                    resolve_color(options.get("color_name")),
+                    options.get("border_style", "single")
+                )
+                
+        elif options.get("video", False):
+            # Video/stream processing path
             process_video_stream(
                 source=options["source"],
                 scale_factor=options["scale"],
@@ -5476,8 +5497,36 @@ def main() -> None:
                 adaptive_quality=options.get("adaptive_quality", True),
                 border=options.get("border", True)
             )
+            return  # Early return as stream processing handles its own output
+        elif options.get("render_engine") == "transformer":
+            # Transformer pipeline for advanced image processing
+            transformer = ArtTransformer(options["source"])
+            
+            # Apply transformations from options
+            for transform in options.get("transformations", []):
+                if transform == "optimize":
+                    transformer.optimize_for_terminal()
+                elif transform == "edge":
+                    transformer.with_edge_detection(
+                        threshold=options.get("edge_threshold", 50),
+                        algorithm=options.get("algorithm", "sobel"),
+                        enhanced=options.get("enhanced_edges", True)
+                    )
+                elif transform == "dither":
+                    transformer.with_dithering(True)
+                    
+            # Configure core parameters
+            transformer.with_scale(options["scale"])
+            transformer.with_block_size(
+                options.get("block_width", 8),
+                options.get("block_height", 8)
+            )
+            transformer.with_color(options["color"])
+            
+            # Generate art with transformer pipeline
+            unicode_art = transformer.render()
         else:
-            # Static content processing with intelligent output handling
+            # Standard image processing path
             unicode_art = generate_unicode_art(
                 image_path=options["source"],
                 scale_factor=options["scale"],
@@ -5491,50 +5540,66 @@ def main() -> None:
                 dithering=options.get("dithering", False),
                 auto_scale=options.get("auto_scale", True)
             )
-            
-            # Handle file output with concurrent I/O processing
-            if save_handler:
-                try:
-                    output_file = save_handler.result(timeout=2)
-                    
-                    # Process lines with specialized format handlers
-                    strip_ansi = options.get("output_format") not in ("ansi", "html")
-                    ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                    
-                    # Format-aware output processing
-                    for line in unicode_art:
-                        processed_line = ansi_pattern.sub('', line) if strip_ansi else line
-                        output_file.write(processed_line + '\n')
-                    
-                    # Close file and report success
-                    output_file.close()
-                    msg = f"✓ Art saved to: {options['save_path']}"
-                    print(f"[green]{msg}[/green]" if HAS_RICH else msg)
-                except Exception as e:
-                    error_msg = f"🚫 Error saving file: {str(e)}"
-                    print(f"[red]{error_msg}[/red]" if HAS_RICH else error_msg)
-            else:
-                # Direct terminal output with optimized buffer flushing
+
+        # Handle file output with concurrent I/O processing
+        if save_handler:
+            try:
+                output_file = save_handler.result(timeout=2)
+                strip_ansi = options.get("output_format") not in ("ansi", "html")
+                ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                
+                # Format-specific headers
+                if options.get("output_format") == "html":
+                    output_file.write('<html><head><meta charset="utf-8">'
+                                     '<style>pre{font-family:monospace;line-height:1}</style>'
+                                     '</head>\n<body><pre>\n')
+                
+                # Write content with efficient batching
                 for line in unicode_art:
-                    print(line, flush=False)  # Batch flush for performance
-                sys.stdout.flush()  # Single flush at end for efficiency
+                    processed_line = ansi_pattern.sub('', line) if strip_ansi else line
+                    output_file.write(processed_line + '\n')
+                
+                # Format-specific footers
+                if options.get("output_format") == "html":
+                    output_file.write('</pre></body></html>')
+                
+                output_file.close()
+                msg = f"✓ Art saved to: {options['save_path']}"
+                print(f"[green]{msg}[/green]" if HAS_RICH else msg)
+            except Exception as e:
+                error_msg = f"🚫 Error saving file: {str(e)}"
+                print(f"[red]{error_msg}[/red]" if HAS_RICH else error_msg)
+        else:
+            # Terminal output with optimized buffer usage
+            if HAS_RICH and CONSOLE:
+                CONSOLE.print("\n".join(unicode_art))
+            else:
+                for line in unicode_art:
+                    print(line)
+                sys.stdout.flush()
 
     except KeyboardInterrupt:
         print("\n👋 Dimensional transmutation interrupted", flush=True)
-        return
     except Exception as e:
-        # Enhanced error reporting with context
+        # Enhanced error handling with comprehensive fallbacks
         error_type = type(e).__name__
         error_msg = str(e) or "Unknown error"
         
-        if HAS_RICH:
-            CONSOLE.print(f"\n[bold red]🚫 {error_type}:[/bold red] {error_msg}")
-            if hasattr(e, "__traceback__") and options.get("debug"):
-                CONSOLE.print_exception()
-            CONSOLE.print("[yellow]💡 For troubleshooting, run with --help or in interactive mode[/yellow]")
-        else:
-            print(f"\n🚫 {error_type}: {error_msg}")
-            print("💡 Run with --help for usage information")
+        # Safe error reporting with nested exception handling
+        try:
+            if HAS_RICH and CONSOLE:
+                CONSOLE.print(f"\n[bold red]🚫 {error_type}:[/bold red] {error_msg}")
+                if "debug" in options and options["debug"] and hasattr(e, "__traceback__"):
+                    CONSOLE.print_exception()
+                CONSOLE.print("[yellow]💡 For troubleshooting, run with --help or in interactive mode[/yellow]")
+            else:
+                print(f"\n🚫 {error_type}: {error_msg}")
+                print("💡 Run with --help for usage information")
+        except Exception:
+            # Ultimate fallback for critical errors
+            print(f"\n🚫 Error: {error_type}: {error_msg}")
+            if "debug" in options and options["debug"]:
+                traceback.print_exc()
         sys.exit(1)
 
 
