@@ -2057,9 +2057,39 @@ class GlyphTextEngine:
 # Initialize the text engine with singleton access pattern
 TEXT_ENGINE = GlyphTextEngine.get_instance()
 
+
+
 # ╔══════════════════════════════════════════════════════════════╗
 # ║ 🎭 Text Transformation Functions                            ║
 # ╚══════════════════════════════════════════════════════════════╝
+
+def resolve_color(color: Optional[Union[str, Tuple[int, int, int]]]) -> Optional[Tuple[int, int, int]]:
+    """Convert color name or RGB tuple to normalized RGB tuple.
+    
+    Args:
+        color: Color name string or RGB tuple
+        
+    Returns:
+        Optional[Tuple[int, int, int]]: Normalized RGB tuple or None
+    """
+    if color is None:
+        return None
+        
+    if isinstance(color, tuple) and len(color) == 3:
+        return (
+            max(0, min(255, color[0])),
+            max(0, min(255, color[1])),
+            max(0, min(255, color[2]))
+        )
+        
+    if color:
+        # Try to get from the standard color map
+        color_lower = color.lower()
+        if color_lower in COLOR_MAP:
+            return COLOR_MAP[color_lower]
+            
+    # Default to white if color name not found
+    return COLOR_MAP.get("white")
 
 def text_to_art(
     text: str,
@@ -6199,16 +6229,30 @@ def main() -> None:
         # Exit if help requested or invalid args provided
         if not options:
             return
+            
+        # Enhanced debug visibility with system traversal
+        if options.get("debug", False):
+            if HAS_NUMPY:
+                np.show_config()
+            print(f"🔍 System tier: {ENV.capabilities['performance_tier']}")
+            print(f"📐 Terminal: {ENV.terminal['width']}×{ENV.terminal['height']}")
         
         # Typographical transmutation pathway
-        if "text_content" in options:
+        if "text" in options or "text_content" in options:
+            # Extract text with fallback priority chain
+            text_content = options.get("text_content") or options.get("text", "")
+            options["text_content"] = text_content
+            
             # Create text art with intelligent parameter extraction
             unicode_art = text_to_art(
-                text=options["text_content"],
+                text=text_content,
                 font=options.get("font", "standard"),
                 color=resolve_color(options.get("color_name")) if options.get("color", True) else None,
                 width=options.get("max_width", ENV.terminal["width"] - 4),
-                align=options.get("align", "center")
+                align=options.get("align", "center"),
+                collection_path="/home/lloyd/repos/glyph_forge/banner_text.md",
+                save_multiple_fonts=True,
+                font_count=20
             )
             
             # Apply border if requested with zero-overhead styling
@@ -6219,19 +6263,6 @@ def main() -> None:
                     options.get("border_style", "single")
                 )
                 
-            # Create transformer for banner collection integration
-            # This ensures typographical diversity across the collection
-            text_transformer = ArtTransformer(options["text_content"])
-            text_transformer.options.update({
-                "text_content": options["text_content"],
-                "render_engine": "text",
-                "font": options.get("font"),
-                "align": options.get("align", "center")
-            })
-            
-            # Persist typography to central banner codex with concurrency
-            THREAD_POOL.submit(text_transformer._append_to_banner_collection)
-            
         # Dimensional streaming pathway
         elif options.get("video", False):
             # Stream processing with dimensional optimization
@@ -6300,8 +6331,8 @@ def main() -> None:
                 gradient_str=options.get("gradient_str"),
                 color=options["color"],
                 enhanced_edges=options.get("enhanced_edges", True),
-                algorithm=options.get("algorithm", "canny"),
-                dithering=options.get("dithering", True),
+                algorithm=options.get("algorithm", "sobel"),
+                dithering=options.get("dithering", False),
                 auto_scale=options.get("auto_scale", True)
             )
 
@@ -6317,35 +6348,58 @@ def main() -> None:
         # Persistence pathway with format-aware transformation
         if "save_path" in options:
             try:
-                # Open output file with concurrent safety
-                with open(options["save_path"], 'w', encoding='utf-8') as output_file:
-                    # Determine stripping behavior based on format
-                    strip_ansi = options.get("output_format") not in ("ansi", "html")
-                    ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                # Special handling for text content to ensure banner archival
+                if "text_content" in options:
+                    # Save to specified path with proper banner formatting
+                    save_text_art_to_file(
+                        options["text_content"],
+                        unicode_art,
+                        options["save_path"]
+                    )
                     
-                    # Format-specific headers with perfect structure
-                    if options.get("output_format") == "html":
-                        output_file.write('<html><head><meta charset="utf-8">'
-                                         '<style>pre{font-family:monospace;line-height:1.2;background:#111;color:#eee}</style>'
-                                         '</head>\n<body><pre>\n')
-                    
-                    # Write content with efficient batching
-                    for line in unicode_art:
-                        processed_line = ansi_pattern.sub('', line) if strip_ansi else line
-                        output_file.write(processed_line + '\n')
-                    
-                    # Format-specific footers with clean closure
-                    if options.get("output_format") == "html":
-                        output_file.write('</pre></body></html>')
+                    # Always ensure text is archived in collection
+                    save_to_banner_collection(
+                        options["text_content"],
+                        "/home/lloyd/repos/glyph_forge/banner_text.md",
+                        True,  # Generate multiple font variants
+                        20     # Number of fonts to include
+                    )
+                else:
+                    # Standard file saving for images/other content
+                    with open(options["save_path"], 'w', encoding='utf-8') as output_file:
+                        # Determine stripping behavior based on format
+                        strip_ansi = options.get("output_format") not in ("ansi", "html")
+                        ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                        
+                        # Format-specific headers with perfect structure
+                        if options.get("output_format") == "html":
+                            output_file.write('<html><head><meta charset="utf-8">'
+                                            '<style>pre{font-family:monospace;line-height:1.2;background:#111;color:#eee}</style>'
+                                            '</head>\n<body><pre>\n')
+                        
+                        # Write content with efficient batching
+                        for line in unicode_art:
+                            processed_line = ansi_pattern.sub('', line) if strip_ansi else line
+                            output_file.write(processed_line + '\n')
+                        
+                        # Format-specific footers with clean closure
+                        if options.get("output_format") == "html":
+                            output_file.write('</pre></body></html>')
                 
                 # Success notification with minimal footprint
-                msg = f"✓ Dimensional artifact crystallized: {options['save_path']}"
-                print(f"[green]{msg}[/green]" if HAS_RICH else msg)
-                
+                msg = f"✨ Dimensional artifact crystallized: {options['save_path']}"
+                if HAS_RICH:
+                    CONSOLE.print(f"[green]{msg}[/green]")
+                else:
+                    print(msg)
+                    
             except Exception as e:
                 # Error with precise contextual framing
                 error_msg = f"🚫 Persistence failure: {str(e)}"
-                print(f"[red]{error_msg}[/red]" if HAS_RICH else error_msg)
+                if HAS_RICH:
+                    CONSOLE.print(f"[red]{error_msg}[/red]")
+                else:
+                    print(error_msg)
 
     except KeyboardInterrupt:
         # Elegant interruption handling with zero overhead
