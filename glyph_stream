@@ -1,386 +1,429 @@
 #!/usr/bin/env python3
-# Author metadata for consistent attribution
-AUTHOR_INFO = {
-    "name": "Lloyd Handyside",
-    "email": "ace1928@gmail.com",
-    "org": "Neuroforge",
-    "org_email": "lloyd.handyside@neuroforge.io",
-    "contributors": ["Eidos <syntheticeidos@gmail.com>"],
-    "version": "1.0.0",
-    "updated": "2025-03-16"
-}
-"""
-╔═════════════════════════════════════════════════════════════════════════════╗
-║  ██████╗ ██╗  ██╗   ██╗██████╗ ██╗  ██╗                                     ║
-║ ██╔════╝ ██║  ╚██╗ ██╔╝ ██╔══██╗██║  ██║                                     ║
-║ ██║  ███╗██║   ╚████╔╝ ██████╔╝███████║                                     ║
-║ ██║   ██║██║    ╚██╔╝  ██╔═══╝ ██╔══██║                                     ║
-║ ╚██████╔╝███████╗██║   ██║     ██║  ██║                                     ║
-║  ╚═════╝ ╚══════╝╚═╝   ╚═╝     ╚═╝  ╚═╝                                     ║
-║                                                                             ║
-║ ███████╗████████╗██████╗ ███████╗ █████╗ ███╗   ███╗                        ║
-║ ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██╔══██╗████╗ ████║                        ║
-║ ███████╗   ██║   ██████╔╝█████╗  ███████║██╔████╔██║                        ║
-║ ╚════██║   ██║   ██╔══██╗██╔══╝  ██╔══██║██║╚██╔╝██║                        ║
-║ ███████║   ██║   ██║  ██║███████╗██║  ██║██║ ╚═╝ ██║                        ║
-║ ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝                        ║
-║ ╔════════════════════════════════════════════════════════════════════════╗  ║
-║ ║              DIMENSIONAL GLYPH TRANSMUTATION ENGINE                    ║  ║
-║ ╚════════════════════════════════════════════════════════════════════════╝  ║
-╟─────────────────────────────────────────────────────────────────────────────╢
-║  Transform images and videos into edge-aware, color-rich Unicode art.        ║
-║  Maintainer: Lloyd Handyside (ace1928@gmail.com)                            ║
-║  Organization: Neuroforge (lloyd.handyside@neuroforge.io)                   ║
-║  Contributor: Eidos (syntheticeidos@gmail.com)                              ║
-║  GitHub: github.com/Ace1928                                                 ║
-║  License: MIT                                                               ║
-╚═════════════════════════════════════════════════════════════════════════════╝
-"""
-
-import argparse
-import sys
-import re
-import shutil
-import shlex
-import subprocess
-import random
-import traceback
-import uuid
-import tempfile
-import io
-import math
-import time
-import platform
-import os
-from pathlib import Path
-from typing import List, Tuple, Optional, Literal, Union, Dict, Any, cast
+import argparse, collections, io, json, math, os, platform, random, re, shlex
+import shutil, socket, subprocess, sys, tempfile, time, traceback, unicodedata, uuid
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
-import numpy as np
-from PIL import Image
-import pyfiglet
-import json
-import unicodedata
-import colorama
+# Conditional imports with elegant fallbacks
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+    
+try:
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
 
-import collections
-
-# ╔══════════════════════════════════════════════════════════════╗
-# ║ 📦 Adaptive Dependency Management                           ║
-# ╚══════════════════════════════════════════════════════════════╝
-
-# OpenCV for video processing
 try:
     import cv2
     HAS_CV2 = True
 except ImportError:
     HAS_CV2 = False
 
-# YouTube-DLP for streaming capabilities
+try:
+    import pyfiglet
+    HAS_FIGLET = True
+except ImportError:
+    HAS_FIGLET = False
+
 try:
     import yt_dlp
     HAS_YT_DLP = True
 except ImportError:
     HAS_YT_DLP = False
 
-# Rich for enhanced terminal output
+try:
+    import colorama
+    colorama.init()
+    HAS_COLORAMA = True
+except ImportError:
+    HAS_COLORAMA = False
+
 try:
     import rich
     from rich.console import Console, Group
-    from rich.progress import Progress, SpinnerColumn, TextColumn
     from rich.panel import Panel
     from rich.table import Table
-    from rich.prompt import Prompt, Confirm
-    from rich.markdown import Markdown
     from rich.text import Text
     from rich.align import Align
-    from rich.layout import Layout
-    CONSOLE = Console()
+    from rich.prompt import Prompt, Confirm
     HAS_RICH = True
+    CONSOLE = Console(highlight=True)
 except ImportError:
     HAS_RICH = False
+    CONSOLE = None
+
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
+
+try:
+    import pyvirtualdisplay
+    HAS_VIRTUAL_DISPLAY = True
+except ImportError:
+    HAS_VIRTUAL_DISPLAY = False
+
+# Unified module availability tracking
+MODULES = {
+    "numpy": np if HAS_NUMPY else None,
+    "pillow": Image if HAS_PILLOW else None,
+    "cv2": cv2 if HAS_CV2 else None,
+    "pyfiglet": pyfiglet if HAS_FIGLET else None,
+    "yt_dlp": yt_dlp if HAS_YT_DLP else None,
+    "colorama": colorama if HAS_COLORAMA else None,
+    "rich": rich if HAS_RICH else None,
+    "psutil": psutil if HAS_PSUTIL else None,
+    "pyvirtualdisplay": pyvirtualdisplay if HAS_VIRTUAL_DISPLAY else None
+}
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║ 🛠️ System Intelligence & Environment Analysis                ║
+# ║ 🌌 Hyperdimensional Environment Awareness System            ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# Terminal and environment detection with elegant fallbacks
+TERMINAL_WIDTH = shutil.get_terminal_size().columns if hasattr(shutil, 'get_terminal_size') else 80
+TERMINAL_HEIGHT = shutil.get_terminal_size().lines if hasattr(shutil, 'get_terminal_size') else 24
+INTERACTIVE_TERMINAL = sys.stdout.isatty()
+
+# Enhanced detection for Unicode and color support
+SUPPORTS_UNICODE = (sys.stdout.encoding and 'utf' in sys.stdout.encoding.lower() and 
+                   not any(k in os.environ for k in ('NO_UNICODE', 'ASCII_ONLY')))
+
+SUPPORTS_COLOR = (HAS_COLORAMA or 
+                 sys.platform != 'win32' or 
+                 any(k in os.environ for k in ('ANSICON', 'WT_SESSION')) or
+                 os.environ.get('TERM_PROGRAM') in ('vscode', 'iTerm.app') or
+                 os.environ.get('COLORTERM') in ('truecolor', '24bit') or
+                 os.environ.get('TERM', '').endswith(('color', '256color')) or 
+                 os.environ.get('FORCE_COLOR'))
+
+# Author and project metadata with dimensional capabilities matrix
+AUTHOR_INFO = {
+    "name": "Lloyd Handyside",
+    "email": "ace1928@gmail.com",
+    "org": "Neuroforge",
+    "org_email": "lloyd.handyside@neuroforge.io",
+    "contributors": ["Eidos <syntheticeidos@gmail.com>", "Prismatic Architect <prism@neuroforge.io>"],
+    "version": "1.0.1",
+    "updated": "2025-03-16",
+    "codename": "Prismatic Cipher",
+    "release_stage": "stable",
+    "license": "MIT",
+    "repository": "github.com/Ace1928/glyph_forge",
+    "documentation": "https://neuroforge.io/docs/glyph_stream",
+    "support": "https://neuroforge.io/support",
+    "keywords": [
+        "unicode-art", "terminal-graphics", "dimensional-rendering", 
+        "reality-transmutation", "prismatic-encoding", "visual-transcendence"
+    ],
+    "capabilities": {
+        "image_processing": HAS_PILLOW,
+        "video_processing": HAS_CV2,
+        "streaming": HAS_YT_DLP,
+        "enhanced_display": HAS_RICH,
+        "text_art": HAS_FIGLET,
+        "virtual_display": HAS_VIRTUAL_DISPLAY,
+        "system_monitoring": HAS_PSUTIL
+    },
+    "preferences": {
+        "banner_style": "cosmic",
+        "color_scheme": "prismatic",
+        "edge_detection": "adaptive",
+        "default_scale": 2,
+        "show_banner_on_import": True
+    }
+}
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ 🌠 Unified Dimensional Banner System                        ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+class BannerEngine:
+    """🎭 Dimensional banner system with adaptive rendering capabilities."""
+    _instance = None
+    _cache = {}
+    
+    @classmethod
+    def get_instance(cls) -> 'BannerEngine':
+        """🔄 Access singleton with lazy initialization."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+    
+    def __init__(self):
+        """Initialize banner engine with environment awareness."""
+        self.has_figlet = HAS_FIGLET
+        self.supports_unicode = SUPPORTS_UNICODE
+        self.supports_color = SUPPORTS_COLOR
+        self.terminal_width = TERMINAL_WIDTH
+    
+    def display(self, style: str = "auto", color: bool = True, width: Optional[int] = None) -> None:
+        """🎨 Display dimensional banner with optimal rendering."""
+        # Auto-select style based on terminal width
+        if style == "auto":
+            style = "cosmic" if self.terminal_width >= 80 else "compact" if self.terminal_width >= 40 else "minimal"
+        
+        banner = self.generate(style, color, width)
+        print(banner) if not HAS_RICH else CONSOLE.print(banner)
+    
+    def generate(self, style: str = "full", color: bool = True, width: Optional[int] = None) -> str:
+        """🌈 Generate dimensional banner with specified parameters."""
+        width = width or self.terminal_width
+        use_color = color and self.supports_color
+        use_unicode = self.supports_unicode and style != "ascii"
+        
+        # Smart style adaptation
+        if width < 40: style = "minimal"
+        elif width < 80 and style == "full": style = "compact"
+        if not use_unicode: style = "ascii"
+        
+        # Efficient caching with template generation
+        cache_key = f"{style}:{width}:{use_color}:{use_unicode}"
+        if cache_key not in self._cache:
+            if len(self._cache) > 10: self._cache.clear()
+            self._cache[cache_key] = self._generate_template(style, width, use_unicode)
+        
+        # Populate template with dynamic content
+        symbols = self._get_symbol_set(use_unicode)
+        metadata = {**AUTHOR_INFO, **symbols}
+        
+        # Generate title art with figlet if available
+        metadata["title_art"] = (pyfiglet.figlet_format("GLYPH STREAM", font="standard") 
+                               if self.has_figlet else "GLYPH STREAM")
+            
+        banner = self._cache[cache_key].format(**metadata)
+        return self._apply_colors(banner) if use_color and not HAS_RICH else banner
+    
+    def _get_symbol_set(self, unicode_support: bool) -> Dict[str, str]:
+        """🔣 Get appropriate symbol set based on Unicode support."""
+        return {
+            "stars": "✧✦✫" if unicode_support else "*-*",
+            "dimension": "⟁" if unicode_support else "+",
+            "cosmic": "⚝" if unicode_support else "#",
+            "bullet": "•" if unicode_support else "*",
+            "top_left": "╔" if unicode_support else "+",
+            "top_right": "╗" if unicode_support else "+",
+            "bottom_left": "╚" if unicode_support else "+",
+            "bottom_right": "╝" if unicode_support else "+",
+            "horizontal": "═" if unicode_support else "-",
+            "vertical": "║" if unicode_support else "|",
+            "star_elem": "✧" if unicode_support else "*",
+            "star2": "✦" if unicode_support else "*",
+            "star3": "✫" if unicode_support else "*",
+            "diamond": "◈" if unicode_support else "<>"
+        }
+    
+    def _generate_template(self, style: str, width: int, unicode: bool) -> str:
+        """📐 Generate appropriate banner template based on style."""
+        templates = {
+            "minimal": (
+                "{top_left}" + "{horizontal}" * (width-2) + "{top_right}\n"
+                "{vertical} GlyphStream v{version} {vertical}\n"
+                "{bottom_left}" + "{horizontal}" * (width-2) + "{bottom_right}"
+            ),
+            "compact": (
+                "{top_left}" + "{horizontal}" * (width-2) + "{top_right}\n"
+                "{vertical} {stars} GLYPH STREAM v{version} - {codename} {stars} {vertical}\n"
+                "{vertical} Dimensional Unicode Transmutation Engine {vertical}\n"
+                "{bottom_left}" + "{horizontal}" * (width-2) + "{bottom_right}"
+            ),
+            "ascii": (
+                "+" + "-" * (width-2) + "+\n"
+                "| GLYPH STREAM v{version} |\n"
+                "| Dimensional Unicode Engine |\n"
+                "+" + "-" * (width-2) + "+"
+            ),
+            "cosmic": (
+                "{top_left}" + "{horizontal}" * (width-2) + "{top_right}\n"
+                "{vertical} {title_art} {vertical}\n"
+                "{vertical}" + "═" * (width-4) + "{vertical}\n"
+                "{vertical}  {star_elem}{star2}{cosmic} PRISMATIC CIPHER v{version} {cosmic}{star2}{star_elem}  {vertical}\n"
+                "{vertical}  {dimension} Transform reality through visual transcendence {dimension}  {vertical}\n"
+                "{bottom_left}" + "{horizontal}" * (width-2) + "{bottom_right}\n"
+                "{cosmic}{star_elem} ADAPTIVE UNIVERSALITY MATRIX INITIALIZED {star_elem}{cosmic}"
+            ),
+            "full": (
+                "{top_left}" + "{horizontal}" * (width-2) + "{top_right}\n"
+                "{vertical} {title_art} {vertical}\n"
+                "{vertical}" + "═" * (width-4) + "{vertical}\n"
+                "{vertical} {dimension} Prismatic Cipher Edition v{version} {dimension} {vertical}\n"
+                "{vertical}  {star_elem} DIMENSIONAL GLYPH TRANSMUTATION ENGINE {star_elem}  {vertical}\n"
+                "{vertical}" + "═" * (width-4) + "{vertical}\n"
+                "{vertical}  {bullet} Maintainer: {name} 「{email}」 {vertical}\n"
+                "{vertical}  {dimension} Organization: {org} 「{org_email}」 {vertical}\n"
+                "{bottom_left}" + "{horizontal}" * (width-2) + "{bottom_right}"
+            )
+        }
+        return templates.get(style, templates["full"])
+    
+    def _apply_colors(self, banner: str) -> str:
+        """🎨 Apply ANSI colors to banner with style-specific enhancements."""
+        color_map = {
+            "GLYPH STREAM": "\033[96m",  # BRIGHT_CYAN
+            "DIMENSIONAL": "\033[95m",   # BRIGHT_MAGENTA
+            "PRISMATIC CIPHER": "\033[95m",  # BRIGHT_MAGENTA
+            "Transform": "\033[32m",     # GREEN
+            "Maintainer:": "\033[33m",   # YELLOW
+            "Organization:": "\033[33m", # YELLOW
+            "ADAPTIVE UNIVERSALITY MATRIX": "\033[95m"  # BRIGHT_MAGENTA
+        }
+        
+        # Colorize special symbols
+        symbol_colors = {
+            s: "\033[35m" for s in ["✧", "⟁", "✦", "⚝", "*-*"]  # MAGENTA
+        }
+        
+        # Colorize border elements
+        border_color = "\033[34m"  # BLUE
+        border_elements = ["═", "╔", "╚", "║", "+", "-", "|"]
+        
+        RESET = "\033[0m"
+        result = []
+        
+        for line in banner.split('\n'):
+            # Check for specific phrases
+            colored = False
+            for phrase, color in color_map.items():
+                if phrase in line:
+                    result.append(f"{color}{line}{RESET}")
+                    colored = True
+                    break
+                    
+            if not colored:
+                # Check for border elements
+                if any(elem in line for elem in border_elements):
+                    result.append(f"{border_color}{line}{RESET}")
+                    continue
+                
+                # Check for special symbols
+                for sym, color in symbol_colors.items():
+                    if sym in line:
+                        result.append(f"{color}{line}{RESET}")
+                        colored = True
+                        break
+                
+                # Default case
+                if not colored:
+                    result.append(line)
+                
+        return "\n".join(result)
+
+# Initialize banner singleton
+BANNER_ENGINE = BannerEngine.get_instance()
+
+def display_banner(style: str = "auto", color: bool = True, width: Optional[int] = None) -> None:
+    """🎭 Display dimensional banner with environment adaptation."""
+    BANNER_ENGINE.display(style, color, width)
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ 🛠️ System Intelligence & Environment Analysis               ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 class SystemContext:
-    """🧠 Self-aware execution environment with adaptive capabilities.
+    """🧠 Self-aware execution environment with adaptive capabilities."""
     
-    Provides comprehensive system intelligence with dynamic resource
-    adaptation and environmental optimization pathways.
-    """
     def __init__(self) -> None:
-        """Initialize system context with runtime intelligence."""
-        self.attributes = self._gather_system_attributes()
-        self.capabilities = self._analyze_capabilities()
-        self.constraints = self._detect_constraints()
-        self.optimization_paths = self._generate_optimization_paths()
-        
-    def _gather_system_attributes(self) -> Dict[str, Any]:
-        """🔍 Collect detailed system attributes with performance implications."""
-        # Core system identification
-        attributes = {
+        """Initialize system context with unified analysis."""
+        # Core system attributes with elegant fallbacks
+        self.attributes = {
+            # System identification
             "platform": platform.system(),
             "architecture": platform.machine(),
             "processor": platform.processor(),
             "python_version": platform.python_version(),
             "hostname": platform.node(),
-            "timestamp": datetime.now().isoformat(),
+            
+            # Terminal capabilities
+            "terminal_width": TERMINAL_WIDTH,
+            "terminal_height": TERMINAL_HEIGHT,
+            "is_interactive": INTERACTIVE_TERMINAL,
+            "supports_unicode": SUPPORTS_UNICODE,
+            "supports_ansi_color": SUPPORTS_COLOR,
+            
+            # Memory and CPU resources
+            "memory_total": getattr(psutil.virtual_memory(), "total", 0) if HAS_PSUTIL else 0,
+            "memory_available": getattr(psutil.virtual_memory(), "available", 0) if HAS_PSUTIL else 0,
+            "cpu_count": psutil.cpu_count(logical=True) if HAS_PSUTIL else os.cpu_count() or 2,
+            "cpu_physical": psutil.cpu_count(logical=False) if HAS_PSUTIL else os.cpu_count() or 1,
+            
+            # Network status and hardware acceleration
+            "network_connected": self._quick_network_check(),
+            "numpy_optimized": self._check_numpy_optimization(),
+            "has_cuda": False,  # Default, would be set if detected
+            "has_metal": platform.system() == "Darwin"  # Simple macOS check
         }
         
-        # Terminal capabilities (with fallbacks)
-        try:
-            attributes.update({
-                "terminal_width": os.get_terminal_size().columns,
-                "terminal_height": os.get_terminal_size().lines,
-                "is_interactive": sys.stdout.isatty(),
-                "supports_unicode": sys.stdout.encoding.lower().startswith(('utf', 'latin')),
-                "supports_ansi_color": self._detect_color_support(attributes),
-            })
-        except (AttributeError, OSError):
-            # Fallback for non-terminal environments
-            attributes.update({
-                "terminal_width": 80,
-                "terminal_height": 24,
-                "is_interactive": False,
-                "supports_unicode": True,
-                "supports_ansi_color": False,
-            })
-            
-        # Memory resources
-        try:
-            import psutil
-            memory = psutil.virtual_memory()
-            attributes.update({
-                "memory_total": memory.total,
-                "memory_available": memory.available,
-                "memory_percent": memory.percent,
-                "cpu_count": psutil.cpu_count(logical=True),
-                "cpu_physical": psutil.cpu_count(logical=False),
-            })
-        except ImportError:
-            # Graceful degradation when psutil unavailable
-            attributes["memory_detection"] = "unavailable"
-            
-        # Network status
-        attributes["network_connected"] = self._check_network_connection()
-        
-        # Hardware acceleration support
-        attributes.update(self._detect_hardware_acceleration(attributes))
-            
-        return attributes
-
-    def _detect_hardware_acceleration(self, attrs: Dict[str, Any]) -> Dict[str, bool]:
-        """🚀 Determine available hardware acceleration options."""
-        acceleration = {
-            "numpy_optimized": False,
-            "has_mkl": False,
-            "has_cuda": False,
-            "has_metal": False,
+        # Derive capabilities from attributes
+        tier = self._get_performance_tier()
+        self.capabilities = {
+            "can_display_unicode": self.attributes["supports_unicode"],
+            "can_display_color": self.attributes["supports_ansi_color"],
+            "can_display_animations": self.attributes["is_interactive"] and self.attributes["supports_ansi_color"],
+            "has_high_performance": tier >= 2,
+            "has_network_access": self.attributes["network_connected"]
         }
         
-        # Check NumPy optimization
-        try:
-            import numpy as np
-            # Check if NumPy is using optimized libraries
-            config_info = np.__config__.show()
-            if isinstance(config_info, str):
-                acceleration["numpy_optimized"] = "mkl" in config_info.lower() or "openblas" in config_info.lower()
-                acceleration["has_mkl"] = "mkl" in config_info.lower()
-        except (ImportError, AttributeError):
-            pass
-            
-        # Check for CUDA availability
-        platform_name = attrs.get("platform", "")
-        try:
-            if platform_name != "Darwin":  # Not MacOS
-                import torch
-                acceleration["has_cuda"] = torch.cuda.is_available()
-        except ImportError:
-            pass
-            
-        # Check for Metal support on macOS
-        if platform_name == "Darwin":
-            acceleration["has_metal"] = True  # Simplified check
-            
-        return acceleration
-        
-    def _detect_color_support(self, attrs: Dict[str, Any]) -> bool:
-        """🎨 Detect terminal color support with environment awareness."""
-        # Check for explicit color disabling
-        if "NO_COLOR" in os.environ:
-            return False
-            
-        # Check for explicit ANSI color support
-        if "COLORTERM" in os.environ:
-            return True
-            
-        # Check platform-specific conditions
-        platform_name = attrs.get("platform", "")
-        if platform_name == "Windows":
-            # Windows 10 build 14931+ supports ANSI
-            if sys.getwindowsversion().build >= 14931:
-                return True
-            # Check for ANSICON or ConEmu
-            return any(env_var in os.environ for env_var in ("ANSICON", "ConEmuANSI"))
-        else:
-            # Unix-like systems
-            term = os.environ.get("TERM", "").lower()
-            return term != "dumb" and term.endswith(("color", "ansi", "-256color"))
+        # Identify constraints based on system analysis
+        self.constraints = {
+            "limited_width": self.attributes["terminal_width"] < 60,
+            "limited_height": self.attributes["terminal_height"] < 20,
+            "max_art_width": self.attributes["terminal_width"] - (2 if self.attributes["terminal_width"] < 60 else 4),
+            "max_art_height": self.attributes["terminal_height"] - (4 if self.attributes["terminal_height"] < 20 else 6),
+            "performance_tier": tier,
+            "max_scale_factor": 1 if tier == 0 else 2 if tier == 1 else 4,
+            "default_fps": 5 if tier == 0 else 10 if tier == 1 else 15
+        }
 
-    def _check_network_connection(self) -> bool:
-        """🌐 Verify network connectivity with minimal overhead."""
+    def _quick_network_check(self) -> bool:
+        """🌐 Fast network connectivity check."""
         try:
-            # Quick socket connection to test network
-            import socket
             socket.create_connection(("8.8.8.8", 53), timeout=1.0)
             return True
         except (socket.error, socket.timeout):
             return False
+    
+    def _check_numpy_optimization(self) -> bool:
+        """🔍 Check if NumPy is using optimized libraries."""
+        if not HAS_NUMPY:
+            return False
+        try:
+            config_info = np.__config__.show() if hasattr(np, "__config__") else ""
+            return isinstance(config_info, str) and any(lib in config_info.lower() 
+                                                     for lib in ["mkl", "openblas"])
+        except (ImportError, AttributeError):
+            return False
+    
+    def _get_performance_tier(self) -> int:
+        """🚄 Calculate system performance tier (0=low to 3=very high)."""
+        # Dynamic scoring based on CPU and memory resources
+        cpu_count = self.attributes["cpu_count"]
+        memory_gb = self.attributes["memory_available"] / (1024 * 1024 * 1024) if self.attributes["memory_available"] else 2
         
-    def _analyze_capabilities(self) -> Dict[str, bool]:
-        """⚙️ Determine system capabilities for feature availability."""
-        return {
-            "can_display_unicode": self.attributes.get("supports_unicode", True),
-            "can_display_color": self.attributes.get("supports_ansi_color", True),
-            "can_display_animations": (self.attributes.get("is_interactive", False) and 
-                                      self.attributes.get("supports_ansi_color", False)),
-            "has_high_performance": self._estimate_performance_tier() >= 2,
-            "has_network_access": self.attributes.get("network_connected", False),
-        }
+        # Score calculation with elegant bounds
+        cpu_score = 2 if cpu_count >= 16 else 1 if cpu_count >= 8 else -1 if cpu_count <= 2 else 0
+        mem_score = 1 if memory_gb >= 16 else -1 if memory_gb <= 2 else 0
         
-    def _detect_constraints(self) -> Dict[str, Any]:
-        """📏 Identify system constraints for adaptive behavior."""
-        constraints = {}
-        
-        # Terminal size constraints
-        width = self.attributes.get("terminal_width", 80)
-        height = self.attributes.get("terminal_height", 24)
-        
-        if width < 60:
-            constraints["limited_width"] = True
-            constraints["max_art_width"] = width - 2
-        else:
-            constraints["limited_width"] = False
-            constraints["max_art_width"] = width - 4
-            
-        if height < 20:
-            constraints["limited_height"] = True
-            constraints["max_art_height"] = height - 4
-        else:
-            constraints["limited_height"] = False
-            constraints["max_art_height"] = height - 6
-            
-        # Performance constraints
-        perf_tier = self._estimate_performance_tier()
-        constraints["performance_tier"] = perf_tier
-        
-        if perf_tier == 0:  # Low-end system
-            constraints["max_scale_factor"] = 1
-            constraints["default_fps"] = 5
-        elif perf_tier == 1:  # Mid-tier system
-            constraints["max_scale_factor"] = 2
-            constraints["default_fps"] = 10
-        else:  # High-end system
-            constraints["max_scale_factor"] = 4
-            constraints["default_fps"] = 15
-            
-        return constraints
-        
-    def _generate_optimization_paths(self) -> Dict[str, Any]:
-        """🔧 Create optimized parameters based on system capabilities."""
-        paths = {}
-        
-        # Block size adaptation
-        if self.constraints.get("limited_width", False):
-            paths["block_width"] = 4
-            paths["block_height"] = 8
-        else:
-            cpu_physical = self.attributes.get("cpu_physical", 2)
-            if cpu_physical >= 8:  # High core count suggests good performance
-                paths["block_width"] = 6
-                paths["block_height"] = 6
-            else:
-                paths["block_width"] = 8
-                paths["block_height"] = 8
-                
-        # Feature adaptation
-        if self.constraints.get("performance_tier", 1) <= 0:
-            paths["default_edge_mode"] = "simple"
-            paths["animation_level"] = 0
-        else:
-            paths["default_edge_mode"] = "enhanced"
-            paths["animation_level"] = 2 if self.capabilities.get("has_high_performance", False) else 1
-            
-        # Ideal scale factor based on system capabilities
-        perf_tier = self.constraints.get("performance_tier", 1)
-        paths["ideal_scale_factor"] = min(perf_tier + 1, 
-                                         self.constraints.get("max_scale_factor", 2))
-                                         
-        # Output format adaptation
-        if not self.capabilities.get("can_display_color", True):
-            paths["default_output_mode"] = "ascii"
-        elif not self.capabilities.get("can_display_unicode", True):
-            paths["default_output_mode"] = "ascii-color"
-        else:
-            paths["default_output_mode"] = "unicode-color"
-            
-        return paths
-        
-    def _estimate_performance_tier(self) -> int:
-        """🚄 Estimate system performance tier (0=low, 1=medium, 2=high, 3=very high)."""
-        # Default to medium tier
-        score = 1
-        
-        # CPU cores influence
-        cpu_count = self.attributes.get("cpu_count", 2)
-        if cpu_count >= 16:
-            score += 2
-        elif cpu_count >= 8:
-            score += 1
-        elif cpu_count <= 2:
-            score -= 1
-            
-        # Memory influence
-        memory_gb = self.attributes.get("memory_available", 4 * 1024 * 1024 * 1024) / (1024 * 1024 * 1024)
-        if memory_gb >= 16:
-            score += 1
-        elif memory_gb <= 2:
-            score -= 1
-            
-        # Hardware acceleration influence
-        if self.attributes.get("has_cuda", False) or self.attributes.get("has_metal", False):
-            score += 1
-            
-        # Bound the score
-        return max(0, min(score, 3))
+        return max(0, min(1 + cpu_score + mem_score, 3))
     
     def get_optimized_parameters(self) -> Dict[str, Any]:
         """⚡ Provide context-aware optimized parameters for current environment."""
+        tier = self.constraints["performance_tier"]
         return {
-            "scale_factor": self.optimization_paths.get("ideal_scale_factor", 2),
-            "block_width": self.optimization_paths.get("block_width", 8),
-            "block_height": self.optimization_paths.get("block_height", 8),
-            "fps": self.constraints.get("default_fps", 15),
-            "edge_mode": self.optimization_paths.get("default_edge_mode", "enhanced"),
-            "color_mode": self.capabilities.get("can_display_color", True),
-            "animation_level": self.optimization_paths.get("animation_level", 1),
-            "max_width": self.constraints.get("max_art_width", 80),
-            "max_height": self.constraints.get("max_art_height", 24),
-        }
-        
-    def get_environment_summary(self) -> Dict[str, Any]:
-        """📊 Generate concise environment summary for diagnostics."""
-        return {
-            "platform": self.attributes.get("platform", "Unknown"),
-            "terminal_dimensions": f"{self.attributes.get('terminal_width', 80)}×{self.attributes.get('terminal_height', 24)}",
-            "color_support": "Yes" if self.capabilities.get("can_display_color", False) else "No",
-            "unicode_support": "Yes" if self.capabilities.get("can_display_unicode", False) else "No",
-            "animation_support": "Yes" if self.capabilities.get("can_display_animations", False) else "No",
-            "performance_tier": ["Low", "Medium", "High", "Very High"][self.constraints.get("performance_tier", 1)],
-            "network_access": "Yes" if self.capabilities.get("has_network_access", False) else "No",
-            "optimization_level": self.optimization_paths.get("animation_level", 1),
+            "scale_factor": self.constraints["max_scale_factor"],
+            "block_width": 4 if self.constraints["limited_width"] else 6 if tier >= 2 else 8,
+            "block_height": 8 if self.constraints["limited_width"] else 6 if tier >= 2 else 8,
+            "fps": self.constraints["default_fps"],
+            "edge_mode": "simple" if tier == 0 else "enhanced",
+            "color_mode": self.capabilities["can_display_color"],
+            "animation_level": 0 if tier == 0 else 2 if tier >= 2 else 1,
+            "max_width": self.constraints["max_art_width"],
+            "max_height": self.constraints["max_art_height"],
         }
 
 # Initialize system context at module load
@@ -4349,6 +4392,9 @@ def parse_command_args() -> Dict[str, Any]:
         Dictionary of parsed and validated command options
     """
     import argparse
+    import shutil
+    import os
+    from rich.panel import Panel
     
     # System-aware default parameters
     sys_params = SYSTEM_CONTEXT.get_optimized_parameters()
