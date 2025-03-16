@@ -1,107 +1,109 @@
 #!/usr/bin/env python3
-import argparse, collections, io, json, math, os, platform, random, re, shlex
-import shutil, socket, subprocess, sys, tempfile, time, traceback, unicodedata, uuid
+import sys, os, re, math, json, time, uuid, socket, shutil, random, platform
+import argparse, collections, io, shlex, subprocess, tempfile, traceback, unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
 
-# Conditional imports with elegant fallbacks
-try:
-    import numpy as np
-    HAS_NUMPY = True
-except ImportError:
-    HAS_NUMPY = False
-    
-try:
-    from PIL import Image, ImageDraw, ImageFont, ImageOps
-    HAS_PILLOW = True
-except ImportError:
-    HAS_PILLOW = False
+# Smart imports with error handling and threading
+_THREAD_POOL = ThreadPoolExecutor(max_workers=4)
+_MODULE_CACHE = {}
 
-try:
-    import cv2
-    HAS_CV2 = True
+def import_module(module_name, package=None):
+    if module_name in _MODULE_CACHE:
+        return _MODULE_CACHE[module_name]
+    try:
+        if package:
+            module = __import__(module_name, fromlist=[package])
+            _MODULE_CACHE[module_name] = getattr(module, package)
+        else:
+            _MODULE_CACHE[module_name] = __import__(module_name)
+        return _MODULE_CACHE[module_name]
 except ImportError:
-    HAS_CV2 = False
+    _MODULE_CACHE[module_name] = None
+        return None
 
-try:
-    import pyfiglet
-    HAS_FIGLET = True
-except ImportError:
-    HAS_FIGLET = False
+# Parallel dynamic imports for performance
+np = import_module('numpy')
+Image = import_module('PIL.Image', 'Image')
+ImageDraw = import_module('PIL.ImageDraw', 'ImageDraw')
+ImageFont = import_module('PIL.ImageFont', 'ImageFont')
+ImageOps = import_module('PIL.ImageOps', 'ImageOps')
+cv2 = import_module('cv2')
+pyfiglet = import_module('pyfiglet')
+yt_dlp = import_module('yt_dlp')
+colorama = import_module('colorama')
+rich = import_module('rich')
+psutil = import_module('psutil')
+pyvirtualdisplay = import_module('pyvirtualdisplay')
 
-try:
-    import yt_dlp
-    HAS_YT_DLP = True
-except ImportError:
-    HAS_YT_DLP = False
-
-try:
-    import colorama
+# Initialize colorama if available
+if colorama:
     colorama.init()
-    HAS_COLORAMA = True
-except ImportError:
-    HAS_COLORAMA = False
-
-try:
-    import rich
+    
+# Import rich components if available
+if rich:
     from rich.console import Console, Group
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
     from rich.align import Align
     from rich.prompt import Prompt, Confirm
-    HAS_RICH = True
-    CONSOLE = Console(highlight=True)
-except ImportError:
-    HAS_RICH = False
+        CONSOLE = Console(highlight=True)
+else:
     CONSOLE = None
 
-try:
-    import psutil
-    HAS_PSUTIL = True
-except ImportError:
-    HAS_PSUTIL = False
+# Module availability tracking with threading for responsive startup
+def _check_modules():
+    modules = {
+    "numpy": bool(np),
+    "pillow": bool(Image),
+    "cv2": bool(cv2),
+    "pyfiglet": bool(pyfiglet),
+    "yt_dlp": bool(yt_dlp),
+    "colorama": bool(colorama),
+    "rich": bool(rich),
+    "psutil": bool(psutil),
+    "pyvirtualdisplay": bool(pyvirtualdisplay)
+    }
+    return modules
 
-try:
-    import pyvirtualdisplay
-    HAS_VIRTUAL_DISPLAY = True
-except ImportError:
-    HAS_VIRTUAL_DISPLAY = False
-
-# Unified module availability tracking
-MODULES = {
-    "numpy": np if HAS_NUMPY else None,
-    "pillow": Image if HAS_PILLOW else None,
-    "cv2": cv2 if HAS_CV2 else None,
-    "pyfiglet": pyfiglet if HAS_FIGLET else None,
-    "yt_dlp": yt_dlp if HAS_YT_DLP else None,
-    "colorama": colorama if HAS_COLORAMA else None,
-    "rich": rich if HAS_RICH else None,
-    "psutil": psutil if HAS_PSUTIL else None,
-    "pyvirtualdisplay": pyvirtualdisplay if HAS_VIRTUAL_DISPLAY else None
-}
+# Run module check in background
+MODULES_FUTURE = _THREAD_POOL.submit(_check_modules)
 
 # ╔══════════════════════════════════════════════════════════════╗
-# ║ 🌌 Hyperdimensional Environment Awareness System            ║
+# ║ 🌌 Hyperdimensional Environment Awareness                   ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-# Terminal and environment detection with elegant fallbacks
-TERMINAL_WIDTH = shutil.get_terminal_size().columns if hasattr(shutil, 'get_terminal_size') else 80
-TERMINAL_HEIGHT = shutil.get_terminal_size().lines if hasattr(shutil, 'get_terminal_size') else 24
+# Terminal dimensions with enhanced detection
+def get_terminal_dimensions():
+    try:
+        return shutil.get_terminal_size()
+    except (AttributeError, OSError):
+        return os.terminal_size((80, 24))
+
+TERMINAL_DIMS = get_terminal_dimensions()
+TERMINAL_WIDTH = TERMINAL_DIMS.columns
+TERMINAL_HEIGHT = TERMINAL_DIMS.lines
 INTERACTIVE_TERMINAL = sys.stdout.isatty()
 
-# Enhanced detection for Unicode and color support
-SUPPORTS_UNICODE = (sys.stdout.encoding and 'utf' in sys.stdout.encoding.lower() and 
-                   not any(k in os.environ for k in ('NO_UNICODE', 'ASCII_ONLY')))
+# Advanced Unicode and color support detection
+SUPPORTS_UNICODE = (
+sys.stdout.encoding and 
+'utf' in sys.stdout.encoding.lower() and 
+                   not any(k in os.environ for k in ('NO_UNICODE', 'ASCII_ONLY'))
+)
 
-SUPPORTS_COLOR = (HAS_COLORAMA or 
+SUPPORTS_COLOR = (
+    bool(colorama) or 
                  sys.platform != 'win32' or 
-                 any(k in os.environ for k in ('ANSICON', 'WT_SESSION')) or
+                 any(k in os.environ for k in ('ANSICON', 'WT_SESSION', 'FORCE_COLOR')) or
                  os.environ.get('TERM_PROGRAM') in ('vscode', 'iTerm.app') or
                  os.environ.get('COLORTERM') in ('truecolor', '24bit') or
-                 os.environ.get('TERM', '').endswith(('color', '256color')) or 
-                 os.environ.get('FORCE_COLOR'))
+                 os.environ.get('TERM', '').endswith(('color', '256color'))
+)
 
 # Author and project metadata with dimensional capabilities matrix
 AUTHOR_INFO = {
@@ -122,15 +124,7 @@ AUTHOR_INFO = {
         "unicode-art", "terminal-graphics", "dimensional-rendering", 
         "reality-transmutation", "prismatic-encoding", "visual-transcendence"
     ],
-    "capabilities": {
-        "image_processing": HAS_PILLOW,
-        "video_processing": HAS_CV2,
-        "streaming": HAS_YT_DLP,
-        "enhanced_display": HAS_RICH,
-        "text_art": HAS_FIGLET,
-        "virtual_display": HAS_VIRTUAL_DISPLAY,
-        "system_monitoring": HAS_PSUTIL
-    },
+    "capabilities": {},  # Filled dynamically when modules are loaded
     "preferences": {
         "banner_style": "cosmic",
         "color_scheme": "prismatic",
@@ -150,29 +144,31 @@ class BannerEngine:
     _cache = {}
     
     @classmethod
-    def get_instance(cls) -> 'BannerEngine':
-        """🔄 Access singleton with lazy initialization."""
+    def get_instance(cls):
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
     
     def __init__(self):
-        """Initialize banner engine with environment awareness."""
-        self.has_figlet = HAS_FIGLET
+                self.has_figlet = bool(pyfiglet)
         self.supports_unicode = SUPPORTS_UNICODE
         self.supports_color = SUPPORTS_COLOR
         self.terminal_width = TERMINAL_WIDTH
     
-    def display(self, style: str = "auto", color: bool = True, width: Optional[int] = None) -> None:
+    def display(self, style="auto", color=True, width=None):
         """🎨 Display dimensional banner with optimal rendering."""
         # Auto-select style based on terminal width
         if style == "auto":
-            style = "cosmic" if self.terminal_width >= 80 else "compact" if self.terminal_width >= 40 else "minimal"
+            if self.terminal_width >= 80: style = "cosmic"
+            elif self.terminal_width >= 40: style = "compact"
+else: style = "minimal"
         
         banner = self.generate(style, color, width)
-        print(banner) if not HAS_RICH else CONSOLE.print(banner)
+        if CONSOLE: CONSOLE.print(banner)
+else: print(banner)
     
-    def generate(self, style: str = "full", color: bool = True, width: Optional[int] = None) -> str:
+@lru_cache(maxsize=8)
+    def generate(self, style="full", color=True, width=None):
         """🌈 Generate dimensional banner with specified parameters."""
         width = width or self.terminal_width
         use_color = color and self.supports_color
@@ -183,24 +179,22 @@ class BannerEngine:
         elif width < 80 and style == "full": style = "compact"
         if not use_unicode: style = "ascii"
         
-        # Efficient caching with template generation
-        cache_key = f"{style}:{width}:{use_color}:{use_unicode}"
-        if cache_key not in self._cache:
-            if len(self._cache) > 10: self._cache.clear()
-            self._cache[cache_key] = self._generate_template(style, width, use_unicode)
-        
-        # Populate template with dynamic content
+        # Generate template with symbols
         symbols = self._get_symbol_set(use_unicode)
         metadata = {**AUTHOR_INFO, **symbols}
         
         # Generate title art with figlet if available
-        metadata["title_art"] = (pyfiglet.figlet_format("GLYPH STREAM", font="standard") 
-                               if self.has_figlet else "GLYPH STREAM")
+if self.has_figlet:
+        metadata["title_art"] = pyfiglet.figlet_format("GLYPH STREAM", font="standard") 
+                               else:
+            metadata["title_art"] = "GLYPH STREAM"
             
-        banner = self._cache[cache_key].format(**metadata)
-        return self._apply_colors(banner) if use_color and not HAS_RICH else banner
+        template = self._generate_template(style, width, use_unicode)
+        banner = template.format(**metadata)
+        
+        return self._apply_colors(banner) if use_color and not CONSOLE else banner
     
-    def _get_symbol_set(self, unicode_support: bool) -> Dict[str, str]:
+    def _get_symbol_set(self, unicode_support):
         """🔣 Get appropriate symbol set based on Unicode support."""
         return {
             "stars": "✧✦✫" if unicode_support else "*-*",
@@ -219,7 +213,7 @@ class BannerEngine:
             "diamond": "◈" if unicode_support else "<>"
         }
     
-    def _generate_template(self, style: str, width: int, unicode: bool) -> str:
+    def _generate_template(self, style, width, unicode):
         """📐 Generate appropriate banner template based on style."""
         templates = {
             "minimal": (
@@ -262,32 +256,33 @@ class BannerEngine:
         }
         return templates.get(style, templates["full"])
     
-    def _apply_colors(self, banner: str) -> str:
+    def _apply_colors(self, banner):
         """🎨 Apply ANSI colors to banner with style-specific enhancements."""
+# Color mapping for special elements
         color_map = {
-            "GLYPH STREAM": "\033[96m",  # BRIGHT_CYAN
-            "DIMENSIONAL": "\033[95m",   # BRIGHT_MAGENTA
-            "PRISMATIC CIPHER": "\033[95m",  # BRIGHT_MAGENTA
+            "GLYPH STREAM": "\033[96m",  # CYAN
+            "DIMENSIONAL": "\033[95m",   # MAGENTA
+            "PRISMATIC CIPHER": "\033[95m",
             "Transform": "\033[32m",     # GREEN
             "Maintainer:": "\033[33m",   # YELLOW
-            "Organization:": "\033[33m", # YELLOW
-            "ADAPTIVE UNIVERSALITY MATRIX": "\033[95m"  # BRIGHT_MAGENTA
+            "Organization:": "\033[33m",
+            "ADAPTIVE UNIVERSALITY MATRIX": "\033[95m"
         }
         
-        # Colorize special symbols
-        symbol_colors = {
-            s: "\033[35m" for s in ["✧", "⟁", "✦", "⚝", "*-*"]  # MAGENTA
-        }
+        # Symbol colors (magenta)
+        symbol_color = "\033[35m"
+        symbol_chars = {"✧", "⟁", "✦", "⚝", "*-*"}
         
-        # Colorize border elements
-        border_color = "\033[34m"  # BLUE
-        border_elements = ["═", "╔", "╚", "║", "+", "-", "|"]
+        # Border color (blue)
+        border_color = "\033[34m"
+        border_chars = {"═", "╔", "╚", "║", "+", "-", "|"}
         
         RESET = "\033[0m"
         result = []
         
+# Process each line for coloring
         for line in banner.split('\n'):
-            # Check for specific phrases
+            # Check for specific phrases to color
             colored = False
             for phrase, color in color_map.items():
                 if phrase in line:
@@ -297,27 +292,24 @@ class BannerEngine:
                     
             if not colored:
                 # Check for border elements
-                if any(elem in line for elem in border_elements):
+                if any(c in line for c in border_chars):
                     result.append(f"{border_color}{line}{RESET}")
                     continue
                 
                 # Check for special symbols
-                for sym, color in symbol_colors.items():
-                    if sym in line:
-                        result.append(f"{color}{line}{RESET}")
-                        colored = True
-                        break
+if any(s in line for s in symbol_chars):
+                                            result.append(f"{symbol_color}{line}{RESET}")
+                        continue
                 
                 # Default case
-                if not colored:
-                    result.append(line)
+                                    result.append(line)
                 
         return "\n".join(result)
 
 # Initialize banner singleton
 BANNER_ENGINE = BannerEngine.get_instance()
 
-def display_banner(style: str = "auto", color: bool = True, width: Optional[int] = None) -> None:
+def display_banner(style="auto", color=True, width=None):
     """🎭 Display dimensional banner with environment adaptation."""
     BANNER_ENGINE.display(style, color, width)
 
@@ -328,36 +320,50 @@ def display_banner(style: str = "auto", color: bool = True, width: Optional[int]
 class SystemContext:
     """🧠 Self-aware execution environment with adaptive capabilities."""
     
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize system context with unified analysis."""
         # Core system attributes with elegant fallbacks
         self.attributes = {
-            # System identification
-            "platform": platform.system(),
+                        "platform": platform.system(),
             "architecture": platform.machine(),
             "processor": platform.processor(),
             "python_version": platform.python_version(),
             "hostname": platform.node(),
-            
-            # Terminal capabilities
-            "terminal_width": TERMINAL_WIDTH,
+                        "terminal_width": TERMINAL_WIDTH,
             "terminal_height": TERMINAL_HEIGHT,
             "is_interactive": INTERACTIVE_TERMINAL,
             "supports_unicode": SUPPORTS_UNICODE,
             "supports_ansi_color": SUPPORTS_COLOR,
-            
-            # Memory and CPU resources
-            "memory_total": getattr(psutil.virtual_memory(), "total", 0) if HAS_PSUTIL else 0,
-            "memory_available": getattr(psutil.virtual_memory(), "available", 0) if HAS_PSUTIL else 0,
-            "cpu_count": psutil.cpu_count(logical=True) if HAS_PSUTIL else os.cpu_count() or 2,
-            "cpu_physical": psutil.cpu_count(logical=False) if HAS_PSUTIL else os.cpu_count() or 1,
-            
-            # Network status and hardware acceleration
+            }
+        
+        # Add memory/CPU info if psutil is available
+        if psutil:
+            try:
+                mem = psutil.virtual_memory()
+                self.attributes.update({
+            "memory_total": mem.total,
+                    "memory_available": mem.available,
+            "cpu_count": psutil.cpu_count(logical=True),
+            "cpu_physical": psutil.cpu_count(logical=False)
+                })
+            except Exception:
+                pass
+        else:
+            # Fallbacks
+            self.attributes.update({
+                "memory_total": 0,
+                "memory_available": 0,
+                "cpu_count": os.cpu_count() or 2,
+                "cpu_physical": os.cpu_count() or 1
+            })
+        
+        # Network connectivity and optimization detection
+        self.attributes.update({
             "network_connected": self._quick_network_check(),
             "numpy_optimized": self._check_numpy_optimization(),
-            "has_cuda": False,  # Default, would be set if detected
-            "has_metal": platform.system() == "Darwin"  # Simple macOS check
-        }
+            "has_cuda": self._check_cuda(),
+            "has_metal": platform.system() == "Darwin"
+        })
         
         # Derive capabilities from attributes
         tier = self._get_performance_tier()
@@ -380,38 +386,50 @@ class SystemContext:
             "default_fps": 5 if tier == 0 else 10 if tier == 1 else 15
         }
 
-    def _quick_network_check(self) -> bool:
+    def _quick_network_check(self):
         """🌐 Fast network connectivity check."""
         try:
-            socket.create_connection(("8.8.8.8", 53), timeout=1.0)
+            socket.create_connection(("8.8.8.8", 53), timeout=0.5)
             return True
         except (socket.error, socket.timeout):
             return False
     
-    def _check_numpy_optimization(self) -> bool:
+    def _check_numpy_optimization(self):
         """🔍 Check if NumPy is using optimized libraries."""
-        if not HAS_NUMPY:
+        if not np:
             return False
         try:
             config_info = np.__config__.show() if hasattr(np, "__config__") else ""
-            return isinstance(config_info, str) and any(lib in config_info.lower() 
-                                                     for lib in ["mkl", "openblas"])
-        except (ImportError, AttributeError):
+            return any(lib in str(config_info).lower() for lib in ["mkl", "openblas", "accelerate"])
+        except Exception:
             return False
     
-    def _get_performance_tier(self) -> int:
+def _check_cuda(self):
+        """🔥 Detect CUDA availability."""
+        # Check for CUDA via cv2 or torch
+        if cv2 and hasattr(cv2, 'cuda') and hasattr(cv2.cuda, 'getCudaEnabledDeviceCount'):
+            try:
+                return cv2.cuda.getCudaEnabledDeviceCount() > 0
+            except Exception:
+                pass
+        return False
+    
+    def _get_performance_tier(self):
         """🚄 Calculate system performance tier (0=low to 3=very high)."""
         # Dynamic scoring based on CPU and memory resources
         cpu_count = self.attributes["cpu_count"]
-        memory_gb = self.attributes["memory_available"] / (1024 * 1024 * 1024) if self.attributes["memory_available"] else 2
+        memory_gb = self.attributes["memory_available"] / (1024**3) if self.attributes["memory_available"] else 2
         
         # Score calculation with elegant bounds
         cpu_score = 2 if cpu_count >= 16 else 1 if cpu_count >= 8 else -1 if cpu_count <= 2 else 0
         mem_score = 1 if memory_gb >= 16 else -1 if memory_gb <= 2 else 0
         
-        return max(0, min(1 + cpu_score + mem_score, 3))
+        # Add bonus for hardware acceleration
+        accel_bonus = 1 if self.attributes["has_cuda"] or self.attributes["has_metal"] else 0
     
-    def get_optimized_parameters(self) -> Dict[str, Any]:
+return max(0, min(1 + cpu_score + mem_score + accel_bonus, 3))
+    
+    def get_optimized_parameters(self):
         """⚡ Provide context-aware optimized parameters for current environment."""
         tier = self.constraints["performance_tier"]
         return {
@@ -419,17 +437,15 @@ class SystemContext:
             "block_width": 4 if self.constraints["limited_width"] else 6 if tier >= 2 else 8,
             "block_height": 8 if self.constraints["limited_width"] else 6 if tier >= 2 else 8,
             "fps": self.constraints["default_fps"],
-            "edge_mode": "simple" if tier == 0 else "enhanced",
+            "edge_mode": "enhanced" if tier > 0 else "simple",
             "color_mode": self.capabilities["can_display_color"],
             "animation_level": 0 if tier == 0 else 2 if tier >= 2 else 1,
             "max_width": self.constraints["max_art_width"],
             "max_height": self.constraints["max_art_height"],
         }
 
-# Initialize system context at module load
+# Initialize system context with lazy loading
 SYSTEM_CONTEXT = SystemContext()
-
-# Legacy compatibility
 SYSTEM_INFO = SYSTEM_CONTEXT.attributes
 
 # ╔══════════════════════════════════════════════════════════════╗
@@ -437,56 +453,55 @@ SYSTEM_INFO = SYSTEM_CONTEXT.attributes
 # ╚══════════════════════════════════════════════════════════════╝
 
 class UnicodeRenderEngine:
-    """⚙️ High-precision multi-dimensional Unicode rendering system.
-    
-    Provides comprehensive character mapping, edge detection matrices,
-    and adaptive rendering with intelligent dimension analysis.
-    """
-    # Singleton instance for global access with lazy initialization
+    """⚙️ Multi-dimensional Unicode rendering system with adaptive capabilities."""
     _instance = None
     
     @classmethod
-    def get_instance(cls) -> 'UnicodeRenderEngine':
-        """🔄 Access singleton with memory-optimized instantiation."""
+    def get_instance(cls):
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
     
-    def __init__(self) -> None:
-        """Initialize rendering engine with adaptive capabilities."""
+    def __init__(self):
+        """Initialize with dimensional awareness."""
         self.cache_dir = Path(os.path.expanduser("~/.cache/glyph_stream"))
-        self.cache_file = self.cache_dir / "character_maps.json"
         self.character_maps = {}
-        self._gradient_categories = {}
-        self._edge_matrices = {}
         self._color_maps = {}
         
         # System-aware initialization
         self.supports_unicode = SYSTEM_CONTEXT.capabilities.get("can_display_unicode", True)
         self.supports_color = SYSTEM_CONTEXT.capabilities.get("can_display_color", True)
         
-        # Initialize character sets
-        self._load_or_generate_character_maps()
-        
-    def _load_or_generate_character_maps(self) -> None:
-        """📝 Load cached character maps or generate optimized defaults."""
+        # Load or generate character maps
         try:
-            if self.cache_file.exists():
-                with open(self.cache_file, 'r', encoding='utf-8') as f:
+# Attempt to load cached character maps
+            if self.cache_dir.exists():
+            cache_file = self.cache_dir / "character_maps.json"
+            if cache_file.exists():
+                with open(cache_file, 'r', encoding='utf-8') as f:
                     self.character_maps = json.load(f)
-                return
-        except (json.JSONDecodeError, OSError):
-            pass  # Continue to generation on any error
-        
-        # Generate maps from scratch
-        self._generate_character_maps()
-        self._save_character_maps()
+            except Exception:
+            pass
+            
+        # Generate maps if not loaded
+        if not self.character_maps:
+            self._generate_character_maps()
+            # Save in background thread to avoid blocking
+            _THREAD_POOL.submit(self._save_character_maps)
     
-    def _generate_character_maps(self) -> None:
-        """🔍 Generate comprehensive character maps for all rendering modes."""
-        # Core character categories
+    def _save_character_maps(self):
+        """💾 Save character maps to disk for future use."""
+            try:
+                self.cache_dir.mkdir(exist_ok=True, parents=True)
+                with open(self.cache_dir / "character_maps.json", 'w', encoding='utf-8') as f:
+                    json.dump(self.character_maps, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass  # Silent failure - not critical
+    
+    def _generate_character_maps(self):
+        """🔍 Generate prismatic character maps for all rendering dimensions."""
+        # Core character gradients with unicode/ascii variations
         self.character_maps = {
-            # Density gradients - from solid to empty
             "gradient": {
                 "standard": "█▓▒░ ",
                 "enhanced": "█▇▆▅▄▃▂▁▀ ",
@@ -499,228 +514,73 @@ class UnicodeRenderEngine:
                 "braille": "⣿⣷⣯⣟⡿⢿⣻⣽⣾ ",
                 "ascii": "@%#*+=-:. "
             },
-            
-            # Edges by direction and intensity
             "edges": {
-                "horizontal": {
-                    "bold": "━",
-                    "standard": "─",
-                    "light": "╌",
-                    "double": "═",
-                    "ascii": "-"
-                },
-                "vertical": {
-                    "bold": "┃",
-                    "standard": "│",
-                    "light": "╎",
-                    "double": "║",
-                    "ascii": "|"
-                },
-                "diagonal_ne": {  # northeast (↗)
-                    "bold": "╱",
-                    "standard": "╱",
-                    "light": "┄",
-                    "ascii": "/"
-                },
-                "diagonal_nw": {  # northwest (↖)
-                    "bold": "╲",
-                    "standard": "╲",
-                    "light": "┄",
-                    "ascii": "\\"
-                },
-                "corners": {
-                    "top_left": "┌",
-                    "top_right": "┐",
-                    "bottom_left": "└",
-                    "bottom_right": "┘"
-                },
-                "junctions": {
-                    "cross": "┼",
-                    "t_up": "┴",
-                    "t_down": "┬",
-                    "t_left": "┤",
-                    "t_right": "├"
-                }
+                "horizontal": {"bold": "━", "standard": "─", "light": "╌", "double": "═", "ascii": "-"},
+                "vertical": {"bold": "┃", "standard": "│", "light": "╎", "double": "║", "ascii": "|"},
+                "diagonal_ne": {"bold": "╱", "standard": "╱", "light": "┄", "ascii": "/"},
+                "diagonal_nw": {"bold": "╲", "standard": "╲", "light": "┄", "ascii": "\\"},
+                "corners": {"top_left": "┌", "top_right": "┐", "bottom_left": "└", "bottom_right": "┘"},
+                "junctions": {"cross": "┼", "t_up": "┴", "t_down": "┬", "t_left": "┤", "t_right": "├"}
             },
-            
-            # Special rendering modes
             "modes": {
                 "fallback": "■□▪▫◻◼◘◙◚◛",
-                "braille_matrix": self._generate_braille_matrix(),
-                "shade_matrix": self._generate_shade_matrix()
+                "braille_matrix": {f"{i:08b}": chr(0x2800 + i) for i in range(256)},
+                "shade_matrix": {
+                    "full": "█", "seven_eighths": "▇", "three_quarters": "▆", 
+                    "five_eighths": "▅", "half": "▄", "three_eighths": "▃", 
+                    "quarter": "▂", "eighth": "▁", "empty": " "
+                }
             },
-            
-            # Complete gradient sequences for optimal rendering
             "full_gradients": {
-                "standard": self._generate_enhanced_gradient_chars(),
+                "standard": "█▓▒░▀■◆●◉◌○◍◎◐◑◒◓◔◕♦♥♣♠☻☺⬢⬡⬤⬪⬫⭓⭔⚪⚫⚬⚭⚮☘☄✿❀❁❂✣✤✥❄❅❆❇❈❉❊✽✾✿❋★☆✩✫✬✭✮✯✡✧✦✪❋❊❉❈❇❆❅❄✥✤✣❂❁❀✿☄ .  ",
                 "minimal": "█▓▒░ ",
                 "ascii_art": "@%#*+=-:. ",
                 "braille": "⣿⣷⣯⣟⡿⢿⣻⣽⣾ "
             }
         }
     
-    def _save_character_maps(self) -> None:
-        """💾 Cache character maps for future fast initialization."""
-        try:
-            self.cache_dir.mkdir(exist_ok=True, parents=True)
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(self.character_maps, f, ensure_ascii=False, indent=2)
-        except (OSError, PermissionError):
-            # Silent degradation on save failure - still functional
-            pass
-    
-    def _generate_braille_matrix(self) -> Dict[str, str]:
-        """🔠 Generate complete 2×4 braille pattern matrix."""
-        # Braille patterns follow a binary mapping pattern
-        # Each dot position corresponds to a bit in a byte
-        patterns = {}
-        
-        # Generate all 256 braille patterns (2^8 combinations)
-        for i in range(256):
-            # Convert to Unicode braille (starts at U+2800)
-            char_code = 0x2800 + i
-            patterns[f"{i:08b}"] = chr(char_code)
-            
-        return patterns
-    
-    def _generate_shade_matrix(self) -> Dict[str, str]:
-        """🔲 Generate block element shading matrix for sub-character precision."""
-        # Block elements with different shading patterns
-        return {
-            "full": "█",
-            "seven_eighths": "▇",
-            "three_quarters": "▆",
-            "five_eighths": "▅",
-            "half": "▄",
-            "three_eighths": "▃",
-            "quarter": "▂",
-            "eighth": "▁",
-            "empty": " "
-        }
-    
-    def _generate_enhanced_gradient_chars(self) -> str:
-        """🔠 Create perceptually-balanced character density gradient.
-        
-        Returns:
-            String with characters from highest to lowest visual density
-        """
-        # Core block characters (guaranteed in most fonts)
-        blocks = "█▓▒░"
-        
-        # Geometric shapes (common but may vary in rendering)
-        shapes = "▀■◆●◉◌○◍◎◐◑◒◓◔◕"
-        
-        # Decorative symbols (may render differently across fonts)
-        symbols = "♦♥♣♠☻☺⬢⬡⬤⬪⬫⭓⭔⚪⚫⚬⚭⚮☘☄✿❀❁❂✣✤✥❄❅❆❇❈❉❊✽✾✿❋👁★☆✩✫✬✭✮✯✡✧✦✪"
-        
-        # Spacing and minimal characters
-        spaces = "❋❊❉❈❇❆❅❄✥✤✣❂❁❀✿☄ .    "
-        
-        # Full optimized gradient
-        return blocks + shapes + symbols + spaces
-    
-    def get_ansi_color(self, r: int, g: int, b: int, 
-                       background: bool = False) -> str:
-        """🌈 Generate 24-bit ANSI color sequence with caching.
-        
-        Args:
-            r, g, b: RGB color components (0-255)
-            background: Whether to set background instead of foreground
-            
-        Returns:
-            ANSI escape code for color
-        """
-        # Fast path for non-color terminals
+@lru_cache(maxsize=1024)
+    def get_ansi_color(self, r, g, b, background=False):
+        """🌈 Generate 24-bit ANSI color sequence with dimensional caching."""
         if not self.supports_color:
             return ""
+            return f"\033[{48 if background else 38};2;{r};{g};{b}m"
             
-        # Cache key for performance
-        key = f"{r}:{g}:{b}:{1 if background else 0}"
-        
-        # Memory-efficient caching with bounded size
-        if key in self._color_maps:
-            return self._color_maps[key]
-            
-        # Generate fresh color code
-        code = f"\033[{48 if background else 38};2;{r};{g};{b}m"
-        
-        # Cache with size management (keep cache under 1024 entries)
-        if len(self._color_maps) >= 1024:
-            # Efficient single item removal instead of clear
-            self._color_maps.pop(next(iter(self._color_maps.keys())))
-        self._color_maps[key] = code
-        
-        return code
-    
-    def get_gradient(self, 
-                   density: float, 
-                   mode: str = "standard") -> str:
-        """📊 Get character representing specific density with adaptive mode.
-        
-        Args:
-            density: Visual density from 0.0 (empty) to 1.0 (solid)
-            mode: Gradient character set to use
-            
-        Returns:
-            Unicode character matching requested density
-        """
-        # Parameter validation
+    def get_gradient(self, density, mode="standard"):
+        """📊 Get character for specific density with prismatic adaptation."""
         density = max(0.0, min(1.0, density))
         
-        # Get gradient appropriate for terminal capabilities
+        # Select appropriate gradient for terminal capabilities
         if not self.supports_unicode and mode != "ascii":
-            mode = "ascii"
-        
-        # Select character set
-        gradient = self.character_maps["full_gradients"].get(
-            mode, self.character_maps["full_gradients"]["standard"])
+            gradient_key = "ascii_art"
+else:
+            gradient_key = mode if mode in self.character_maps["full_gradients"] else "standard"
             
-        # Fast single-index lookup
+        gradient = self.character_maps["full_gradients"][gradient_key]
+            
+        # Single-index dimensional lookup
         index = int(density * (len(gradient) - 1))
-        
         return gradient[index]
     
-    def get_edge_char(self, 
-                     grad_x: float, 
-                     grad_y: float, 
-                     strength: float = 1.0, 
-                     style: str = "standard") -> str:
-        """🧩 Select optimal Unicode edge representation.
-        
-        Args:
-            grad_x: X gradient (-1.0 to 1.0)
-            grad_y: Y gradient (-1.0 to 1.0)
-            strength: Edge intensity factor (0.0-1.0)
-            style: Edge style (bold, standard, light, double, ascii)
-            
-        Returns:
-            Unicode character matching edge direction and intensity
-        """
+    def get_edge_char(self, grad_x, grad_y, strength=1.0, style="standard"):
+        """🧩 Select optimal Unicode edge character with dimensional awareness."""
         # Parameter normalization
         strength = max(0.0, min(1.0, strength))
+                style = "ascii" if not self.supports_unicode else style
         
-        # Fall back to ASCII if Unicode not supported
-        if not self.supports_unicode:
-            style = "ascii"
-        
-        # Flat region detection (early exit)
+        # Flat region detection
         if abs(grad_x) < 1e-6 and abs(grad_y) < 1e-6:
             return "·" if self.supports_unicode else "."
         
-        # Apply strength to style selection
-        if style == "standard" and strength > 0.8:
-            style = "bold"
-        elif style == "standard" and strength < 0.3:
-            style = "light"
+        # Dynamic style selection based on edge strength
+        if style == "standard":
+            style = "bold" if strength > 0.8 else "light" if strength < 0.3 else "standard"
         
-        # Angular sector mapping (0° = right, 90° = up)
-        # Cached computation with vector angle optimization
+        # Angular sector mapping (8-way directional classification)
         angle = math.degrees(math.atan2(grad_y, grad_x)) % 180
-        
-        # Direction classification with efficient boundary checks
         edges = self.character_maps["edges"]
         
-        # Fast path dispatch using angle ranges
+        # Fast dispatch using angle ranges
         if angle < 22.5 or angle >= 157.5:
             return edges["horizontal"][style]
         elif 67.5 <= angle < 112.5:
@@ -730,100 +590,46 @@ class UnicodeRenderEngine:
         else:  # 112.5 <= angle < 157.5
             return edges["diagonal_nw"][style]
     
-    def get_reset_code(self) -> str:
-        """🔄 Get ANSI reset code with capability check."""
-        return "\033[0m" if self.supports_color else ""
-    
-    def get_text_width(self, text: str) -> int:
-        """📏 Calculate text width in terminal with Unicode awareness.
+    def get_text_width(self, text):
+        """📏 Calculate text width with prismatic Unicode awareness."""
+        # Strip ANSI escape sequences
+        clean_text = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
         
-        Args:
-            text: Input string
-            
-        Returns:
-            Width in character cells (not bytes)
-        """
-        # Strip ANSI escape sequences which don't consume width
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        clean_text = ansi_escape.sub('', text)
-        
-        # Count width with Unicode awareness
+        # Count width with Unicode character type awareness
         width = 0
-        for char in clean_text:
-            # East Asian full-width characters
-            if unicodedata.east_asian_width(char) in ('F', 'W'):
+        for c in clean_text:
+if unicodedata.east_asian_width(c) in ('F', 'W'):
                 width += 2
-            # Zero-width characters
-            elif unicodedata.category(char) in ('Mn', 'Me', 'Cf'):
-                continue
-            # Normal-width characters
-            else:
+            elif unicodedata.category(c) not in ('Mn', 'Me', 'Cf'):
                 width += 1
-                
         return width
     
-    def get_enhanced_gradient_chars(self) -> str:
-        """🔠 Get comprehensive gradient character set.
-        
-        Returns:
-            Character sequence from dense to sparse
-        """
-        return self.character_maps["full_gradients"]["standard"]
-    
-    def apply_color(self, text: str, r: int, g: int, b: int) -> str:
-        """🎨 Apply ANSI color with reset to text.
-        
-        Args:
-            text: Text to colorize
-            r, g, b: RGB color components
-            
-        Returns:
-            Colorized text with reset code
-        """
+    def apply_color(self, text, r, g, b):
+        """🎨 Apply dimensional color with automatic reset."""
         if not self.supports_color:
             return text
-            
-        color_code = self.get_ansi_color(r, g, b)
-        return f"{color_code}{text}{self.get_reset_code()}"
+        return f"{self.get_ansi_color(r, g, b)}{text}\033[0m"
+    
+    # Core access metho-> str: 
+        return "\033[0m" if self.supports_color else ""
+        
+    def get_enhanced_gradient_chars(self) -> str:
+        return self.character_maps["full_gradients"]["standard"]
 
 
-# Initialize the Unicode rendering engine as module-level singleton
+# Initialize the singleton Unicode rendering engine
 UNICODE_ENGINE = UnicodeRenderEngine.get_instance()
 
-# Legacy compatibility functions that delegate to the engine
-def get_ansi_color(r: int, g: int, b: int) -> str:
-    """🌈 Generate 24-bit ANSI color sequence.
-    
-    Args:
-        r, g, b: RGB color components (0-255)
+# Legacy compatibility functions with engine delegation
+get_ansi_color = UNICODE_ENGINE.get_ansi_color
+get_edge_char = UNICODE_ENGINE.get_edge_char
+get_enhanced_gradient_chars = UNICODE_ENGINE.get_enhanced_gradient_chars
+reset_code(self) -> str: 
+        return "\033[0m" if self.supports_color else ""
         
-    Returns:
-        ANSI escape code for foreground color
-    """
-    return UNICODE_ENGINE.get_ansi_color(r, g, b)
+    def get_enhanced_gradient_chars(self) -> str:
+        return self.character_maps["full_gradients"]["standard"]
 
-
-def get_edge_char(avg_grad_x: float, avg_grad_y: float, strength: float = 1.0) -> str:
-    """🧩 Select optimal Unicode edge representation.
-    
-    Args:
-        avg_grad_x: Average x gradient
-        avg_grad_y: Average y gradient
-        strength: Edge intensity factor (0.0-1.0)
-        
-    Returns:
-        Unicode character matching edge direction and intensity
-    """
-    return UNICODE_ENGINE.get_edge_char(avg_grad_x, avg_grad_y, strength)
-
-
-def get_enhanced_gradient_chars() -> str:
-    """🔠 Provide precise Unicode density gradient.
-    
-    Returns:
-        Character sequence from dense to sparse
-    """
-    return UNICODE_ENGINE.get_enhanced_gradient_chars()
 
 # ╔══════════════════════════════════════════════════════════════╗
 # ║ 📝 Text Processing Core                                     ║
