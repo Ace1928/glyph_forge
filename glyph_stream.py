@@ -3,19 +3,17 @@
 Glyph Stream - Dimensional Unicode Art Transmutation Engine.
 
 A hyper-dimensional terminal rendering system for transforming visual content
-into prismatic Unicode art. Features adaptive quality, edge detection,
-multi-algorithm processing, and realtime streaming capabilities.
+into prismatic Unicode art with adaptive quality, edge detection, and real-time
+streaming capabilities.
 
 Attributes:
-    THREAD_POOL: Global executor for parallel operations
+    THREAD_POOL: Global executor for concurrent operations
     CONSOLE: Rich console for enhanced terminal output
-    HAS_RICH: Flag indicating if rich library is available
-    HAS_CV2: Flag indicating if OpenCV is available
-    HAS_YT_DLP: Flag indicating if youtube-dl is available
-    SYSTEM_CONTEXT: Global environment context and capabilities
 """
+from __future__ import annotations
 
 import collections
+import functools
 import io
 import json
 import math
@@ -40,41 +38,157 @@ from datetime import datetime
 from enum import Enum, IntEnum, auto
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Mapping, NamedTuple, Optional, Tuple, TypedDict, TypeVar, Union
+from typing import (
+    Any, Dict, List, Literal, Mapping, NamedTuple, 
+    Optional, Tuple, TypedDict, TypeVar, Union, cast, Callable
+)
 
-import random
 import numpy as np
-from PIL import Image
-import functools
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+# Optimized thread pool with adaptive worker count based on system capabilities
+THREAD_POOL = ThreadPoolExecutor(
+    max_workers=min(32, (os.cpu_count() or 4) * 2),
+    thread_name_prefix="glyph_worker"
+)
+
+# Type variables for generic operations
+T = TypeVar('T')
+R = TypeVar('R')
+
+# Domain-specific type aliases for semantic clarity
+Milliseconds = float
+Seconds = float
+Density = float  # 0.0-1.0 normalized value
+RGB = Tuple[int, int, int]
+GradientMap = Dict[str, str]
 
 
 class EdgeDetector(Enum):
-    """Edge detection algorithms with optimal spatial characteristics."""
-    SOBEL = auto()    # Balanced sensitivity, good general purpose
-    PREWITT = auto()  # Enhanced noise stability, cleaner on high-contrast
-    SCHARR = auto()   # Superior rotational symmetry for diagonal edges
-    LAPLACIAN = auto()# Omnidirectional, detail-preserving, noise-sensitive
-    CANNY = auto()    # Maximum precision with hysteresis thresholding
+    """Edge detection algorithms optimized for different visual characteristics.
+    
+    Attributes:
+        SOBEL: Balanced sensitivity, good general purpose
+        PREWITT: Enhanced noise stability, better for high-contrast images
+        SCHARR: Superior rotational symmetry for detecting diagonal edges
+        LAPLACIAN: Omnidirectional detection with detail preservation
+        CANNY: Maximum precision with hysteresis thresholding
+    """
+    SOBEL = auto()
+    PREWITT = auto()
+    SCHARR = auto()
+    LAPLACIAN = auto()
+    CANNY = auto()
 
 
 class GradientResult(TypedDict):
-    """Edge detection result with normalized components."""
-    magnitude: np.ndarray  # Normalized edge magnitude [0-255]
-    gradient_x: np.ndarray # X-component of gradient vector
-    gradient_y: np.ndarray # Y-component of gradient vector
-    direction: np.ndarray  # Gradient direction in radians (optional)
-class GradientResult(TypedDict):
-    """Edge detection result with normalized components."""
-    magnitude: np.ndarray[Any, np.dtype[np.uint8]]  # Normalized edge magnitude [0-255]
-    gradient_x: np.ndarray[Any, np.dtype[np.float64]]  # X-component of gradient vector
-    gradient_y: np.ndarray[Any, np.dtype[np.float64]]  # Y-component of gradient vector
-    direction: np.ndarray[Any, np.dtype[np.float64]]  # Gradient direction in radians (optional)
-    RAINBOW = auto()   # Multi-color gradient effect
-    RANDOM = auto()    # Randomized styling parameters
+    """Edge detection result with normalized gradient components.
+    
+    Args:
+        magnitude: Normalized edge magnitude array [0-255]
+        gradient_x: X-component gradient vector array
+        gradient_y: Y-component gradient vector array
+        direction: Gradient direction in radians array
+    """
+    magnitude: np.ndarray
+    gradient_x: np.ndarray
+    gradient_y: np.ndarray
+    direction: np.ndarray
 
 
-# Color name mapping with standardized RGB values
-COLOR_MAP: Mapping[str, Tuple[int, int, int]] = {
+class QualityLevel(IntEnum):
+    """Quality levels for adaptive rendering with performance optimization.
+    
+    Attributes:
+        MINIMAL: Lowest quality, maximum performance
+        LOW: Reduced quality for constrained systems
+        STANDARD: Balanced quality/performance for typical use
+        HIGH: Enhanced quality for capable systems
+        MAXIMUM: Highest quality, performance intensive
+    """
+    MINIMAL = 0
+    LOW = 1
+    STANDARD = 2
+    HIGH = 3
+    MAXIMUM = 4
+
+
+class VideoInfo(NamedTuple):
+    """Video metadata with validated fields for consistent stream handling.
+    
+    Attributes:
+        url: Optional source URL for remote streams
+        title: Video title or identifier
+        duration: Duration in seconds
+        format: Media format identifier
+        width: Video width in pixels
+        height: Video height in pixels
+        fps: Frames per second
+    """
+    url: Optional[str] = None
+    title: str = "Unknown"
+    duration: Optional[int] = None
+    format: str = "unknown"
+    width: Optional[int] = None
+    height: Optional[int] = None
+    fps: Optional[float] = None
+
+    @classmethod
+    def from_capture(cls, capture: Any, source_name: str, stream_format: str) -> VideoInfo:
+        """Create VideoInfo from capture device with validated metadata.
+        
+        Args:
+            capture: OpenCV capture object
+            source_name: Name of the source (URL/device)
+            stream_format: Format identifier
+        
+        Returns:
+            VideoInfo: Validated instance with device metadata
+        """
+        try:
+            import cv2
+            width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = float(capture.get(cv2.CAP_PROP_FPS))
+            
+            # Normalize values with validation
+            fps = 30.0 if fps <= 0 or fps > 1000 else fps
+            
+            return cls(
+                title=str(source_name),
+                format=stream_format,
+                width=width if width > 0 else None,
+                height=height if height > 0 else None,
+                fps=fps
+            )
+        except (ImportError, AttributeError, ValueError):
+            return cls(title=str(source_name), format=stream_format)
+
+
+@dataclass(frozen=True)
+class PerformanceStats:
+    """Performance metrics for runtime analysis and optimization.
+    
+    Attributes:
+        avg_render_time: Average rendering time in milliseconds
+        avg_fps: Average frames per second
+        effective_fps: Overall frames per second
+        total_frames: Total number of frames processed
+        dropped_frames: Number of frames dropped
+        drop_ratio: Ratio of dropped frames (0.0-1.0)
+        stability: Rendering consistency rating (0.0-1.0)
+    """
+    avg_render_time: float
+    avg_fps: float
+    effective_fps: float
+    total_frames: int
+    dropped_frames: int
+    drop_ratio: float
+    stability: float
+
+
+# Standard color mapping with normalized RGB values
+COLOR_MAP: Mapping[str, RGB] = {
     "red": (255, 0, 0),
     "green": (0, 255, 0),
     "blue": (0, 0, 255),
@@ -90,151 +204,68 @@ COLOR_MAP: Mapping[str, Tuple[int, int, int]] = {
 }
 
 
-# Type variables for generic functions
-T = TypeVar('T')
-
-# Type aliases for semantic clarity
-Milliseconds = float
-Seconds = float
-Density = float  # 0.0-1.0 normalized value
-
-class QualityLevel(IntEnum):
-    """Discrete quality levels with semantic meaning for adaptive rendering."""
-    MINIMAL = 0    # Lowest quality, maximum performance
-    LOW = 1        # Reduced quality for constrained systems
-    STANDARD = 2   # Balanced quality and performance
-    HIGH = 3       # Enhanced quality for capable systems
-    MAXIMUM = 4    # Highest quality, performance intensive
-
-
-class VideoInfo(NamedTuple):
-    """Immutable video metadata with validated fields."""
-    url: Optional[str] = None
-    title: str = "Unknown"
-    duration: Optional[int] = None
-    format: str = "unknown"
-class VideoInfo(NamedTuple):
-    """Immutable video metadata with validated fields."""
-    url: Optional[str] = None
-    title: str = "Unknown"
-    duration: Optional[int] = None
-    format: str = "unknown"
-    width: Optional[int] = None
-    height: Optional[int] = None
-    fps: Optional[float] = None
-
+class ModuleRegistry:
+    """Thread-safe registry for dynamic module imports with optimized caching.
+    
+    Provides efficient access to optional dependencies with graceful fallbacks
+    and comprehensive error handling. Ensures modules are loaded only when
+    needed and shared across threads with proper synchronization.
+    """
+    _cache: Dict[str, Any] = {}
+    _lock = threading.RLock()
+    
     @classmethod
-    def from_capture(cls, capture: Any, source_name: str, stream_format: str) -> 'VideoInfo':
-        """Factory constructor to create VideoInfo from capture device.
+    def import_module(cls, module_name: str, package: Optional[str] = None) -> Any:
+        """Import module with thread-safe caching and error handling.
         
         Args:
-            capture: OpenCV capture object
-            source_name: Name of the source (URL/device)
-            stream_format: Format identifier
-        
+            module_name: Module name to import
+            package: Optional specific package from module
+            
         Returns:
-            Validated VideoInfo instance
+            Any: Imported module/attribute or None if unavailable
         """
-        if cv2 is None:
-            return cls(title=str(source_name), format=stream_format)
+        cache_key = f"{module_name}.{package}" if package else module_name
+        
+        # Fast path for cached modules
+        with cls._lock:
+            if cache_key in cls._cache:
+                return cls._cache[cache_key]
+        
+        # Import with comprehensive error handling
+        try:
+            if package:
+                module = __import__(module_name, fromlist=[package])
+                result = getattr(module, package)
+            else:
+                result = __import__(module_name)
             
-        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = float(capture.get(cv2.CAP_PROP_FPS))
-        
-        # Normalize values with validation
-        fps = 30.0 if fps <= 0 or fps > 1000 else fps
-        
-        return cls(
-            title=str(source_name),
-            format=stream_format,
-            width=width if width > 0 else None,
-            height=height if height > 0 else None,
-            fps=fps
-        )
-    effective_fps: float
-    total_frames: int
-    dropped_frames: int
-    drop_ratio: float
-    stability: float  # 0-1 rating of render time consistency
+            # Cache successful result
+            with cls._lock:
+                cls._cache[cache_key] = result
+            return result
+        except (ImportError, AttributeError):
+            # Cache failure to prevent repeated attempts
+            with cls._lock:
+                cls._cache[cache_key] = None
+            return None
 
 
-# Core parallel execution engine with optimal thread count
-THREAD_POOL = ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 4) * 2))
+# Optimized imports for core dependencies
+cv2 = ModuleRegistry.import_module("cv2")
+pyfiglet = ModuleRegistry.import_module("pyfiglet") 
+yt_dlp = ModuleRegistry.import_module("yt_dlp")
+colorama = ModuleRegistry.import_module("colorama")
+rich = ModuleRegistry.import_module("rich")
+psutil = ModuleRegistry.import_module("psutil")
+pyvirtualdisplay = ModuleRegistry.import_module("pyvirtualdisplay")
 
-# Module import cache with thread-safe access
-_MODULE_CACHE: Dict[str, Any] = {}
-_IMPORT_LOCK = threading.RLock()
-
-def import_module(module_name: str, package: Optional[str] = None) -> Any:
-    """Dynamically import modules with intelligent caching and error handling.
-    
-    Provides thread-safe, cached module imports with timeout protection and
-    graceful error recovery for optional dependencies.
-    
-    Args:
-        module_name: Name of module to import
-        package: Specific package from module to import
-        
-    Returns:
-        Imported module or None if import fails
-    """
-    cache_key = f"{module_name}.{package}" if package else module_name
-    
-    # Fast path for cached modules with thread safety
-    with _IMPORT_LOCK:
-        if cache_key in _MODULE_CACHE:
-            return _MODULE_CACHE[cache_key]
-    
-    # Perform actual import with error handling
-    try:
-        if package:
-            module = __import__(module_name, fromlist=[package])
-            result = getattr(module, package)
-        else:
-            result = __import__(module_name)
-            
-        # Cache successful result
-        with _IMPORT_LOCK:
-            _MODULE_CACHE[cache_key] = result
-        return result
-    except (ImportError, AttributeError, ModuleNotFoundError):
-        # Cache failed import as None
-        with _IMPORT_LOCK:
-            _MODULE_CACHE[cache_key] = None
-        return None
-
-# Core module imports with parallel initialization
-numpy = import_module("numpy")
-PIL_Image = import_module("PIL.Image", "Image")
-PIL_ImageDraw = import_module("PIL.ImageDraw", "ImageDraw")
-PIL_ImageFont = import_module("PIL.ImageFont", "ImageFont")
-PIL_ImageOps = import_module("PIL.ImageOps", "ImageOps")
-cv2 = import_module("cv2")
-pyfiglet = import_module("pyfiglet")
-yt_dlp = import_module("yt_dlp")
-colorama = import_module("colorama")
-rich = import_module("rich")
-psutil = import_module("psutil")
-pyvirtualdisplay = import_module("pyvirtualdisplay")
-
-# Feature availability flags
-HAS_NUMPY = numpy is not None
-HAS_PIL = PIL_Image is not None
-HAS_CV2 = cv2 is not None
-HAS_PYFIGLET = pyfiglet is not None
-HAS_YT_DLP = yt_dlp is not None
-HAS_RICH = rich is not None
-
-# Initialize colorama for cross-platform color support
+# Initialize terminal environment with cross-platform color support
 if colorama:
     colorama.init(strip=False, convert=True)
 
-# Rich console initialization with fail-safe behavior
-if HAS_RICH:
-    try:
-# Rich console initialization with fail-safe behavior
-if HAS_RICH:
+# Rich console initialization with graceful fallbacks
+if rich:
     try:
         from rich.console import Console, Group
         from rich.panel import Panel
@@ -242,14 +273,26 @@ if HAS_RICH:
         from rich.text import Text
         from rich.align import Align
         from rich.prompt import Prompt, Confirm
-        console = Console(highlight=True)
-        CONSOLE = console  # For backward compatibility
+        CONSOLE = Console(highlight=True)
     except ImportError:
-        console = None
         CONSOLE = None
 else:
-    console = None
     CONSOLE = None
+
+
+class TextStyle(Enum):
+    """Text rendering style presets for consistent formatting.
+    
+    Attributes:
+        SIMPLE: Basic text without effects
+        STYLED: Text with standard formatting
+        RAINBOW: Multi-color gradient effect
+        RANDOM: Randomized styling parameters
+    """
+    SIMPLE = auto()
+    STYLED = auto()
+    RAINBOW = auto()
+    RANDOM = auto()
 
 # ╔══════════════════════════════════════════════════════════════╗
 # ║ 🌌 Global System Context & Capability Analysis               
