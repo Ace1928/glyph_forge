@@ -26,6 +26,7 @@ import shlex
 import shutil
 import socket
 import statistics
+import argparse
 import subprocess
 import sys
 import tempfile
@@ -43,6 +44,58 @@ from pathlib import Path
 from typing import (Any, Callable, Dict, List, Literal, NamedTuple, Optional, 
                    Set, Tuple, TypedDict, TypeVar, Union, cast)
 
+from enum import Enum, auto
+from typing import Dict, List, Literal, Mapping, Optional, Tuple, Union, cast
+import random
+from typing import Dict, Literal, Optional, Protocol, Tuple, TypedDict, Union, cast, overload
+from enum import Enum, auto
+import numpy as np
+from PIL import Image
+import functools
+
+
+class EdgeDetector(Enum):
+    """Edge detection algorithms with optimal spatial characteristics."""
+    SOBEL = auto()    # Balanced sensitivity, good general purpose
+    PREWITT = auto()  # Enhanced noise stability, cleaner on high-contrast
+    SCHARR = auto()   # Superior rotational symmetry for diagonal edges
+    LAPLACIAN = auto()# Omnidirectional, detail-preserving, noise-sensitive
+    CANNY = auto()    # Maximum precision with hysteresis thresholding
+
+
+class GradientResult(TypedDict):
+    """Edge detection result with normalized components."""
+    magnitude: np.ndarray  # Normalized edge magnitude [0-255]
+    gradient_x: np.ndarray # X-component of gradient vector
+    gradient_y: np.ndarray # Y-component of gradient vector
+    direction: np.ndarray  # Gradient direction in radians (optional)
+
+
+class TextStyle(Enum):
+    """Standardized text rendering presets for consistent application."""
+    SIMPLE = auto()    # Basic text without decoration
+    STYLED = auto()    # Enhanced with color and borders
+    RAINBOW = auto()   # Multi-color gradient effect
+    RANDOM = auto()    # Randomized styling parameters
+
+
+# Color name mapping with standardized RGB values
+COLOR_MAP: Mapping[str, Tuple[int, int, int]] = {
+    "red": (255, 0, 0),
+    "green": (0, 255, 0),
+    "blue": (0, 0, 255),
+    "yellow": (255, 255, 0),
+    "cyan": (0, 255, 255),
+    "magenta": (255, 0, 255),
+    "white": (255, 255, 255),
+    "black": (0, 0, 0),
+    "orange": (255, 165, 0),
+    "purple": (128, 0, 128),
+    "pink": (255, 192, 203),
+    "gray": (128, 128, 128),
+}
+
+
 # Type variables for generic functions
 T = TypeVar('T')
 
@@ -50,6 +103,64 @@ T = TypeVar('T')
 Milliseconds = float
 Seconds = float
 Density = float  # 0.0-1.0 normalized value
+
+class QualityLevel(IntEnum):
+    """Discrete quality levels with semantic meaning for adaptive rendering."""
+    MINIMAL = 0    # Lowest quality, maximum performance
+    LOW = 1        # Reduced quality for constrained systems
+    STANDARD = 2   # Balanced quality and performance
+    HIGH = 3       # Enhanced quality for capable systems
+    MAXIMUM = 4    # Highest quality, performance intensive
+
+
+class VideoInfo(NamedTuple):
+    """Immutable video metadata with validated fields."""
+    url: Optional[str] = None
+    title: str = "Unknown"
+    duration: Optional[int] = None
+    format: str = "unknown"
+    width: Optional[int] = None
+    height: Optional[int] = None
+    fps: Optional[float] = None
+
+    @classmethod
+    def from_capture(cls, capture, source_name: str, stream_format: str) -> 'VideoInfo':
+        """Factory constructor to create VideoInfo from capture device.
+        
+        Args:
+            capture: OpenCV capture object
+            source_name: Name of the source (URL/device)
+            stream_format: Format identifier
+        
+        Returns:
+            Validated VideoInfo instance
+        """
+        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        
+        # Normalize values with validation
+        fps = 30.0 if fps <= 0 or fps > 1000 else fps
+        
+        return cls(
+            title=str(source_name),
+            format=stream_format,
+            width=width if width > 0 else None,
+            height=height if height > 0 else None,
+            fps=fps
+        )
+
+
+class PerformanceStats(TypedDict):
+    """Rich statistical performance metrics."""
+    avg_render_time: float
+    avg_fps: float
+    effective_fps: float
+    total_frames: int
+    dropped_frames: int
+    drop_ratio: float
+    stability: float  # 0-1 rating of render time consistency
+
 
 # Core parallel execution engine with optimal thread count
 THREAD_POOL = ThreadPoolExecutor(max_workers=min(32, (os.cpu_count() or 4) * 2))
@@ -339,54 +450,70 @@ SYSTEM_CONTEXT = SystemContext.get_instance()
 # ║ 🌌 Hyperdimensional Environment & System Intelligence        ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+# Core modules mapping with standardized capability detection
+CORE_MODULES = {
+    "numpy": ("numpy", "NumPy tensor operations"),
+    "pillow": ("PIL_Image", "Image processing"),
+    "opencv": ("cv2", "Computer vision operations"),
+    "pyfiglet": ("pyfiglet", "ASCII art generation"),
+    "yt_dlp": ("yt_dlp", "Media streaming"),
+    "rich": ("rich", "Terminal rendering"),
+    "psutil": ("psutil", "System monitoring")
+}
+
 class EnvContext:
     """Unified environment intelligence with multidimensional awareness.
     
-    Provides comprehensive system detection and capability analysis with
-    parallel resource detection, caching, and dynamic optimization tailoring.
+    A thread-safe singleton providing comprehensive system intelligence
+    with parallel detection, optimized caching, and dynamic configuration.
+    Automatically adapts parameters based on available resources.
     
     Attributes:
-        terminal: Terminal dimensions and capabilities
-        runtime: Python runtime environment details
-        hardware: System hardware capabilities 
-        network: Network connectivity status
-        capabilities: Synthesized capability flags
-        constraints: System-aware operational constraints
+        terminal (Dict[str, Any]): Terminal dimensions and capabilities
+        runtime (Dict[str, Any]): Python runtime environment details
+        hardware (Dict[str, Any]): System hardware specifications
+        network (Dict[str, bool]): Network connectivity status
+        modules (Dict[str, bool]): Available module capabilities
+        capabilities (Dict[str, Any]): Synthesized capability flags
+        constraints (Dict[str, Any]): System-aware operational constraints
     """
     _instance: Optional['EnvContext'] = None
+    _lock: threading.RLock = threading.RLock()
     
     @classmethod
     def get(cls) -> 'EnvContext':
-        """Access singleton instance with lazy initialization.
+        """Access thread-safe singleton instance with lazy initialization.
         
         Returns:
             EnvContext: The global environment context
         """
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
     
     def __init__(self) -> None:
-        """Initialize environment context with parallel analysis."""
-        # Core dimensions with robust detection
+        """Initialize environment with parallel capability detection."""
+        # Terminal properties with fast detection
         self.terminal = self._detect_terminal()
         
-        # Concurrent analysis of system capabilities
+        # Execute analysis tasks concurrently
         futures = {
-            "runtime": _THREAD_POOL.submit(self._analyze_runtime),
-            "hardware": _THREAD_POOL.submit(self._analyze_hardware),
-            "network": _THREAD_POOL.submit(self._analyze_network)
+            "runtime": THREAD_POOL.submit(self._analyze_runtime),
+            "hardware": THREAD_POOL.submit(self._analyze_hardware),
+            "network": THREAD_POOL.submit(self._analyze_network)
         }
         
         # Gather results with timeout protection
         self.runtime = self._safely_get(futures["runtime"], {})
         self.hardware = self._safely_get(futures["hardware"], {})
-        self.network = self._safely_get(futures["network"], {})
+        self.network = self._safely_get(futures["network"], {"connected": False})
         
-        # Set module capabilities from globals
-        self.modules = {m: bool(globals()[n]) for m, (n, _) in _CORE_MODULES.items()}
+        # Module detection
+        self.modules = {name: bool(globals()[module_name]) 
+                       for name, (module_name, _) in CORE_MODULES.items()}
         
-        # Synthesize capabilities and constraints
+        # Calculate derived properties
         self._update_capabilities()
         self._update_constraints()
 
@@ -394,9 +521,11 @@ class EnvContext:
         """Detect terminal properties with robust fallbacks."""
         try:
             dims = shutil.get_terminal_size()
+            width, height = dims.columns, dims.lines
         except (AttributeError, OSError):
-            dims = os.terminal_size((80, 24))
+            width, height = 80, 24
             
+        # Comprehensive environment-aware capability detection
         supports_unicode = (
             sys.stdout.encoding and 
             'utf' in sys.stdout.encoding.lower() and 
@@ -413,86 +542,84 @@ class EnvContext:
         )
         
         return {
-            "width": dims.columns,
-            "height": dims.lines,
+            "width": width,
+            "height": height,
             "interactive": sys.stdout.isatty(),
             "supports_unicode": supports_unicode,
             "supports_color": supports_color
         }
     
     def _analyze_runtime(self) -> Dict[str, Any]:
-        """Analyze Python runtime environment."""
+        """Analyze Python runtime environment and platform capabilities."""
         return {
             "platform": platform.system(),
             "architecture": platform.machine(),
-            "processor": platform.processor(),
-            "python_version": platform.python_version(),
+            "python_version": tuple(map(int, platform.python_version().split('.'))),
             "hostname": platform.node(),
-            "has_metal": platform.system() == "Darwin"
+            "has_metal": platform.system() == "Darwin",
+            "is_64bit": sys.maxsize > 2**32,
+            "is_debug": hasattr(sys, 'gettrace') and sys.gettrace() is not None,
+            "is_frozen": getattr(sys, 'frozen', False)
         }
     
     def _analyze_hardware(self) -> Dict[str, Any]:
-        """Analyze hardware capabilities with intelligent fallbacks."""
+        """Analyze hardware capabilities with parallel detection."""
         result = {
             "memory_total": 0,
             "memory_available": 0,
             "cpu_count": os.cpu_count() or 2,
-            "cpu_physical": os.cpu_count() or 1,
-            "has_cuda": False
+            "cpu_physical": max(1, (os.cpu_count() or 2) // 2),
+            "has_cuda": False,
+            "numpy_optimized": False
         }
         
-        # Memory analysis
+        # Memory analysis with psutil
         if psutil:
             try:
                 mem = psutil.virtual_memory()
                 result.update({
                     "memory_total": mem.total,
                     "memory_available": mem.available,
-                    "cpu_count": psutil.cpu_count(logical=True),
-                    "cpu_physical": psutil.cpu_count(logical=False),
+                    "cpu_count": psutil.cpu_count(logical=True) or result["cpu_count"],
+                    "cpu_physical": psutil.cpu_count(logical=False) or result["cpu_physical"]
                 })
             except Exception:
                 pass
                 
-        # CUDA detection
-        if cv2 and hasattr(cv2, 'cuda') and hasattr(cv2.cuda, 'getCudaEnabledDeviceCount'):
+        # GPU acceleration detection
+        if cv2 and hasattr(cv2, 'cuda'):
             try:
                 result["has_cuda"] = cv2.cuda.getCudaEnabledDeviceCount() > 0
             except Exception:
                 pass
                 
         # NumPy optimization detection
-        if np:
+        if numpy:
             try:
-                config_info = np.__config__.show() if hasattr(np, "__config__") else ""
-                result["numpy_optimized"] = any(lib in str(config_info).lower() 
-                                               for lib in ["mkl", "openblas", "accelerate", "blas"])
+                config_info = str(numpy.show_config()) if hasattr(numpy, "show_config") else ""
+                result["numpy_optimized"] = any(lib in config_info.lower() 
+                                              for lib in ["mkl", "openblas", "accelerate", "blas"])
             except Exception:
-                result["numpy_optimized"] = False
+                pass
                 
         return result
     
     def _analyze_network(self) -> Dict[str, bool]:
         """Check network connectivity with fast timeout."""
-        try:
-            socket.create_connection(("1.1.1.1", 53), timeout=0.5)
-            return {"connected": True}
-        except (socket.error, socket.timeout):
-            return {"connected": False}
+        # Redundant check with multiple services for reliability
+        for host, port in [("1.1.1.1", 53), ("8.8.8.8", 53)]:
+            try:
+                socket.create_connection((host, port), timeout=0.5).close()
+                return {"connected": True}
+            except (socket.error, socket.timeout):
+                continue
+        return {"connected": False}
     
     def _safely_get(self, future: Future, default: T) -> T:
-        """Safely retrieve future results with timeout protection.
-        
-        Args:
-            future: The future to retrieve
-            default: Default value if future fails
-            
-        Returns:
-            The future result or default value
-        """
+        """Retrieve future results with timeout protection."""
         try:
             return future.result(timeout=0.5)
-        except Exception:
+        except (TimeoutError, Exception):
             return default
     
     def _update_capabilities(self) -> None:
@@ -507,8 +634,12 @@ class EnvContext:
             "high_performance": perf_tier >= 2,
             "network": self.network.get("connected", False),
             "hardware_accel": self.hardware.get("has_cuda", False) or 
-                             self.runtime.get("has_metal", False),
-            "performance_tier": perf_tier
+                            self.runtime.get("has_metal", False),
+            "performance_tier": perf_tier,
+            "has_rich": self.modules.get("rich", False),
+            "has_numpy": self.modules.get("numpy", False),
+            "has_cv2": self.modules.get("opencv", False),
+            "has_yt_dlp": self.modules.get("yt_dlp", False)
         }
     
     def _update_constraints(self) -> None:
@@ -523,41 +654,46 @@ class EnvContext:
             "max_art_width": term_width - (2 if term_width < 60 else 4),
             "max_art_height": term_height - (4 if term_height < 20 else 6),
             "max_scale_factor": min(4, max(1, perf_tier + 1)),
-            "default_fps": 5 if perf_tier == 0 else 10 if perf_tier == 1 else 15
+            "default_fps": 5 if perf_tier == 0 else 10 if perf_tier == 1 else 15,
+            "max_memory_usage": min(1.0, 0.5 + (perf_tier * 0.2)),
+            "parallel_tasks": max(2, min(8, self.hardware.get("cpu_count", 2)))
         }
     
     def _calculate_performance_tier(self) -> int:
-        """Calculate system performance tier (0-3) for adaptive optimization.
+        """Calculate system performance tier for adaptive optimization.
+        
+        Analyzes CPU, memory and acceleration capabilities to determine
+        the appropriate performance tier for dynamic parameter scaling.
         
         Returns:
             int: Performance tier (0=minimal, 3=high-end)
         """
-        # Base score from hardware
         cpu_count = self.hardware.get("cpu_count", 2)
-        memory_gb = self.hardware.get("memory_available", 0) / (1024**3) if self.hardware.get("memory_available", 0) else 2
+        memory_gb = self.hardware.get("memory_available", 0) / (1024**3) if self.hardware.get("memory_available", 0) > 0 else 2
         
-        # Calculate component scores
         cpu_score = 2 if cpu_count >= 16 else 1 if cpu_count >= 8 else -1 if cpu_count <= 2 else 0
         mem_score = 1 if memory_gb >= 16 else -1 if memory_gb <= 2 else 0
         accel_bonus = 1 if self.hardware.get("has_cuda", False) or self.runtime.get("has_metal", False) else 0
         
-        # Bounded sum with base level
         return max(0, min(1 + cpu_score + mem_score + accel_bonus, 3))
     
     @lru_cache(maxsize=8)
     def get_optimal_params(self, operation: str = "general") -> Dict[str, Any]:
         """Get context-aware optimized parameters for specific operations.
         
+        Provides intelligent default parameters based on current system
+        capabilities and terminal constraints for different operations.
+        
         Args:
             operation: Operation type ("general", "video", "image", "text")
             
         Returns:
-            Dict[str, Any]: Optimized parameters for the specified operation
+            Dict[str, Any]: Optimized parameters for specified operation
         """
         tier = self.capabilities["performance_tier"]
         limited = self.constraints["limited_width"]
         
-        # Base parameters for all operations
+        # Base parameters with progressive enhancement
         params = {
             "scale_factor": self.constraints["max_scale_factor"],
             "block_width": 4 if limited else 6 if tier >= 2 else 8,
@@ -568,25 +704,32 @@ class EnvContext:
             "animation_level": min(tier, 2),
             "max_width": self.constraints["max_art_width"],
             "max_height": self.constraints["max_art_height"],
+            "cache_ttl": 300 * (tier + 1)
         }
         
-        # Operation-specific enhancements
+        # Operation-specific parameter optimization
         if operation == "video":
             params.update({
                 "buffer_frames": 2 if tier <= 1 else 4,
                 "preprocessing": tier >= 2,
-                "parallel_decode": tier >= 1
+                "parallel_decode": tier >= 1,
+                "adaptive_quality": True,
+                "quality_headroom": 0.1 * (tier + 1)
             })
         elif operation == "image":
             params.update({
                 "dithering": tier >= 2,
                 "edge_threshold": 60 if tier == 0 else 50 if tier == 1 else 40,
-                "algorithm": "sobel" if tier <= 1 else "scharr"
+                "algorithm": "sobel" if tier <= 1 else "scharr",
+                "denoise": tier >= 2,
+                "contrast_boost": 1.0 + (0.1 * tier)
             })
         elif operation == "text":
             params.update({
                 "font_cache_size": 4 if tier == 0 else 8 if tier == 1 else 16,
-                "enable_effects": tier >= 1
+                "enable_effects": tier >= 1,
+                "max_width_ratio": 0.8 + (0.05 * tier),
+                "alignment": "center" if not limited else "left"
             })
             
         return params
@@ -594,7 +737,7 @@ class EnvContext:
 # Initialize environment with thread safety
 ENV = EnvContext.get()
 
-# Project metadata with dynamic capabilities
+# Project metadata with dynamic capability detection
 AUTHOR_INFO = {
     "name": "Lloyd Handyside",
     "email": "ace1928@gmail.com",
@@ -628,52 +771,61 @@ AUTHOR_INFO = {
 # ╚══════════════════════════════════════════════════════════════╝
 
 class BannerEngine:
-    """🎭 Dimensional banner system with adaptive rendering capabilities.
+    """Dimensional banner system with adaptive rendering capabilities.
     
-    Contextually-aware banner generation with dynamic templating, intelligent
-    style selection, and performance-optimized rendering pipeline. Automatically
-    adapts to terminal constraints and environment capabilities.
+    Provides contextually-aware banner generation with intelligent style selection,
+    caching, and terminal-adaptive layouts. Automatically adjusts to environment
+    constraints while maintaining visual consistency.
+    
+    Attributes:
+        terminal_width (int): Current terminal width in characters
+        terminal_height (int): Current terminal height in lines
+        supports_unicode (bool): Whether terminal supports Unicode characters
+        supports_color (bool): Whether terminal supports ANSI color codes
+        symbols (Dict[str, Dict[str, str]]): Symbol registry with unicode/ascii variants
     """
     _instance: Optional['BannerEngine'] = None
+    _lock: threading.RLock = threading.RLock()
     _cache: Dict[str, Tuple[str, float]] = {}  # (content, creation_timestamp)
     _cache_ttl: float = 3600.0  # Cache lifetime in seconds
     _max_cache_entries: int = 16  # Bounded cache size
     
     @classmethod
     def get_instance(cls) -> 'BannerEngine':
-        """🔄 Access singleton with lazy initialization."""
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+        """Get singleton instance with thread-safe lazy initialization.
+        
+        Returns:
+            BannerEngine: Thread-safe singleton instance
+        """
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
     
     def __init__(self) -> None:
-        """Initialize banner engine with environment-aware parameters."""
-        # Terminal capabilities with context awareness
-        self.terminal_width = ENV.terminal["width"]
-        self.terminal_height = ENV.terminal["height"]
-        self.supports_unicode = ENV.capabilities["unicode"]
-        self.supports_color = ENV.capabilities["color"]
-        self.has_figlet = bool(pyfiglet)
+        """Initialize banner engine with environment-aware configuration."""
+        # Terminal capabilities detection
+        self.terminal_width: int = ENV.terminal["width"]
+        self.terminal_height: int = ENV.terminal["height"]
+        self.supports_unicode: bool = ENV.capabilities["unicode"]
+        self.supports_color: bool = ENV.capabilities["color"]
+        self.has_figlet: bool = "pyfiglet" in ENV.modules
         
-        # Dynamic symbol registry with fallbacks
-        self.symbols = self._build_symbol_registry()
-        
-    def _build_symbol_registry(self) -> Dict[str, Dict[str, str]]:
-        """🔣 Build complete symbol registry with unicode and ascii variants."""
-        return {
+        # Create symbol registry with unicode/ascii variants
+        self.symbols: Dict[str, Dict[str, str]] = {
             "unicode": {
-                # Decorative elements and borders
+                # Borders and structure
                 "top_left": "╔", "top_right": "╗", "bottom_left": "╚", "bottom_right": "╝",
                 "horizontal": "═", "vertical": "║", "inner_h": "━", "inner_v": "┃",
-                # Dimensional symbols
+                # Decorative elements
                 "cosmic": "⚝", "dimension": "⟁", "star": "✧", "star_alt": "✦", 
                 "star_filled": "✫", "diamond": "◈", "bullet": "•", "circle": "○",
-                # Groupings for semantic reference
+                # Semantic groupings
                 "stars": "✧✦✫", "corners": "╔╗╚╝", "lines": "═║",
                 "stylized_bullet": "◆", "stylized_star": "★",
             },
             "ascii": {
-                # ASCII fallbacks for all symbols
+                # ASCII fallbacks
                 "top_left": "+", "top_right": "+", "bottom_left": "+", "bottom_right": "+",
                 "horizontal": "-", "vertical": "|", "inner_h": "=", "inner_v": "|",
                 "cosmic": "#", "dimension": "+", "star": "*", "star_alt": "*",
@@ -685,30 +837,33 @@ class BannerEngine:
     
     def display(self, style: str = "auto", color: bool = True, 
                 width: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None) -> None:
-        """🎨 Display dimensional banner with optimal style selection.
+        """Display dimensional banner with environment-adaptive formatting.
+        
+        Renders a banner using the optimal style for current terminal dimensions
+        and capabilities, with intelligent caching for performance.
         
         Args:
             style: Banner style ('auto', 'full', 'compact', 'minimal', 'ascii', 'cosmic')
             color: Whether to enable ANSI colors
-            width: Custom width (None=auto-detect)
-            metadata: Optional custom metadata for banner content
+            width: Custom width in characters (None=auto-detect)
+            metadata: Optional custom content to include in banner
         """
-        # Auto-select optimal style based on environment constraints
-        if style == "auto":
-            style = self._select_optimal_style(width)
+        banner = self.generate(
+            style if style != "auto" else self._select_optimal_style(width),
+            color and self.supports_color,
+            width or self.terminal_width,
+            metadata
+        )
         
-        # Generate banner with all parameters
-        banner = self.generate(style, color, width, metadata)
-        
-        # Display with environment-optimized method
-        if CONSOLE:
-            CONSOLE.print(banner)
-        else:
-            print(banner)
+        print(banner) if not CONSOLE else CONSOLE.print(banner)
     
     def generate(self, style: str = "cosmic", color: bool = True,
                 width: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None) -> str:
-        """🌈 Generate dimensional banner with specified parameters.
+        """Generate dimensional banner with specified parameters.
+        
+        Creates a banner with the requested style, adapting to terminal constraints
+        and applying semantic colors if supported. Uses efficient caching for
+        repeated generations.
         
         Args:
             style: Banner style ('full', 'compact', 'minimal', 'ascii', 'cosmic')
@@ -717,101 +872,99 @@ class BannerEngine:
             metadata: Optional custom metadata to include
             
         Returns:
-            Rendered banner as string
+            str: Fully rendered banner text
         """
-        # Parameter normalization and context adaptation
+        # Parameter normalization with environment awareness
         width = width or self.terminal_width
         use_color = color and self.supports_color
         use_unicode = self.supports_unicode and style != "ascii"
         
-        # Apply terminal constraints with progressive degradation
+        # Progressive style adaptation for constrained environments
         if width < 40:
-            style = "minimal"
+            style = "minimal"  # Ultra compact for tiny terminals
         elif width < 80 and style in ("full", "cosmic"):
-            style = "compact"
+            style = "compact"  # Reduced size for small terminals
         
-        # Force ASCII style for non-Unicode environments
+        # Force ASCII for non-Unicode environments
         if not use_unicode:
             style = "ascii"
         
-        # Cache system with timestamp validation
+        # Generate cache key with all relevant parameters
         cache_key = f"{style}:{width}:{use_color}:{use_unicode}"
         if metadata:
-            # Add metadata hash to cache key for custom content
             cache_key += f":{hash(tuple(sorted(metadata.items())))}"
             
-        # Check cache with TTL validation
-        current_time = time.time()
-        if cache_key in self._cache:
-            content, timestamp = self._cache[cache_key]
-            if current_time - timestamp < self._cache_ttl:
-                return content
+        # Check cache with thread safety and TTL validation
+        with self._lock:
+            if cache_key in self._cache:
+                content, timestamp = self._cache[cache_key]
+                if time.time() - timestamp < self._cache_ttl:
+                    return content
         
-        # Build complete render context
-        context = self._prepare_render_context(width, use_unicode, metadata)
+        # Generate banner from template with complete context
+        context = self._build_context(width, use_unicode, metadata)
+        banner = self._get_template(style, width).format(**context)
         
-        # Generate banner from template
-        template = self._get_template(style, width)
-        banner = template.format(**context)
-        
-        # Apply color transformation if requested
-        if use_color:
-            banner = self._apply_semantic_colors(banner)
+        # Apply semantic colors if requested and supported
+        if use_color and not CONSOLE:  # Skip if Rich will handle coloring
+            banner = self._apply_colors(banner)
         
         # Update cache with bounded size management
-        if len(self._cache) >= self._max_cache_entries:
-            # Remove oldest entry (most efficient approach)
-            oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
-            del self._cache[oldest_key]
+        with self._lock:
+            if len(self._cache) >= self._max_cache_entries:
+                # Remove oldest entry
+                oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
+                del self._cache[oldest_key]
+            
+            # Store with current timestamp
+            self._cache[cache_key] = (banner, time.time())
         
-        # Cache with timestamp
-        self._cache[cache_key] = (banner, current_time)
         return banner
     
     def _select_optimal_style(self, width: Optional[int] = None) -> str:
-        """🎯 Select most appropriate banner style based on environment.
+        """Select most appropriate banner style based on terminal constraints.
         
         Args:
-            width: Terminal width to consider (None=use current width)
+            width: Terminal width in characters (None=use current width)
             
         Returns:
-            Optimal style name for current environment
+            str: Best style for current environment
         """
         width = width or self.terminal_width
-        user_preference = AUTHOR_INFO["preferences"].get("banner_style", "cosmic")
+        preference = AUTHOR_INFO["preferences"].get("banner_style", "cosmic")
         
-        # Progressive style selection based on constraints
+        # Progressive style selection logic
         if width < 40:
-            return "minimal"
+            return "minimal"  # Ultra compact
         elif width < 80:
-            return "compact"
+            return "compact"  # Reduced size
         elif not self.supports_unicode:
-            return "ascii"
-        elif user_preference in ("cosmic", "full") and width >= 100:
-            return user_preference
+            return "ascii"    # ASCII compatible
+        elif preference in ("cosmic", "full") and width >= 100:
+            return preference  # User preference when space allows
         else:
             return "cosmic" if width >= 90 else "compact"
     
-    def _prepare_render_context(self, 
-                               width: int, 
-                               use_unicode: bool,
-                               custom_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """🧩 Prepare complete context dictionary for template rendering.
+    def _build_context(self, 
+                      width: int,
+                      use_unicode: bool,
+                      custom_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Build complete template context dictionary with all required values.
         
         Args:
-            width: Terminal width for layout
-            use_unicode: Whether Unicode is supported
+            width: Terminal width for layout calculations
+            use_unicode: Whether Unicode characters are supported
             custom_metadata: Optional user-provided metadata
             
         Returns:
-            Complete context dictionary for template formatting
+            Dict[str, Any]: Complete context dictionary for template formatting
         """
-        # Select symbol set based on capabilities
+        # Select appropriate symbol set
         symbols = self.symbols["unicode" if use_unicode else "ascii"]
         
-        # Start with standard metadata
+        # Core context with project metadata
         context = {
-            # Core version information
+            # Version information
             "version": AUTHOR_INFO["version"],
             "codename": AUTHOR_INFO["codename"],
             "release": AUTHOR_INFO.get("release_stage", "stable"),
@@ -820,86 +973,79 @@ class BannerEngine:
             "maintainer": AUTHOR_INFO["name"],
             "email": AUTHOR_INFO["email"],
             "organization": AUTHOR_INFO["org"],
-            "org_email": AUTHOR_INFO["org_email"],
-            "contributors": ", ".join(c.split(" <")[0] for c in AUTHOR_INFO["contributors"]),
+            "org_email": AUTHOR_INFO.get("org_email", ""),
             
-            # Project metadata
-            "repository": AUTHOR_INFO["repository"],
-            "license": AUTHOR_INFO["license"],
-            
-            # Dynamic widths for layout
+            # Layout dimensions
             "horizontal_line": symbols["horizontal"] * (width - 2),
-            "separator_line": symbols["horizontal"] * (width - 4),
+            "separator_line": symbols["inner_h"] * (width - 4),
             "content_width": width - 4,
         }
         
-        # Add all symbols to context
+        # Add symbols and custom metadata
         context.update(symbols)
-        
-        # Add custom metadata if provided
         if custom_metadata:
             context.update(custom_metadata)
         
-        # Generate title with figlet if available
+        # Generate title art with figlet when available
         if self.has_figlet:
-            # Calculate title width based on terminal constraints
             title_width = max(20, min(width - 6, 120))
-            figlet = pyfiglet.Figlet(font="standard", width=title_width)
-            raw_title = figlet.renderText("GLYPH STREAM").rstrip()
-            
-            # Format for template embedding
-            if use_unicode:
-                # Center with unicode elegance
-                lines = []
-                for line in raw_title.splitlines():
-                    padding = max(0, (width - 6 - len(line)) // 2)
-                    lines.append(" " * padding + line)
-                context["title_art"] = "\n".join(lines)
-            else:
-                # Simpler for ASCII mode
-                context["title_art"] = raw_title
+            try:
+                figlet = pyfiglet.Figlet(font="standard", width=title_width)
+                title_art = figlet.renderText("GLYPH STREAM").rstrip()
+                
+                # Center title within available space
+                if use_unicode:
+                    lines = []
+                    for line in title_art.splitlines():
+                        padding = max(0, (width - 6 - len(line)) // 2)
+                        lines.append(" " * padding + line)
+                    context["title_art"] = "\n".join(lines)
+                else:
+                    context["title_art"] = title_art
+            except Exception:
+                context["title_art"] = "GLYPH STREAM"  # Fallback on error
         else:
-            # Fallback when figlet unavailable
-            context["title_art"] = "GLYPH STREAM"
+            context["title_art"] = "GLYPH STREAM"  # Simple fallback
         
         return context
     
     def _get_template(self, style: str, width: int) -> str:
-        """📐 Get appropriate banner template based on style and width.
+        """Get appropriate banner template based on selected style and width.
         
         Args:
             style: Banner style name
             width: Terminal width for layout decisions
             
         Returns:
-            Template string with format placeholders
+            str: Template string with format placeholders
         """
-        if style == "minimal":
-            return (
+        templates = {
+            # Minimal ultra-compact style
+            "minimal": (
                 "{top_left}{horizontal_line}{top_right}\n"
                 "{vertical} GlyphStream v{version} {vertical}\n"
                 "{bottom_left}{horizontal_line}{bottom_right}"
-            )
+            ),
             
-        elif style == "compact":
-            return (
+            # Compact style for medium terminals
+            "compact": (
                 "{top_left}{horizontal_line}{top_right}\n"
                 "{vertical} {stars} GLYPH STREAM v{version} - {codename} {stars} {vertical}\n"
                 "{vertical} Dimensional Unicode Transmutation Engine {vertical}\n"
                 "{bottom_left}{horizontal_line}{bottom_right}"
-            )
+            ),
             
-        elif style == "ascii":
-            return (
+            # ASCII-compatible style
+            "ascii": (
                 "+{horizontal_line}+\n"
                 "| GLYPH STREAM v{version} |\n"
                 "| Dimensional Unicode Engine |\n"
                 "| Codename: {codename} |\n"
                 "+{horizontal_line}+"
-            )
+            ),
             
-        elif style == "cosmic":
-            return (
+            # Cosmic style with balanced decoration
+            "cosmic": (
                 "{top_left}{horizontal_line}{top_right}\n"
                 "{vertical} {title_art} {vertical}\n"
                 "{vertical}{separator_line}{vertical}\n"
@@ -907,10 +1053,10 @@ class BannerEngine:
                 "{vertical}  {dimension} Transform reality through visual transcendence {dimension}  {vertical}\n"
                 "{bottom_left}{horizontal_line}{bottom_right}\n"
                 "{cosmic}{star} ADAPTIVE UNIVERSALITY MATRIX INITIALIZED {star}{cosmic}"
-            )
+            ),
             
-        else:  # "full" - default comprehensive style
-            return (
+            # Full detailed style
+            "full": (
                 "{top_left}{horizontal_line}{top_right}\n"
                 "{vertical} {title_art} {vertical}\n"
                 "{vertical}{separator_line}{vertical}\n"
@@ -919,74 +1065,69 @@ class BannerEngine:
                 "{vertical}{separator_line}{vertical}\n"
                 "{vertical}  {bullet} Maintainer: {maintainer} 「{email}」 {vertical}\n"
                 "{vertical}  {dimension} Organization: {organization} 「{org_email}」 {vertical}\n"
-                "{vertical}  {bullet} Repository: {repository} {vertical}\n"
                 "{bottom_left}{horizontal_line}{bottom_right}"
             )
+        }
+        
+        return templates.get(style, templates["cosmic"])
     
-    def _apply_semantic_colors(self, banner: str) -> str:
-        """🎨 Apply ANSI colors with semantic highlighting.
+    def _apply_colors(self, banner: str) -> str:
+        """Apply semantic ANSI color codes to banner elements.
+        
+        Maps specific banner elements to appropriate colors using optimized
+        pattern matching for visual consistency and emphasis.
         
         Args:
             banner: Uncolored banner string
             
         Returns:
-            Banner with semantic ANSI color codes applied
+            str: Banner with ANSI color codes applied
         """
-        # Skip if Rich will handle it or colors aren't supported
-        if CONSOLE:
-            return banner
-            
-        # Optimized color palette with clear semantic mapping
+        # Color palette with semantic mapping
         colors = {
             "title": "\033[96m",     # Bright Cyan for titles
             "emphasis": "\033[95m",   # Bright Magenta for emphasis
-            "action": "\033[92m",     # Bright Green for actions/verbs
+            "action": "\033[92m",     # Bright Green for actions
             "metadata": "\033[93m",   # Bright Yellow for metadata
             "symbol": "\033[35m",     # Magenta for symbols
             "border": "\033[34m",     # Blue for borders
-            "highlight": "\033[97m",  # Bright White for highlights
-            "reset": "\033[0m"        # Reset all formatting
+            "reset": "\033[0m"        # Reset formatting
         }
         
-        # Semantic pattern matching for color application
+        # Pattern-replacement pairs for semantic colorization
         patterns = [
             # Title elements
             (r"(GLYPH STREAM)", f"{colors['title']}\\1{colors['reset']}"),
-            (r"(DIMENSIONAL)", f"{colors['emphasis']}\\1{colors['reset']}"),
             (r"(PRISMATIC CIPHER)", f"{colors['emphasis']}\\1{colors['reset']}"),
-            (r"(Transform\s+reality)", f"{colors['action']}\\1{colors['reset']}"),
+            (r"(DIMENSIONAL|TRANSMUTATION|ENGINE)", f"{colors['emphasis']}\\1{colors['reset']}"),
+            (r"(Transform\s+reality|INITIALIZED)", f"{colors['action']}\\1{colors['reset']}"),
             
             # Metadata elements
-            (r"(Maintainer:.*)", f"{colors['metadata']}\\1{colors['reset']}"),
-            (r"(Organization:.*)", f"{colors['metadata']}\\1{colors['reset']}"),
-            (r"(Repository:.*)", f"{colors['metadata']}\\1{colors['reset']}"),
+            (r"(v\d+\.\d+\.\d+)", f"{colors['metadata']}\\1{colors['reset']}"),
+            (r"(Maintainer:.*|Organization:.*)", f"{colors['metadata']}\\1{colors['reset']}"),
             
-            # Special sequences
-            (r"(ADAPTIVE UNIVERSALITY MATRIX)", f"{colors['emphasis']}\\1{colors['reset']}"),
-            
-            # Symbol highlighting with lookbehind/lookahead for precision
+            # Symbols and borders (with non-capturing lookbehind/lookahead)
             (r"([✧✦✫⚝⟁•◈★☆✩])", f"{colors['symbol']}\\1{colors['reset']}"),
-            
-            # Border characters with negative lookahead to avoid double-coloring
             (r"([╔╗╚╝═║┌┐└┘━┃+\-|])", f"{colors['border']}\\1{colors['reset']}")
         ]
         
-        # Apply all patterns with regex substitution
-        colored_banner = banner
+        # Apply all patterns sequentially
+        result = banner
         for pattern, replacement in patterns:
-            colored_banner = re.sub(pattern, replacement, colored_banner)
+            result = re.sub(pattern, replacement, result)
             
-        return colored_banner
+        return result
 
-# Initialize the global banner engine
+
+# Initialize global banner engine singleton
 BANNER = BannerEngine.get_instance()
 
 def display_banner(style: str = "auto", color: bool = True, 
                   width: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None) -> None:
-    """🎭 Display dimensional banner with environment adaptation.
+    """Display dimensional banner with automatic environment adaptation.
     
-    Renders an adaptive banner with intelligent style selection, Unicode
-    support detection, and terminal-aware layout.
+    Renders a banner using optimal style selection, Unicode detection,
+    and terminal-aware layout with semantic coloring.
     
     Args:
         style: Banner style ('auto', 'full', 'compact', 'minimal', 'ascii', 'cosmic')
@@ -997,224 +1138,227 @@ def display_banner(style: str = "auto", color: bool = True,
     BANNER.display(style, color, width, metadata)
 
 class UnicodeRenderEngine:
-    """Multi-dimensional Unicode rendering system with environment-aware capabilities.
+    """Multidimensional Unicode rendering system with adaptive capabilities.
     
-    This rendering engine provides optimal character selection based on terminal capabilities,
-    with intelligent fallbacks, efficient caching, and dimensional gradient mapping.
+    A thread-safe, performance-optimized rendering engine providing contextual
+    character selection based on terminal capabilities with intelligent fallbacks,
+    efficient caching, and dimensional gradient mapping.
     
-    The engine automatically adapts to the environment's Unicode and color support,
-    providing appropriate characters and styles with consistent interfaces.
+    Attributes:
+        supports_unicode (bool): Whether terminal supports Unicode rendering
+        supports_color (bool): Whether terminal supports ANSI color codes
+        character_maps (Dict[str, Any]): Character sets for different rendering modes
     """
     _instance: Optional['UnicodeRenderEngine'] = None
-    _CACHE_SIZE: int = 1024
+    _lock: threading.RLock = threading.RLock()
     
     @classmethod
     def get_instance(cls) -> 'UnicodeRenderEngine':
-        """Returns singleton instance with thread-safe lazy initialization.
+        """Get thread-safe singleton instance with optimized initialization.
         
         Returns:
             UnicodeRenderEngine: Global singleton instance
         """
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
     
     def __init__(self) -> None:
-        """Initialize rendering engine with environment detection and character maps."""
-        # Core state persistence
-        self.cache_dir: Path = Path(os.path.expanduser("~/.cache/glyph_stream"))
-        self.character_maps: Dict[str, Any] = {}
-        self._color_cache: Dict[Tuple[int, int, int, bool], str] = {}
+        """Initialize engine with environment detection and optimized maps."""
+        # Core state with persistence strategy
+        self.cache_path = Path(os.path.expanduser("~/.cache/glyph_stream/character_maps.json"))
         
         # Environment capability detection
-        self.supports_unicode: bool = ENV.capabilities["unicode"]
-        self.supports_color: bool = ENV.capabilities["color"]
+        self.supports_unicode = ENV.capabilities["unicode"]
+        self.supports_color = ENV.capabilities["color"]
         
-        # Initialize character maps with fail-safe approach
-        self._initialize_character_maps()
+        # Memory-optimized character maps with LRU caching
+        self.character_maps = {}
+        self._initialize_maps()
+        
+        # High-performance color cache with thread safety
+        self._color_cache: Dict[Tuple[int, int, int, bool], str] = {}
     
-    def _initialize_character_maps(self) -> None:
-        """Load or generate character maps with fault-tolerance."""
+    def _initialize_maps(self) -> None:
+        """Initialize character maps with optimal loading strategy."""
         try:
-            if self._load_cached_maps():
+            if self._load_cached():
                 return
         except Exception:
-            pass  # Fall through to generation
+            pass  # Fail gracefully to generation
             
-        self._generate_character_maps()
-        # Non-blocking save for performance
-        _THREAD_POOL.submit(self._save_character_maps)
+        self._generate_maps()
+        # Non-blocking persistence with low priority
+        THREAD_POOL.submit(self._save_maps)
     
-    def _load_cached_maps(self) -> bool:
-        """Load character maps from disk cache if available.
+    def _load_cached(self) -> bool:
+        """Load maps from persistent cache with validation.
         
         Returns:
-            bool: True if maps were loaded successfully
+            bool: True if successfully loaded
         """
-        cache_file = self.cache_dir / "character_maps.json"
-        if not cache_file.exists():
+        if not self.cache_path.exists():
             return False
             
         try:
-            with open(cache_file, 'r', encoding='utf-8') as f:
-                self.character_maps = json.load(f)
-            return bool(self.character_maps)  # Return True if maps were loaded
+            with open(self.cache_path, 'r', encoding='utf-8') as f:
+                maps = json.load(f)
+                # Validate essential keys
+                if all(k in maps for k in ["gradient", "full_gradients", "edges"]):
+                    self.character_maps = maps
+                    return True
+            return False
         except (json.JSONDecodeError, IOError):
             return False
     
-    def _save_character_maps(self) -> None:
-        """Persist character maps to disk for future use."""
+    def _save_maps(self) -> None:
+        """Persist maps to disk with error resilience."""
         try:
-            self.cache_dir.mkdir(exist_ok=True, parents=True)
-            with open(self.cache_dir / "character_maps.json", 'w', encoding='utf-8') as f:
-                json.dump(self.character_maps, f, ensure_ascii=False, indent=2)
-        except (IOError, PermissionError):
-            pass  # Silent failure - not critical for operation
+            self.cache_path.parent.mkdir(exist_ok=True, parents=True)
+            with open(self.cache_path, 'w', encoding='utf-8') as f:
+                json.dump(self.character_maps, f, ensure_ascii=False)
+        except Exception:
+            pass  # Non-critical operation
     
-    def _generate_character_maps(self) -> None:
-        """Generate optimized character maps for all rendering dimensions."""
+    def _generate_maps(self) -> None:
+        """Generate optimized character maps for all dimensions."""
         self.character_maps = {
-            # Gradient collections for density rendering
+            # Core gradients with progressive detail
             "gradient": {
                 "standard": "█▓▒░ ",
                 "enhanced": "█▇▆▅▄▃▂▁▀ ",
                 "blocks": "█▉▊▋▌▍▎▏ ",
-                "dots": "■●◉◎○◌· ",
-                "squares": "■□▣▤▥▦▧▨▩▪▫◻◼◘◙◚◛ ",
-                "shapes": "■◆●◉◌○◍◎◐◑◒◓◔◕♦♥♣♠☻☺⬢⬡⬤⬪⬫⭓⭔⚪⚫⚬⚭⚮☘☄",
-                "symbols": "✿❀❁❂✣✤✥❄❅❆❇❈❉❊✽✾✿❋",
-                "stars": "★☆✩✫✬✭✮✯✡✧✦✪",
                 "braille": "⣿⣷⣯⣟⡿⢿⣻⣽⣾ ",
                 "ascii": "@%#*+=-:. "
             },
             
-            # Edge detection and line drawing characters
+            # Edge representation with directional accuracy
             "edges": {
-                "horizontal": {"bold": "━", "standard": "─", "light": "╌", "double": "═", "ascii": "-"},
-                "vertical": {"bold": "┃", "standard": "│", "light": "╎", "double": "║", "ascii": "|"},
-                "diagonal_ne": {"bold": "╱", "standard": "╱", "light": "┄", "ascii": "/"},
-                "diagonal_nw": {"bold": "╲", "standard": "╲", "light": "┄", "ascii": "\\"},
-                "corners": {"top_left": "┌", "top_right": "┐", "bottom_left": "└", "bottom_right": "┘"},
-                "junctions": {"cross": "┼", "t_up": "┴", "t_down": "┬", "t_left": "┤", "t_right": "├"}
+                "horizontal": {"bold": "━", "standard": "─", "light": "╌", "ascii": "-"},
+                "vertical": {"bold": "┃", "standard": "│", "light": "╎", "ascii": "|"},
+                "diagonal_ne": {"bold": "╱", "standard": "╱", "ascii": "/"},
+                "diagonal_nw": {"bold": "╲", "standard": "╲", "ascii": "\\"},
             },
             
-            # Special rendering modes
-            "modes": {
-                "fallback": "■□▪▫◻◼◘◙◚◛",
-                "braille_matrix": {f"{i:08b}": chr(0x2800 + i) for i in range(256)},
-                "shade_matrix": {
-                    "full": "█", "seven_eighths": "▇", "three_quarters": "▆", 
-                    "five_eighths": "▅", "half": "▄", "three_eighths": "▃", 
-                    "quarter": "▂", "eighth": "▁", "empty": " "
-                }
-            },
-            
-            # Full gradient sets for different rendering scenarios
+            # Full character sets for different rendering contexts
             "full_gradients": {
-                "standard": "█▓▒░▀■◆●◉◌○◍◎◐◑◒◓◔◕♦♥♣♠☻☺⬢⬡⬤⬪⬫⭓⭔⚪⚫⚬⚭⚮☘☄✿❀❁❂✣✤✥❄❅❆❇❈❉❊✽✾✿❋★☆✩✫✬✭✮✯✡✧✦✪❋❊❉❈❇❆❅❄✥✤✣❂❁❀✿☄ .  ",
+                "standard": "█▓▒░■◆●◉○♦♥♠☻☺⬢⬡✿❀✣❄★☆✩✫✬ .  ",
                 "minimal": "█▓▒░ ",
                 "ascii_art": "@%#*+=-:. ",
                 "braille": "⣿⣷⣯⣟⡿⢿⣻⣽⣾ "
             }
         }
     
-    @lru_cache(maxsize=_CACHE_SIZE)
-    def get_ansi_color(self, r: int, g: int, b: int, background: bool = False) -> str:
-        """Generate 24-bit ANSI color sequence with memory-efficient caching.
+    @lru_cache(maxsize=256)
+    def get_ansi_color(self, r: int, g: int, b: int, bg: bool = False) -> str:
+        """Generate 24-bit ANSI color sequence with optimized caching.
         
         Args:
             r: Red component (0-255)
             g: Green component (0-255)
             b: Blue component (0-255)
-            background: Whether this is a background color
+            bg: Whether this is a background color
             
         Returns:
-            ANSI color escape sequence or empty string if color not supported
+            str: ANSI color escape sequence or empty string
         """
         if not self.supports_color:
             return ""
-        return f"\033[{48 if background else 38};2;{r};{g};{b}m"
+        
+        # Normalize color components
+        r = max(0, min(255, r))
+        g = max(0, min(255, g))
+        b = max(0, min(255, b))
+        
+        return f"\033[{48 if bg else 38};2;{r};{g};{b}m"
     
     def get_gradient(self, density: float, mode: str = "standard") -> str:
-        """Select optimal character for specific density with capability awareness.
+        """Select optimal character for density with capability awareness.
         
         Args:
             density: Value between 0.0 (empty) and 1.0 (solid)
-            mode: Gradient style name ("standard", "minimal", "ascii", "braille")
+            mode: Gradient style name
             
         Returns:
-            Character representing requested density
+            str: Character representing requested density
         """
-        # Parameter normalization with bounds enforcement
+        # Normalize density with bounds protection
         density = max(0.0, min(1.0, density))
         
-        # Select most appropriate gradient based on environment
+        # Select appropriate gradient based on capabilities
+        gradient_key = mode
         if not self.supports_unicode and mode != "ascii":
             gradient_key = "ascii_art"
-        else:
-            gradient_key = mode if mode in self.character_maps["full_gradients"] else "standard"
+        elif mode not in self.character_maps["full_gradients"]:
+            gradient_key = "standard"
             
-        gradient = self.character_maps["full_gradients"][gradient_key]
+        gradient = self.character_maps["full_gradients"].get(gradient_key, "█▓▒░ ")
         
-        # Fast single-index lookup
-        index = int(density * (len(gradient) - 1))
+        # Optimized single-index lookup with bounds protection
+        index = min(int(density * (len(gradient) - 1)), len(gradient) - 1)
         return gradient[index]
     
     def get_edge_char(self, grad_x: float, grad_y: float, 
                      strength: float = 1.0, style: str = "standard") -> str:
-        """Select optimal Unicode edge character based on gradient direction.
+        """Select optimal edge character based on gradient direction.
         
         Args:
             grad_x: X gradient component
             grad_y: Y gradient component
             strength: Edge intensity (0.0-1.0)
-            style: Edge style ("standard", "bold", "light", "double", "ascii")
+            style: Edge style name
             
         Returns:
-            Character that best represents the edge direction and strength
+            str: Character representing the edge direction
         """
-        # Input normalization and capability adaptation
+        # Capability adaptation and input normalization
+        if not self.supports_unicode:
+            style = "ascii"
         strength = max(0.0, min(1.0, strength))
-        style = "ascii" if not self.supports_unicode else style
         
-        # Flat region detection (no edge)
+        # Flat region detection for optimization
         if abs(grad_x) < 1e-6 and abs(grad_y) < 1e-6:
             return "·" if self.supports_unicode else "."
         
         # Dynamic style selection based on edge strength
-        if style == "standard":
-            style = "bold" if strength > 0.8 else "light" if strength < 0.3 else "standard"
+        actual_style = style
+        if style == "standard" and strength != 1.0:
+            actual_style = "bold" if strength > 0.8 else "light" if strength < 0.3 else "standard"
         
-        # 8-way angular sector mapping
+        # 8-way directional mapping with angle classification
         angle = math.degrees(math.atan2(grad_y, grad_x)) % 180
         edges = self.character_maps["edges"]
         
-        # Fast path selection via angle classification
+        # Fast path selection for common angles
         if angle < 22.5 or angle >= 157.5:
-            return edges["horizontal"][style]
+            return edges["horizontal"][actual_style]
         elif 67.5 <= angle < 112.5:
-            return edges["vertical"][style]
+            return edges["vertical"][actual_style]
         elif 22.5 <= angle < 67.5:
-            return edges["diagonal_ne"][style]
+            return edges["diagonal_ne"][actual_style]
         else:  # 112.5 <= angle < 157.5
-            return edges["diagonal_nw"][style]
+            return edges["diagonal_nw"][actual_style]
     
     def get_text_width(self, text: str) -> int:
-        """Calculate display width of text with Unicode awareness.
+        """Calculate display width of text with Unicode and ANSI awareness.
         
         Args:
             text: Input text with possible ANSI escape sequences
             
         Returns:
-            Visual width of text accounting for wide characters
+            int: Visual width in character cells
         """
-        # Strip ANSI escape sequences for width calculation
+        # Strip ANSI escape sequences
         clean_text = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
         
-        # Account for wide characters and combining marks
         width = 0
         for c in clean_text:
-            if unicodedata.east_asian_width(c) in ('F', 'W'):
+            # Fast path for ASCII
+            if ord(c) < 127:
+                width += 1
+            # Handle wide characters and combining marks
+            elif unicodedata.east_asian_width(c) in ('F', 'W'):
                 width += 2
             elif unicodedata.category(c) not in ('Mn', 'Me', 'Cf'):
                 width += 1
@@ -1230,9 +1374,9 @@ class UnicodeRenderEngine:
             b: Blue component (0-255)
             
         Returns:
-            Colored text with reset sequence appended
+            str: Colored text with reset sequence
         """
-        if not self.supports_color:
+        if not self.supports_color or not text:
             return text
         return f"{self.get_ansi_color(r, g, b)}{text}{self.reset_code()}"
     
@@ -1240,28 +1384,28 @@ class UnicodeRenderEngine:
         """Get ANSI reset sequence if color is supported.
         
         Returns:
-            ANSI reset code or empty string
+            str: ANSI reset code or empty string
         """
         return "\033[0m" if self.supports_color else ""
     
     def get_enhanced_gradient_chars(self) -> str:
-        """Get full standard gradient character set.
+        """Get full standard gradient character set for dimensional rendering.
         
         Returns:
-            String containing gradient characters in density order
+            str: Gradient characters in density order
         """
         return self.character_maps["full_gradients"]["standard"]
 
 
-# Initialize singleton instance with immediate reference export
+# Initialize singleton instance with immediate availability
 UNICODE_ENGINE = UnicodeRenderEngine.get_instance()
 
-# Legacy compatibility function references for backward compatibility 
+# Export API functions with semantic naming
 get_ansi_color = UNICODE_ENGINE.get_ansi_color
 get_edge_char = UNICODE_ENGINE.get_edge_char
-get_gradient_char = UNICODE_ENGINE.get_gradient  # New consistent naming
+get_gradient_char = UNICODE_ENGINE.get_gradient
 get_enhanced_gradient_chars = UNICODE_ENGINE.get_enhanced_gradient_chars
-reset_ansi = UNICODE_ENGINE.reset_code  # More descriptive name
+reset_ansi = UNICODE_ENGINE.reset_code
 
 
 # ╔══════════════════════════════════════════════════════════════╗
@@ -1271,16 +1415,16 @@ reset_ansi = UNICODE_ENGINE.reset_code  # More descriptive name
 class GlyphTextEngine:
     """Dimensional text transmutation system with adaptive rendering.
     
-    A multi-modal text processor providing dynamic font selection, progressive
-    enhancement capabilities, and contextual awareness for terminal dimensions
-    with optimized resource utilization.
+    A thread-safe, multi-modal text processor providing dynamic font selection,
+    progressive enhancement capabilities, and contextual awareness with optimized
+    resource utilization and efficient caching.
     
     Attributes:
         fonts (List[str]): Available FIGlet fonts
         font_categories (Dict[str, List[str]]): Categorized font collections
     """
     _instance: Optional['GlyphTextEngine'] = None
-    _MAX_CACHE_ENTRIES: int = 128
+    _lock: threading.RLock = threading.RLock()
     _CACHE_TTL: float = 3600.0  # Cache lifetime in seconds
     
     @classmethod
@@ -1290,23 +1434,24 @@ class GlyphTextEngine:
         Returns:
             GlyphTextEngine: The global engine instance
         """
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
     
     def __init__(self) -> None:
         """Initialize the engine with context-aware configuration."""
-        # Cache management with bounded size
-        self._render_cache: Dict[str, Tuple[List[str], float]] = {}  # (result, timestamp)
-        self._font_cache: Dict[str, Any] = {}
-        
-        # Environment detection
+        # Environment detection with optimized parameters
         params = ENV.get_optimal_params("text")
         self._terminal_width = ENV.terminal["width"]
         self._supports_color = ENV.capabilities["color"]
         self._supports_unicode = ENV.capabilities["unicode"]
         self._max_cache_size = params.get("font_cache_size", 16)
         self._enable_effects = params.get("enable_effects", True)
+        
+        # Thread-safe caching system
+        self._render_cache: Dict[str, Tuple[List[str], float]] = {}
+        self._font_cache: Dict[str, pyfiglet.Figlet] = {}
         
         # Font system initialization
         self.fonts = self._detect_available_fonts()
@@ -1323,11 +1468,11 @@ class GlyphTextEngine:
             
         try:
             all_fonts = pyfiglet.FigletFont.getFonts()
-            # Filter problematic fonts
+            # Filter problematic fonts that cause rendering issues
             blacklist = {"eftichess", "eftifont", "eftirobot", "eftiwall"}
             return [font for font in all_fonts if font not in blacklist]
         except Exception:
-            # Fallback to core fonts
+            # Fallback to core fonts that are most commonly available
             return ["standard", "slant", "small", "big", "block", "digital"]
     
     def _categorize_fonts(self) -> Dict[str, List[str]]:
@@ -1336,27 +1481,40 @@ class GlyphTextEngine:
         Returns:
             Dict[str, List[str]]: Map of category names to font lists
         """
-        # Core categorization by stylistic properties
-        categories = {
+        # Semantic categorization by stylistic properties
+        categories: Dict[str, List[str]] = {
             "standard": ["standard", "slant", "small", "mini"],
             "bold": ["block", "big", "chunky", "epic", "doom", "larry3d"],
             "script": ["script", "slscript", "cursive"],
             "simple": ["small", "mini", "lean", "sub-zero", "tiny"],
-            "tech": ["digital", "binary", "bubble", "hex", "cyberlarge", "cybermedium"],
-            "stylized": ["gothic", "graffiti", "crazy", "cosmic", "isometric"],
+            "tech": ["digital", "binary", "bubble", "hex", "cyberlarge"],
+            "stylized": ["gothic", "graffiti", "cosmic", "isometric"],
             "symbols": ["banner3-D", "ivrit", "weird", "starwars"],
             "decorative": ["bubble", "banner", "dotmatrix", "broadway"],
-            "ascii_only": ["standard", "small", "mini", "straight", "lean", 
-                          "banner", "dotmatrix", "bubble"],
-            "all": self.fonts,
+            "ascii_only": ["standard", "small", "mini", "straight", "lean"],
         }
         
-        # Validate that fonts in categories exist in the available fonts
-        for category, font_list in list(categories.items()):
-            if category != "all":
-                categories[category] = [f for f in font_list if f in self.fonts]
-                
-        return categories
+        # Add 'all' category containing all fonts
+        categories["all"] = self.fonts
+        
+        # Ensure categories only contain valid fonts
+        return {k: [f for f in v if f in self.fonts] for k, v in categories.items()}
+    
+    @lru_cache(maxsize=16)
+    def get_figlet_instance(self, font: str) -> pyfiglet.Figlet:
+        """Get cached FIGlet instance with intelligent fallbacks.
+        
+        Args:
+            font: Font name to initialize
+            
+        Returns:
+            pyfiglet.Figlet: Configured FIGlet renderer
+        """
+        try:
+            return pyfiglet.Figlet(font=font)
+        except Exception:
+            # Silent fallback to standard font on error
+            return pyfiglet.Figlet(font="standard")
     
     def text_to_figlet(
         self, 
@@ -1380,63 +1538,78 @@ class GlyphTextEngine:
         Returns:
             List[str]: Lines of rendered FIGlet text with optional coloring
         """
-        # Parameter normalization
+        # Parameter normalization and cache key generation
         width = width or self._terminal_width
         cache_key = f"{text}:{font}:{width}:{justify}:{direction}"
-        current_time = time.time()
         
-        # Check cache with timestamp validation
-        if cache_key in self._render_cache:
-            result, timestamp = self._render_cache[cache_key]
-            if current_time - timestamp < self._CACHE_TTL:
-                return self._apply_color(result.copy(), color)
-        
-        # Ensure font is available or find closest alternative
-        if font not in self.fonts:
-            font = self._find_similar_font(font)
+        # Thread-safe cache check with TTL validation
+        with self._lock:
+            current_time = time.time()
+            if cache_key in self._render_cache:
+                result, timestamp = self._render_cache[cache_key]
+                if current_time - timestamp < self._CACHE_TTL:
+                    return self._apply_color(result.copy(), color)
             
-        # Core rendering with error handling
-        try:
-            figlet = pyfiglet.Figlet(font=font, width=width, justify=justify, direction=direction)
-            rendered = figlet.renderText(text)
-            result = [line.rstrip() for line in rendered.splitlines()]
-        except Exception:
-            # Silent recovery with standard font
-            figlet = pyfiglet.Figlet(font="standard", width=width, justify=justify)
-            rendered = figlet.renderText(text)
-            result = [line.rstrip() for line in rendered.splitlines()]
-        
-        # Bounded cache management
-        self._update_cache(cache_key, result, current_time)
-        
+            # Ensure font is available or find closest alternative
+            if font not in self.fonts:
+                font = self._find_similar_font(font)
+                
+            # Core rendering with cached FIGlet instances
+            try:
+                figlet = self.get_figlet_instance(font)
+                figlet.width = width
+                figlet.justify = justify
+                figlet.direction = direction
+                rendered = figlet.renderText(text)
+                result = [line.rstrip() for line in rendered.splitlines()]
+            except Exception:
+                # Silent recovery with standard font
+                result = [text] if not pyfiglet else self._fallback_render(text, width)
+            
+            # Bounded cache management
+            self._cache_result(cache_key, result, current_time)
+            
         # Apply colorization if requested
         return self._apply_color(result, color)
     
-    def _update_cache(self, key: str, value: List[str], timestamp: float) -> None:
-        """Update render cache with bounded size management.
+    def _fallback_render(self, text: str, width: int) -> List[str]:
+        """Fallback rendering when normal rendering fails.
+        
+        Args:
+            text: Text to render
+            width: Maximum width
+            
+        Returns:
+            List[str]: Simple rendered text
+        """
+        try:
+            # Try with standard font as fallback
+            figlet = pyfiglet.Figlet(font="standard", width=width)
+            rendered = figlet.renderText(text)
+            return [line.rstrip() for line in rendered.splitlines()]
+        except Exception:
+            # Ultimate fallback is just plain text
+            return [text]
+    
+    def _cache_result(self, key: str, value: List[str], timestamp: float) -> None:
+        """Thread-safe cache update with bounded size management.
         
         Args:
             key: Cache lookup key
             value: Result to cache
             timestamp: Creation timestamp for TTL calculation
         """
-        # Ensure cache doesn't exceed size limits
-        if len(self._render_cache) >= self._MAX_CACHE_ENTRIES:
-            # Purge expired entries first
-            current_time = timestamp
-            expired_keys = [k for k, (_, t) in self._render_cache.items() 
-                           if current_time - t > self._CACHE_TTL]
+        with self._lock:
+            # Ensure cache doesn't exceed size limits
+            if len(self._render_cache) >= self._max_cache_size:
+                # Remove oldest entries
+                sorted_keys = sorted(self._render_cache.keys(), 
+                                   key=lambda k: self._render_cache[k][1])
+                for old_key in sorted_keys[:len(sorted_keys)//4 + 1]:
+                    self._render_cache.pop(old_key, None)
             
-            for k in expired_keys:
-                del self._render_cache[k]
-                
-            # If still too large, remove oldest entries
-            if len(self._render_cache) >= self._MAX_CACHE_ENTRIES:
-                oldest_key = min(self._render_cache, key=lambda k: self._render_cache[k][1])
-                del self._render_cache[oldest_key]
-        
-        # Add new entry with timestamp
-        self._render_cache[key] = (value, timestamp)
+            # Add new entry
+            self._render_cache[key] = (value, timestamp)
     
     def _find_similar_font(self, requested_font: str) -> str:
         """Find closest matching font using optimized lookup strategy.
@@ -1459,53 +1632,18 @@ class GlyphTextEngine:
         # Normalize for comparison
         req_lower = requested_font.lower()
         
-        # First try prefix matching (most intuitive for users)
+        # Try prefix matching for intuitive user experience
         prefix_matches = [f for f in self.fonts if f.lower().startswith(req_lower)]
         if prefix_matches:
             return prefix_matches[0]
         
-        # Fall back to edit distance for fuzzy matching
-        return min(self.fonts, 
-                  key=lambda f: self._levenshtein_distance(req_lower, f.lower()),
-                  default="standard")
-    
-    @staticmethod
-    def _levenshtein_distance(s1: str, s2: str) -> int:
-        """Calculate edit distance between strings with optimized algorithm.
-        
-        Args:
-            s1: First string
-            s2: Second string
+        # Fall back to fast substring matching
+        substring_matches = [f for f in self.fonts if req_lower in f.lower()]
+        if substring_matches:
+            return substring_matches[0]
             
-        Returns:
-            int: Edit distance (lower = more similar)
-        """
-        # Ensure s1 is the longer string for optimal performance
-        if len(s1) < len(s2):
-            return GlyphTextEngine._levenshtein_distance(s2, s1)
-        
-        # Fast paths for empty strings
-        if not s2:
-            return len(s1)
-        
-        # Single-row matrix optimization
-        prev_row = range(len(s2) + 1)
-        curr_row = [0] * (len(s2) + 1)
-        
-        for i, c1 in enumerate(s1):
-            curr_row[0] = i + 1
-            
-            # Efficiently compute distance using dynamic programming
-            for j, c2 in enumerate(s2):
-                insertion = prev_row[j + 1] + 1
-                deletion = curr_row[j] + 1
-                substitution = prev_row[j] + (c1 != c2)
-                curr_row[j + 1] = min(insertion, deletion, substitution)
-            
-            # Swap rows for next iteration
-            prev_row, curr_row = curr_row, prev_row
-            
-        return prev_row[-1]
+        # Final fallback to standard
+        return "standard"
     
     def _apply_color(self, lines: List[str], color: Optional[Tuple[int, int, int]]) -> List[str]:
         """Apply ANSI color to text with environment-aware capability detection.
@@ -1547,9 +1685,13 @@ class GlyphTextEngine:
         if not lines:
             return []
             
-        # Process each line with delegated rendering
-        result = []
+        # Process each line with optimized batching
+        result: List[str] = []
         for line in lines:
+            if not line.strip():
+                result.append("")
+                continue
+                
             rendered = self.text_to_figlet(
                 line, font=font, width=width, color=color, justify=align
             )
@@ -1578,19 +1720,32 @@ class GlyphTextEngine:
         Returns:
             Dict[str, List[str]]: Map of font names to rendered previews
         """
-        # Select fonts to preview based on category
+        # Select fonts based on category with optimized slicing
         fonts_to_preview = (self.font_categories.get(category, []) 
-                           if category in self.font_categories else self.fonts)
+                          if category else self.fonts[:max_fonts])
         
-        # Generate previews with bounded selection
-        previews = {}
-        for font in fonts_to_preview[:max_fonts]:
-            try:
-                previews[font] = self.text_to_figlet(text, font=font)
-            except Exception:
-                continue  # Skip problematic fonts silently
+        # Bounded selection for performance
+        if len(fonts_to_preview) > max_fonts:
+            fonts_to_preview = fonts_to_preview[:max_fonts]
+        
+        # Generate previews with parallel processing for larger sets
+        if len(fonts_to_preview) > 5 and ENV.constraints.get("parallel_tasks", 2) > 1:
+            previews = {}
+            with ThreadPoolExecutor(max_workers=min(8, ENV.constraints.get("parallel_tasks", 2))) as executor:
+                futures = {font: executor.submit(
+                    self.text_to_figlet, text, font=font
+                ) for font in fonts_to_preview}
                 
-        return previews
+                for font, future in futures.items():
+                    try:
+                        previews[font] = future.result()
+                    except Exception:
+                        continue
+            return previews
+        else:
+            # Sequential generation for smaller sets
+            return {font: self.text_to_figlet(text, font=font) 
+                   for font in fonts_to_preview}
     
     def show_font_gallery(self, text: str = "Test", category: Optional[str] = None) -> None:
         """Display interactive font gallery with rich formatting.
@@ -1599,41 +1754,40 @@ class GlyphTextEngine:
             text: Sample text to render
             category: Font category to display
         """
-        # Dependency validation
-        if not CONSOLE:
-            print("Font gallery requires rich library.")
-            print("Install with: pip install rich")
-            return
-            
-        # Generate previews
-        previews = self.get_font_preview(text, category)
+        # Generate previews with category filtering
+        previews = self.get_font_preview(text, category, max_fonts=30)
         
-        # Display gallery with rich formatting
-        title = f"🔠 Font Gallery: {category or 'All'} ({len(previews)} fonts)"
-        CONSOLE.print(Panel(title, style="cyan bold"))
-        
-        for font_name, lines in previews.items():
-            font_panel = Panel("\n".join(lines), title=font_name, border_style="blue")
-            CONSOLE.print(font_panel)
+        if CONSOLE:
+            # Rich display with visual styling
+            title = f"🔠 Font Gallery: {category or 'All'} ({len(previews)} fonts)"
+            CONSOLE.print(Panel(title, style="cyan bold"))
             
-            # Add pagination separator for non-interactive output
-            if not CONSOLE.is_interactive:
-                CONSOLE.print("--")
+            for font_name, lines in previews.items():
+                font_panel = Panel("\n".join(lines), title=font_name, border_style="blue")
+                CONSOLE.print(font_panel)
+        else:
+            # Fallback plain text display
+            print(f"=== Font Gallery: {category or 'All'} ({len(previews)} fonts) ===")
+            
+            for font_name, lines in previews.items():
+                print(f"\n--- {font_name} ---")
+                print("\n".join(lines))
+                print("\n" + "-" * 40)
                 
     def get_random_font(self, category: Optional[str] = None) -> str:
         """Get random font name with optional category filtering.
         
         Args:
-            category: Font category to select from
+            category: Font category to select from (None=all fonts)
             
         Returns:
             str: Random font name from the selected category
         """
-        # Select font list based on category
+        # Select font list based on category with fallback
         fonts = (self.font_categories.get(category, []) 
                 if category in self.font_categories else self.fonts)
         
-        # Select random font with fallback
+        # Select with pseudorandom quality
         if not fonts:
             return "standard"
             
@@ -1669,13 +1823,15 @@ class GlyphTextEngine:
                 "sample": self.text_to_figlet("Sample", font=closest)
             }
         
-        # Return information for available font
+        # Return comprehensive information for available font
         return {
             "name": font,
             "found": True,
             "categories": [cat for cat, fonts in self.font_categories.items() 
                           if font in fonts and cat != "all"],
-            "sample": self.text_to_figlet("Sample", font=font)
+            "sample": self.text_to_figlet("Sample", font=font),
+            "available_sizes": ["small", "standard", "large"] 
+                               if self._enable_effects else ["standard"]
         }
 
 
@@ -1686,75 +1842,39 @@ TEXT_ENGINE = GlyphTextEngine.get_instance()
 # ║ 🎭 Text Transformation Functions                            ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-from enum import Enum, auto
-from typing import Dict, List, Literal, Mapping, Optional, Tuple, Union, cast
-import random
-
-
-class TextStyle(Enum):
-    """Standardized text rendering presets for consistent application."""
-    SIMPLE = auto()    # Basic text without decoration
-    STYLED = auto()    # Enhanced with color and borders
-    RAINBOW = auto()   # Multi-color gradient effect
-    RANDOM = auto()    # Randomized styling parameters
-
-
-# Color name mapping with standardized RGB values
-COLOR_MAP: Mapping[str, Tuple[int, int, int]] = {
-    "red": (255, 0, 0),
-    "green": (0, 255, 0),
-    "blue": (0, 0, 255),
-    "yellow": (255, 255, 0),
-    "cyan": (0, 255, 255),
-    "magenta": (255, 0, 255),
-    "white": (255, 255, 255),
-    "black": (0, 0, 0),
-    "orange": (255, 165, 0),
-    "purple": (128, 0, 128),
-    "pink": (255, 192, 203),
-    "gray": (128, 128, 128),
-}
-
-
 def text_to_art(
     text: str,
     font: str = "standard",
-    color: Optional[Tuple[int, int, int]] = None,
+    color: Optional[Union[str, Tuple[int, int, int]]] = None,
     width: Optional[int] = None,
     align: Literal["left", "center", "right"] = "left"
 ) -> List[str]:
     """Convert text to ASCII/FIGlet art with optimal rendering.
-    
-    Creates text art using the TEXT_ENGINE with direct parameter delegation.
-    This is the core primitive function for text transformation.
-    
+
     Args:
         text: Text to convert
         font: FIGlet font name or category
-        color: RGB color tuple (None for no color)
-        width: Maximum width (None for terminal width)
+        color: RGB color tuple or color name
+        width: Maximum width in characters (None for terminal width)
         align: Text alignment direction
-        
+
     Returns:
         List[str]: Lines of rendered text art
     """
+    rgb_color = resolve_color(color)
     return TEXT_ENGINE.text_to_figlet(
-        text=text,
-        font=font,
-        width=width,
-        color=color,
-        justify=align
+        text=text, font=font, width=width, color=rgb_color, justify=align
     )
 
 
 def resolve_color(color: Optional[Union[str, Tuple[int, int, int]]]) -> Optional[Tuple[int, int, int]]:
     """Convert color name or RGB tuple to normalized RGB values.
-    
+
     Args:
         color: Color name (string) or RGB tuple
-        
+
     Returns:
-        Optional[Tuple[int, int, int]]: Normalized RGB values or None if no color specified
+        Optional[Tuple[int, int, int]]: Normalized RGB values or None
     """
     if color is None:
         return None
@@ -1762,7 +1882,8 @@ def resolve_color(color: Optional[Union[str, Tuple[int, int, int]]]) -> Optional
     if isinstance(color, str):
         return COLOR_MAP.get(color.lower(), COLOR_MAP["white"])
     
-    return color
+    # Return normalized RGB tuple
+    return tuple(max(0, min(255, c)) for c in color)  # type: ignore
 
 
 def render_styled_text(
@@ -1770,15 +1891,16 @@ def render_styled_text(
     font: str = "standard",
     color: Optional[Union[str, Tuple[int, int, int]]] = None,
     width: Optional[int] = None,
-    align: Literal["left", "center", "right"] = "left",
+    align: Literal["left", "center", "right"] = "center",
     add_border: bool = False,
-    padding: int = 0
+    padding: int = 0,
+    style: Literal["single", "double", "rounded", "bold"] = "single"
 ) -> List[str]:
     """Render text with comprehensive styling options.
-    
+
     Creates fully styled text with controlled parameters for color,
     borders and padding with intelligent parameter normalization.
-    
+
     Args:
         text: Text to render
         font: FIGlet font name
@@ -1787,38 +1909,28 @@ def render_styled_text(
         align: Text alignment
         add_border: Add decorative border
         padding: Padding around text (0-10)
-        
+        style: Border style when add_border is True
+
     Returns:
         List[str]: Lines of styled text art
     """
-    # Normalize color parameter
     rgb_color = resolve_color(color)
     
     # Generate base text art
     lines = TEXT_ENGINE.text_to_figlet(
-        text=text,
-        font=font,
-        width=width,
-        color=rgb_color,
-        justify=align
+        text=text, font=font, width=width, color=rgb_color, justify=align
     )
     
     # Apply padding with bounds enforcement
-    padding = max(0, min(10, padding))  # Limit padding to reasonable range
+    padding = max(0, min(10, padding))
     if padding > 0:
-        # Optimize vertical padding
-        padded_lines = [""] * padding
-        
-        # Horizontal padding for content lines
-        h_padding = " " * padding
-        padded_lines.extend(f"{h_padding}{line}{h_padding}" for line in lines)
-        
-        # Add bottom padding
-        padded_lines.extend([""] * padding)
+        padded_lines = [""] * padding  # Top padding
+        padded_lines.extend(f"{' ' * padding}{line}{' ' * padding}" for line in lines)
+        padded_lines.extend([""] * padding)  # Bottom padding
         lines = padded_lines
     
     # Apply border if requested
-    return add_unicode_border(lines, rgb_color) if add_border else lines
+    return add_unicode_border(lines, rgb_color, style) if add_border else lines
 
 
 def add_unicode_border(
@@ -1827,25 +1939,25 @@ def add_unicode_border(
     style: Literal["single", "double", "rounded", "bold"] = "single"
 ) -> List[str]:
     """Add decorative Unicode border around text with style options.
-    
+
     Args:
         lines: Text lines to frame
         color: Border RGB color
         style: Border style preset
-        
+
     Returns:
         List[str]: Text with border applied
     """
     if not lines:
         return []
     
-    # Calculate maximum visible line width, accounting for ANSI sequences
+    # Calculate maximum visible line width
     width = max((UNICODE_ENGINE.get_text_width(line) for line in lines), default=0)
     
     # Border character sets by style
     borders = {
         "single": ("╔", "╗", "╚", "╝", "═", "║"),
-        "double": ("╔", "╗", "╚", "╝", "═", "║"),
+        "double": ("╔", "╗", "╚", "╝", "═", "║"),  # Actually uses Box Drawings Heavy
         "rounded": ("╭", "╮", "╰", "╯", "─", "│"),
         "bold": ("┏", "┓", "┗", "┛", "━", "┃"),
     }
@@ -1855,11 +1967,10 @@ def add_unicode_border(
         style, borders["single"]
     )
     
-    # Generate border lines
+    # Generate border lines with optional color
     top_border = f"{top_left}{horizontal * (width + 2)}{top_right}"
     bottom_border = f"{bottom_left}{horizontal * (width + 2)}{bottom_right}"
     
-    # Apply color with environment detection
     if color is not None and ENV.capabilities["color"]:
         r, g, b = color
         top_border = UNICODE_ENGINE.apply_color(top_border, r, g, b)
@@ -1868,15 +1979,11 @@ def add_unicode_border(
     else:
         vertical_colored = vertical
     
-    # Generate result with optimized line building
+    # Efficient line building with padding
     result = [top_border]
-    
     for line in lines:
-        # Calculate padding for alignment with Unicode awareness
         line_width = UNICODE_ENGINE.get_text_width(line)
         padding = " " * (width - line_width)
-        
-        # Add vertical borders
         result.append(f"{vertical_colored} {line}{padding} {vertical_colored}")
     
     result.append(bottom_border)
@@ -1890,16 +1997,16 @@ def generate_text_art(
     color: Optional[Union[str, Tuple[int, int, int]]] = None
 ) -> List[str]:
     """Generate text art with intelligent preset modes.
-    
+
     Creates text art with preconfigured style combinations using both
     direct and enum-based mode selection for flexible usage patterns.
-    
+
     Args:
         text: Text to render
         mode: Rendering style preset (string or TextStyle)
         font: FIGlet font or category (None for mode-specific default)
-        color: Text color name or RGB values (None for mode-specific default)
-        
+        color: Text color name or RGB values
+
     Returns:
         List[str]: Rendered text art
     """
@@ -1908,78 +2015,62 @@ def generate_text_art(
         try:
             mode = TextStyle[mode.upper()]
         except KeyError:
-            # Default to STYLED for invalid string modes
             mode = TextStyle.STYLED
     
     # Apply mode-specific parameters
     if mode == TextStyle.SIMPLE:
-        return render_styled_text(
-            text=text,
-            font=font or "standard",
-            color=None,
-            add_border=False
-        )
+        return render_styled_text(text, font or "standard", None, add_border=False)
         
     elif mode == TextStyle.STYLED:
         return render_styled_text(
-            text=text,
-            font=font or "slant",
-            color=color or "cyan",
-            add_border=True,
-            padding=1
+            text, font or "slant", color or "cyan", add_border=True, padding=1
         )
         
     elif mode == TextStyle.RAINBOW:
-        # Specialized rainbow rendering
+        # Specialized rainbow rendering with optimized approach
         selected_font = font or TEXT_ENGINE.get_random_font("bold")
         rendered = TEXT_ENGINE.text_to_figlet(text, font=selected_font)
         
-        # Generate rainbow lines with optimized buffer approach
         rainbow_lines = []
         for line_idx, line in enumerate(rendered):
             if not line.strip():
                 rainbow_lines.append("")
                 continue
                 
-            # Pre-compute hue shift for the line
-            hue_shift = line_idx * 15
+            hue_shift = line_idx * 15  # Color variety between lines
             
             # Generate the rainbow-colored line
-            rainbow_parts = []
+            chars = []
             for i, char in enumerate(line):
                 if char.strip():
-                    # Generate color from rotating hue
                     hue = (i * 10 + hue_shift) % 360
                     r, g, b = hsv_to_rgb(hue/360, 1.0, 1.0)
-                    rainbow_parts.append(UNICODE_ENGINE.apply_color(char, r, g, b))
+                    chars.append(UNICODE_ENGINE.apply_color(char, r, g, b))
                 else:
-                    rainbow_parts.append(char)
+                    chars.append(char)
                     
-            rainbow_lines.append("".join(rainbow_parts))
+            rainbow_lines.append("".join(chars))
         
-        # Add border for visual framing
-        return add_unicode_border(rainbow_lines, (255, 255, 255))
+        return add_unicode_border(rainbow_lines, (255, 255, 255), "rounded")
         
     elif mode == TextStyle.RANDOM:
         # Generate randomized styling parameters
         selected_font = font or TEXT_ENGINE.get_random_font()
+        border_style = random.choice(["single", "rounded", "bold"])
         border = bool(random.getrandbits(1))  # 50% chance of border
         
         # Random vibrant color if not specified
-        selected_color = color
         if color is None:
             # Generate vibrant colors (avoid dark/muted values)
-            r = random.randint(100, 255)
-            g = random.randint(100, 255)
-            b = random.randint(100, 255)
+            r, g, b = hsv_to_rgb(random.random(), 0.8, 1.0)  
             selected_color = (r, g, b)
+        else:
+            selected_color = color
         
         return render_styled_text(
-            text=text,
-            font=selected_font,
-            color=selected_color,
-            add_border=border,
-            padding=1 if border else 0
+            text, selected_font, selected_color, 
+            add_border=border, padding=random.choice([0, 1, 2]),
+            style=border_style
         )
     
     # Fallback for any unexpected case
@@ -1988,12 +2079,12 @@ def generate_text_art(
 
 def hsv_to_rgb(h: float, s: float, v: float) -> Tuple[int, int, int]:
     """Convert HSV color to RGB components with optimized algorithm.
-    
+
     Args:
-        h: Hue (0-1)
-        s: Saturation (0-1)
-        v: Value (0-1)
-        
+        h: Hue (0.0-1.0)
+        s: Saturation (0.0-1.0)
+        v: Value (0.0-1.0)
+
     Returns:
         Tuple[int, int, int]: RGB components (0-255)
     """
@@ -2007,39 +2098,32 @@ def hsv_to_rgb(h: float, s: float, v: float) -> Tuple[int, int, int]:
         v_byte = int(v * 255)
         return (v_byte, v_byte, v_byte)
     
-    # Standard HSV conversion
     h *= 6.0
     i = int(h)
     f = h - i
     
     # Pre-compute common values
-    p = v * (1.0 - s)
-    q = v * (1.0 - s * f)
-    t = v * (1.0 - s * (1.0 - f))
+    p, q, t = v * (1.0 - s), v * (1.0 - s * f), v * (1.0 - s * (1.0 - f))
     
-    # Mapping based on hue sector
-    if i % 6 == 0:
-        rgb = (v, t, p)
-    elif i % 6 == 1:
-        rgb = (q, v, p)
-    elif i % 6 == 2:
-        rgb = (p, v, t)
-    elif i % 6 == 3:
-        rgb = (p, q, v)
-    elif i % 6 == 4:
-        rgb = (t, p, v)
-    else:
-        rgb = (v, p, q)
+    # Mapping based on hue sector with lookup table for optimal performance
+    rgb = [
+        (v, t, p),  # i=0
+        (q, v, p),  # i=1
+        (p, v, t),  # i=2
+        (p, q, v),  # i=3
+        (t, p, v),  # i=4
+        (v, p, q),  # i=5
+    ][i % 6]
     
     # Convert to byte values
     return (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
 
 
 # Font visualization and discovery functions 
-
+@lru_cache(maxsize=4)
 def show_all_fonts(text: str = "Sample", category: Optional[str] = None) -> None:
     """Display interactive gallery of available fonts with categorization.
-    
+
     Args:
         text: Sample text to render
         category: Font category filter (None to show all categories)
@@ -2049,13 +2133,12 @@ def show_all_fonts(text: str = "Sample", category: Optional[str] = None) -> None
 
 def list_font_categories() -> List[str]:
     """List available font categories with rich formatting when available.
-    
+
     Returns:
         List[str]: Available font category names
     """
     categories = TEXT_ENGINE.get_font_categories()
     
-    # Category descriptions for documentation
     descriptions = {
         "standard": "Common readable fonts",
         "bold": "Heavy weight striking fonts",
@@ -2069,98 +2152,77 @@ def list_font_categories() -> List[str]:
         "all": "Complete font collection"
     }
     
-    # Rich table display when available
     if CONSOLE:
-        from rich.table import Table
-        
-        table = Table(title="Available Font Categories")
-        table.add_column("Category", style="cyan")
+        table = Table(title="🔠 Font Categories")
+        table.add_column("Category", style="cyan bold")
         table.add_column("Description", style="green")
-        table.add_column("Fonts", style="dim")
+        table.add_column("Count", style="magenta")
         
-        for category in categories:
-            # Get fonts, count and examples
-            fonts = TEXT_ENGINE.font_categories.get(category, [])
-            count = len(fonts)
-            examples = ", ".join(fonts[:3]) + ("..." if count > 3 else "")
-            
-            # Add row with description or blank if not documented
-            table.add_row(
-                category,
-                descriptions.get(category, ""),
-                f"{count} fonts: {examples}"
-            )
+        for cat in sorted(categories):
+            fonts = TEXT_ENGINE.font_categories.get(cat, [])
+            table.add_row(cat, descriptions.get(cat, ""), f"{len(fonts)} fonts")
             
         CONSOLE.print(table)
     else:
-        # Plain text fallback
-        for category in categories:
-            fonts = TEXT_ENGINE.font_categories.get(category, [])
-            print(f"{category}: {len(fonts)} fonts")
+        # Clean plain text fallback
+        print("\n=== Font Categories ===")
+        for cat in sorted(categories):
+            fonts = TEXT_ENGINE.font_categories.get(cat, [])
+            desc = descriptions.get(cat, "")
+            print(f"• {cat}: {len(fonts)} fonts - {desc}")
             
     return categories
 
-from typing import Dict, Literal, Optional, Protocol, Tuple, TypedDict, Union, cast, overload
-from enum import Enum, auto
-import numpy as np
-from PIL import Image
-import functools
-
-
-class EdgeDetector(Enum):
-    """Edge detection algorithms with optimal spatial characteristics."""
-    SOBEL = auto()    # Balanced sensitivity, good general purpose
-    PREWITT = auto()  # Enhanced noise stability, cleaner on high-contrast
-    SCHARR = auto()   # Superior rotational symmetry for diagonal edges
-    LAPLACIAN = auto()# Omnidirectional, detail-preserving, noise-sensitive
-    CANNY = auto()    # Maximum precision with hysteresis thresholding
-
-
-class GradientResult(TypedDict):
-    """Edge detection result with normalized components."""
-    magnitude: np.ndarray  # Normalized edge magnitude [0-255]
-    gradient_x: np.ndarray # X-component of gradient vector
-    gradient_y: np.ndarray # Y-component of gradient vector
-    direction: np.ndarray  # Gradient direction in radians (optional)
-
-
 class ImageProcessor:
-    """Adaptive dimensional image processing system with tensor acceleration.
-    
-    Vectorized convolution engine with multi-algorithm edge detection,
-    context-aware parameter selection, and adaptive precision control.
+    """Vectorized image processor with adaptive edge detection algorithms.
+
+    A thread-safe singleton providing optimized tensor operations for image
+    manipulation and edge detection with intelligent algorithm selection
+    and caching strategies.
+
+    Attributes:
+        system_tier (int): Performance tier of system (0-3)
+        max_dim (int): Maximum allowed image dimension
     """
     _instance: Optional['ImageProcessor'] = None
+    _lock: threading.RLock = threading.RLock()
     
     @classmethod
     def get_instance(cls) -> 'ImageProcessor':
-        """Access singleton with memory-optimized lazy initialization."""
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+        """Get thread-safe singleton instance with lazy initialization.
+
+        Returns:
+            ImageProcessor: Global processor instance
+        """
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
     
     def __init__(self) -> None:
-        """Initialize processor with environment-aware configuration."""
-        # Performance-optimized data structures
-        self._cache: Dict[str, any] = {}
-        self._kernels = self._initialize_kernels()
+        """Initialize processor with optimized kernels and system-aware parameters."""
+        self._cache: Dict[str, Any] = {}
+        self._kernels = self._build_kernels()
         
-        # System-aware processing parameters
-        self.system_tier = SYSTEM_CONTEXT.constraints.get("performance_tier", 1)
-        self.max_dim = 4096 if self.system_tier >= 2 else 2048
-        self.optimize_memory = self.system_tier <= 1
+        # System-calibrated processing parameters
+        self.system_tier = ENV.capabilities.get("performance_tier", 1)
+        self.max_dim = 8192 if self.system_tier >= 2 else 4096
         
-        # Algorithm mapping for dispatch
-        self._edge_detectors = {
-            EdgeDetector.SOBEL: self._sobel_edge,
-            EdgeDetector.PREWITT: self._prewitt_edge,
-            EdgeDetector.SCHARR: self._scharr_edge,
-            EdgeDetector.LAPLACIAN: self._laplacian_edge,
-            EdgeDetector.CANNY: self._canny_edge
+        # Algorithm dispatcher for efficient edge detection
+        self._algo_map = {
+            EdgeDetector.SOBEL: self._detect_sobel,
+            EdgeDetector.PREWITT: self._detect_prewitt,
+            EdgeDetector.SCHARR: self._detect_scharr, 
+            EdgeDetector.LAPLACIAN: self._detect_laplacian,
+            EdgeDetector.CANNY: self._detect_canny
         }
-        
-    def _initialize_kernels(self) -> Dict[str, np.ndarray]:
-        """Generate optimized convolution kernels with pre-normalization."""
+    
+    def _build_kernels(self) -> Dict[str, np.ndarray]:
+        """Build optimized convolution kernels with pre-normalization.
+
+        Returns:
+            Dict[str, np.ndarray]: Named convolution kernels
+        """
         return {
             # Edge detection kernels
             "sobel_x": np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]),
@@ -2171,31 +2233,26 @@ class ImageProcessor:
             "scharr_y": np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]),
             "laplacian": np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]]),
             
-            # Enhancement kernels
-            "gaussian_3x3": np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]]) / 16,
+            # Enhancement kernels with optimized weights
+            "gaussian": np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]]) / 16,
             "sharpen": np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
         }
     
-    @functools.lru_cache(maxsize=8)
+    @lru_cache(maxsize=16)
     def supersample_image(self, image: Image.Image, scale_factor: int) -> Image.Image:
-        """Upscale image with adaptive quality based on system capabilities.
-        
+        """Upscale image with system-optimal resampling method.
+
         Args:
             image: Source PIL image
             scale_factor: Integer multiplier for dimensions
-            
+
         Returns:
-            Upscaled image using optimal resampling method
+            Image.Image: Upscaled image
         """
-        # Enforce integer scale factor
-        scale = max(1, int(scale_factor))
+        # Parameter normalization
+        scale = max(1, min(4, int(scale_factor)))
         
-        # Cache key for reuse
-        cache_key = f"supersample_{id(image)}_{scale}"
-        if cache_key in self._cache:
-            return self._cache[cache_key]
-        
-        # Enforce dimensional safety bounds
+        # Dimensional safety check
         new_width = int(image.width * scale)
         new_height = int(image.height * scale)
         
@@ -2203,34 +2260,25 @@ class ImageProcessor:
             scale_factor = min(self.max_dim / image.width, self.max_dim / image.height)
             new_width = int(image.width * scale_factor)
             new_height = int(image.height * scale_factor)
-            
-            if HAS_RICH:
-                CONSOLE.print(f"[yellow]⚠️ Image dimensions reduced for memory safety "
-                             f"({new_width}×{new_height})[/yellow]")
         
         # Select optimal resampling algorithm based on system tier
-        resampling = Image.BICUBIC if self.system_tier >= 2 else Image.BILINEAR
-        result = image.resize((new_width, new_height), resampling)
-        
-        # Cache result if optimization allows
-        if not self.optimize_memory:
-            self._cache[cache_key] = result
-            
-        return result
+        resampling = Image.LANCZOS if self.system_tier >= 2 else Image.BILINEAR
+        return image.resize((new_width, new_height), resampling)
     
     def rgb_to_gray(self, image_array: np.ndarray) -> np.ndarray:
-        """Convert RGB to perceptually accurate grayscale using ITU-R BT.601.
-        
+        """Convert RGB to perceptually-accurate grayscale (ITU-R BT.601).
+
         Args:
             image_array: RGB numpy array (H×W×3) or grayscale (H×W)
-            
+
         Returns:
-            Grayscale numpy array (H×W)
+            np.ndarray: Grayscale numpy array (H×W)
         """
         # Fast path for already grayscale images
         if len(image_array.shape) == 2:
             return image_array
-            
+        
+        # Vectorized dot product with perceptual weights
         return np.dot(image_array[..., :3], [0.2126, 0.7152, 0.0722]).astype(np.uint8)
     
     def enhance_image(self, 
@@ -2239,359 +2287,338 @@ class ImageProcessor:
                      brightness: float = 0.0,
                      denoise: bool = False) -> np.ndarray:
         """Apply adaptive image enhancements with vectorized operations.
-        
+
         Args:
             image_array: Input image as numpy array
             contrast: Contrast adjustment factor (0.5-2.0, 1.0=neutral)
             brightness: Brightness adjustment (-128 to +128)
             denoise: Apply Gaussian noise reduction
-            
+
         Returns:
-            Enhanced image array
+            np.ndarray: Enhanced image array
         """
-        # Parameter bounds enforcement
-        contrast = np.clip(contrast, 0.5, 2.0)
-        brightness = np.clip(brightness, -128, 128)
-        
-        # Avoid unnecessary copy when no operations needed
+        # Fast path for identity operations
         if contrast == 1.0 and brightness == 0 and not denoise:
             return image_array
             
-        # Create working copy
-        result = image_array.copy()
+        # Parameter normalization
+        contrast = np.clip(contrast, 0.5, 2.0)
+        brightness = np.clip(brightness, -128, 128)
         
-        # Apply brightness if requested
-        if brightness != 0:
-            result = np.clip(result + brightness, 0, 255).astype(np.uint8)
-            
-        # Apply contrast if requested
-        if contrast != 1.0:
+        # Create working copy with float32 precision
+        result = image_array.astype(np.float32)
+        
+        # Apply contrast and brightness in one pass
+        if contrast != 1.0 or brightness != 0:
             f = 259 * (contrast * 255 + 255) / (255 * (259 - contrast * 255))
-            result = np.clip(f * (result.astype(np.float32) - 128) + 128, 0, 255).astype(np.uint8)
+            result = np.clip(f * (result - 128) + 128 + brightness, 0, 255)
             
-        # Apply denoising if requested and system supports
-        if denoise and self.system_tier >= 1:
-            kernel = self._kernels["gaussian_3x3"]
+        # Apply denoising with optimized kernel convolution
+        if denoise:
+            kernel = self._kernels["gaussian"]
             
-            # Process channels efficiently
             if len(result.shape) == 2:
-                # Single channel optimization
-                result = self._apply_kernel(result, kernel)
+                # Single-channel fast path
+                result = self._convolve(result, kernel)
             else:
                 # Multi-channel processing with reduced memory usage
                 for c in range(result.shape[2]):
-                    result[:,:,c] = self._apply_kernel(result[:,:,c], kernel)
+                    result[:,:,c] = self._convolve(result[:,:,c], kernel)
                     
-        return result
+        return result.astype(np.uint8)
     
     def detect_edges(self, 
                     gray_array: np.ndarray, 
                     algorithm: Union[str, EdgeDetector] = EdgeDetector.SOBEL,
                     threshold: Optional[int] = None) -> GradientResult:
-        """Multi-algorithm edge detection with adaptive thresholding.
-        
+        """Detect edges with optimized multi-algorithm selection.
+
         Args:
             gray_array: Grayscale image as numpy array
             algorithm: Edge detection algorithm or name
-            threshold: Manual sensitivity threshold (None=auto)
-            
+            threshold: Edge sensitivity threshold (None=auto)
+
         Returns:
-            GradientResult with magnitude and directional components
+            GradientResult: Magnitude and directional components
         """
-        # Convert string algorithm to enum if needed
+        # Normalize algorithm type
         if isinstance(algorithm, str):
             algorithm = self._parse_algorithm(algorithm)
-        
+            
         # Auto-threshold based on image statistics
         if threshold is None:
-            mean_value = gray_array.mean()
+            mean_value = np.mean(gray_array)
             threshold = int(40 + (mean_value / 5))
-        
-        # Dispatch to appropriate detector
-        edge_fn = self._edge_detectors.get(algorithm, self._sobel_edge)
-        return edge_fn(gray_array, threshold)
+            
+        # Dispatch to specialized algorithm
+        detector = self._algo_map.get(algorithm, self._detect_sobel)
+        return detector(gray_array, threshold)
     
     def _parse_algorithm(self, algorithm_name: str) -> EdgeDetector:
-        """Convert algorithm name to enum with fallback."""
+        """Convert algorithm name to enum with resilient fallback.
+
+        Args:
+            algorithm_name: Algorithm name string
+
+        Returns:
+            EdgeDetector: Algorithm enum
+        """
+        name = algorithm_name.upper()
         try:
-            return EdgeDetector[algorithm_name.upper()]
+            return EdgeDetector[name]
         except (KeyError, AttributeError):
-            if HAS_RICH:
-                CONSOLE.print(f"[yellow]Unknown edge algorithm '{algorithm_name}', using SOBEL[/yellow]")
+            # Fuzzy matching for common misspellings
+            for algo in EdgeDetector:
+                if algo.name.startswith(name[:3]):
+                    return algo
             return EdgeDetector.SOBEL
     
-    def _apply_kernel(self, channel: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-        """Apply convolution kernel with optimized tensor operations."""
-        padded = np.pad(channel, ((1, 1), (1, 1)), mode='edge')
-        windows = np.lib.stride_tricks.sliding_window_view(padded, (3, 3))
-        return np.tensordot(windows, kernel, axes=([2, 3], [0, 1])).astype(np.uint8)
-    
-    def _process_gradients(self, 
-                          grad_x: np.ndarray, 
-                          grad_y: np.ndarray, 
-                          threshold: int) -> GradientResult:
-        """Process gradient components into normalized magnitude.
-        
-        A unified gradient processing pipeline to avoid code duplication
-        across different edge detection algorithms.
+    def _convolve(self, channel: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+        """Apply convolution with optimized sliding window approach.
+
+        Args:
+            channel: Single channel image data
+            kernel: Convolution kernel
+
+        Returns:
+            np.ndarray: Convolved result
         """
-        # Compute gradient magnitude with numerical stability
-        grad = np.hypot(grad_x, grad_y)
+        # Boundary handling with edge padding
+        padded = np.pad(channel, ((1, 1), (1, 1)), mode='edge')
         
-        # Calculate direction for algorithms that need it
+        # Efficient sliding window view for vectorized operations
+        windows = np.lib.stride_tricks.sliding_window_view(padded, kernel.shape)
+        
+        # Tensor contraction for fast convolution
+        return np.tensordot(windows, kernel, axes=([2, 3], [0, 1]))
+    
+    def _detect_sobel(self, gray_array: np.ndarray, threshold: int) -> GradientResult:
+        """Apply Sobel edge detection with vectorized gradients.
+
+        Args:
+            gray_array: Grayscale image data
+            threshold: Edge sensitivity threshold
+
+        Returns:
+            GradientResult: Edge detection components
+        """
+        # Get gradient components with optimized convolution
+        grad_x = self._convolve(gray_array, self._kernels["sobel_x"])
+        grad_y = self._convolve(gray_array, self._kernels["sobel_y"])
+        
+        # Process with unified gradient pipeline
+        return self._process_gradients(grad_x, grad_y, threshold)
+    
+    def _detect_prewitt(self, gray_array: np.ndarray, threshold: int) -> GradientResult:
+        """Apply Prewitt edge detection for noise-stable edges.
+
+        Args:
+            gray_array: Grayscale image data
+            threshold: Edge sensitivity threshold
+
+        Returns:
+            GradientResult: Edge detection components
+        """
+        # Get gradient components
+        grad_x = self._convolve(gray_array, self._kernels["prewitt_x"])
+        grad_y = self._convolve(gray_array, self._kernels["prewitt_y"])
+        
+        return self._process_gradients(grad_x, grad_y, threshold)
+    
+    def _detect_scharr(self, gray_array: np.ndarray, threshold: int) -> GradientResult:
+        """Apply Scharr edge detection for improved rotational symmetry.
+
+        Args:
+            gray_array: Grayscale image data
+            threshold: Edge sensitivity threshold
+
+        Returns:
+            GradientResult: Edge detection components
+        """
+        # Get gradient components
+        grad_x = self._convolve(gray_array, self._kernels["scharr_x"])
+        grad_y = self._convolve(gray_array, self._kernels["scharr_y"])
+        
+        return self._process_gradients(grad_x, grad_y, threshold)
+    
+    def _detect_laplacian(self, gray_array: np.ndarray, threshold: int) -> GradientResult:
+        """Apply Laplacian edge detection for omnidirectional edges.
+
+        Args:
+            gray_array: Grayscale image data
+            threshold: Edge sensitivity threshold
+
+        Returns:
+            GradientResult: Edge detection components
+        """
+        # Preprocess with Gaussian to reduce noise sensitivity
+        if self.system_tier >= 1:
+            gray_array = self._convolve(gray_array, self._kernels["gaussian"])
+            
+        # Apply Laplacian operator
+        laplacian = self._convolve(gray_array, self._kernels["laplacian"])
+        
+        # Get directional information from Sobel (more reliable)
+        grad_x = self._convolve(gray_array, self._kernels["sobel_x"])
+        grad_y = self._convolve(gray_array, self._kernels["sobel_y"])
+        
+        # Create result with Laplacian magnitude but Sobel direction
+        magnitude = self._normalize_gradient(np.abs(laplacian), threshold)
         direction = np.arctan2(grad_y, grad_x)
         
-        # Normalize and threshold with zero-division protection
-        if grad.max() > 0:
-            # Apply threshold before normalization (detail control)
-            grad = np.clip((grad / grad.max()) * 255, 0, 255)
-            grad = np.where(grad < threshold, 0, grad)
-            
-            # Re-normalize after thresholding if needed
-            if grad.max() > 0:
-                grad = (grad / grad.max()) * 255
-                
         return {
-            "magnitude": grad.astype(np.uint8),
+            "magnitude": magnitude,
             "gradient_x": grad_x,
             "gradient_y": grad_y,
             "direction": direction
         }
     
-    def _sobel_edge(self, 
-                   gray_array: np.ndarray, 
-                   threshold: int = 50) -> GradientResult:
-        """Extract directional edges using tensor-accelerated Sobel operator.
-        
-        Optimized implementation with vectorized gradient computation.
-        
+    def _detect_canny(self, gray_array: np.ndarray, threshold: int) -> GradientResult:
+        """Apply Canny edge detection with non-maximum suppression.
+
         Args:
-            gray_array: Grayscale image as numpy array
-            threshold: Sensitivity threshold
-            
+            gray_array: Grayscale image data
+            threshold: High threshold value for hysteresis
+
         Returns:
-            GradientResult with magnitude and directional components
+            GradientResult: Edge detection components
         """
-        # Get cached kernels
-        Kx = self._kernels["sobel_x"]
-        Ky = self._kernels["sobel_y"]
-        
-        # Optimized sliding window approach
-        padded = np.pad(gray_array, ((1, 1), (1, 1)), mode='edge')
-        windows = np.lib.stride_tricks.sliding_window_view(padded, (3, 3))
-        
-        # Vectorized tensor operations (4-8× faster than loops)
-        grad_x = np.tensordot(windows, Kx, axes=([2, 3], [0, 1]))
-        grad_y = np.tensordot(windows, Ky, axes=([2, 3], [0, 1]))
-        
-        # Process through unified gradient pipeline
-        return self._process_gradients(grad_x, grad_y, threshold)
-    
-    def _prewitt_edge(self, 
-                     gray_array: np.ndarray, 
-                     threshold: int = 50) -> GradientResult:
-        """Extract edges using Prewitt operator with balanced sensitivity.
-        
-        Better for high-contrast images with less noise sensitivity than Sobel.
-        
-        Args:
-            gray_array: Grayscale image as numpy array
-            threshold: Sensitivity threshold
-            
-        Returns:
-            GradientResult with magnitude and directional components
-        """
-        # Optimized implementation using cached kernels
-        Kx = self._kernels["prewitt_x"]
-        Ky = self._kernels["prewitt_y"]
-        
-        # Boundary handling with edge padding
-        padded = np.pad(gray_array, ((1, 1), (1, 1)), mode='edge')
-        windows = np.lib.stride_tricks.sliding_window_view(padded, (3, 3))
-        
-        # Vectorized gradient computation
-        grad_x = np.tensordot(windows, Kx, axes=([2, 3], [0, 1]))
-        grad_y = np.tensordot(windows, Ky, axes=([2, 3], [0, 1]))
-        
-        return self._process_gradients(grad_x, grad_y, threshold)
-    
-    def _scharr_edge(self, 
-                    gray_array: np.ndarray, 
-                    threshold: int = 50) -> GradientResult:
-        """Extract edges using Scharr operator for improved angular accuracy.
-        
-        Superior rotational symmetry for enhanced diagonal edge detection.
-        
-        Args:
-            gray_array: Grayscale image as numpy array
-            threshold: Sensitivity threshold
-            
-        Returns:
-            GradientResult with magnitude and directional components
-        """
-        # Optimized implementation using cached kernels
-        Kx = self._kernels["scharr_x"]
-        Ky = self._kernels["scharr_y"]
-        
-        # Boundary handling with edge padding
-        padded = np.pad(gray_array, ((1, 1), (1, 1)), mode='edge')
-        windows = np.lib.stride_tricks.sliding_window_view(padded, (3, 3))
-        
-        # Vectorized gradient computation
-        grad_x = np.tensordot(windows, Kx, axes=([2, 3], [0, 1]))
-        grad_y = np.tensordot(windows, Ky, axes=([2, 3], [0, 1]))
-        
-        return self._process_gradients(grad_x, grad_y, threshold)
-    
-    def _laplacian_edge(self, 
-                       gray_array: np.ndarray, 
-                       threshold: int = 30) -> GradientResult:
-        """Extract edges using Laplacian operator for omnidirectional detection.
-        
-        Detects edges in all directions simultaneously, ideal for detailed images.
-        
-        Args:
-            gray_array: Grayscale image as numpy array
-            threshold: Sensitivity threshold (lower than other methods)
-            
-        Returns:
-            GradientResult with magnitude and directional components
-        """
-        # Get laplacian kernel
-        K = self._kernels["laplacian"]
-        
-        # Apply preprocessing for noise reduction on capable systems
-        if self.system_tier >= 2:
-            gray_array = self._apply_kernel(gray_array, self._kernels["gaussian_3x3"])
-            
-        # Boundary handling with edge padding
-        padded = np.pad(gray_array, ((1, 1), (1, 1)), mode='edge')
-        windows = np.lib.stride_tricks.sliding_window_view(padded, (3, 3))
-        
-        # Apply laplacian
-        grad = np.abs(np.tensordot(windows, K, axes=([2, 3], [0, 1])))
-        
-        # For laplacian, generate directional components using Sobel
-        Kx = self._kernels["sobel_x"]
-        Ky = self._kernels["sobel_y"]
-        grad_x = np.tensordot(windows, Kx, axes=([2, 3], [0, 1]))
-        grad_y = np.tensordot(windows, Ky, axes=([2, 3], [0, 1]))
-        
-        # Use actual laplacian for gradient magnitude but keep directional information
-        return {
-            "magnitude": self._normalize_threshold(grad, threshold),
-            "gradient_x": grad_x,
-            "gradient_y": grad_y,
-            "direction": np.arctan2(grad_y, grad_x)
-        }
-    
-    def _canny_edge(self, 
-                   gray_array: np.ndarray, 
-                   threshold: int = 50) -> GradientResult:
-        """Extract edges using optimized Canny algorithm with hysteresis.
-        
-        Implements non-maximum suppression and hysteresis thresholding.
-        
-        Args:
-            gray_array: Grayscale image as numpy array
-            threshold: Primary sensitivity threshold (high threshold)
-            
-        Returns:
-            GradientResult with magnitude and directional components
-        """
-        # Start with Sobel gradient computation (no thresholding yet)
-        result = self._sobel_edge(gray_array, 0)
-        grad = result["magnitude"]
-        grad_x = result["gradient_x"]
-        grad_y = result["gradient_y"]
+        # Start with Sobel gradients
+        result = self._detect_sobel(gray_array, 0)
+        grad = result["magnitude"].astype(np.float32)
+        grad_x, grad_y = result["gradient_x"], result["gradient_y"]
         theta = result["direction"]
         
-        # Quantize directions to 4 angles (0°, 45°, 90°, 135°)
-        angle = np.round(theta * (4/np.pi)) % 4
+        # Quantize angles to 4 directions (0°, 45°, 90°, 135°)
+        angle = (np.round(theta * (4/np.pi)) % 4).astype(np.uint8)
         
-        # Non-maximum suppression with optimized memory usage
+        # Non-maximum suppression (edge thinning)
         height, width = grad.shape
         suppressed = np.zeros_like(grad)
         
-        # Process significantly non-zero gradients only
-        non_zero_mask = grad > 10
-        y_indices, x_indices = np.where(non_zero_mask)
+        # Vectorize significant gradient processing
+        y_indices, x_indices = np.where(grad > 10)
         
+        # Process edge pixels with direction-aware suppression
         for i, j in zip(y_indices, x_indices):
-            # Skip edge pixels for simplified boundary handling
+            # Skip boundary pixels
             if i == 0 or i == height-1 or j == 0 or j == width-1:
                 continue
                 
-            # Select neighbors based on gradient direction
-            if angle[i, j] == 0:  # Horizontal
-                neighbors = [grad[i, j-1], grad[i, j+1]]
-            elif angle[i, j] == 1:  # Diagonal (45°)
-                neighbors = [grad[i+1, j-1], grad[i-1, j+1]]
-            elif angle[i, j] == 2:  # Vertical
-                neighbors = [grad[i-1, j], grad[i+1, j]]
-            else:  # Diagonal (135°)
-                neighbors = [grad[i-1, j-1], grad[i+1, j+1]]
+            # Get direction-based neighbors
+            if angle[i, j] == 0:      # Horizontal
+                n1, n2 = grad[i, j-1], grad[i, j+1]
+            elif angle[i, j] == 1:    # Diagonal ↗
+                n1, n2 = grad[i+1, j-1], grad[i-1, j+1]
+            elif angle[i, j] == 2:    # Vertical
+                n1, n2 = grad[i-1, j], grad[i+1, j]
+            else:                     # Diagonal ↖
+                n1, n2 = grad[i-1, j-1], grad[i+1, j+1]
                 
-            # Keep pixel if it's the maximum in its direction
-            if grad[i, j] >= max(neighbors[0], neighbors[1]):
+            # Keep only local maxima along gradient direction
+            if grad[i, j] >= max(n1, n2):
                 suppressed[i, j] = grad[i, j]
         
-        # Two-level hysteresis thresholding
-        high_threshold = threshold
+        # Hysteresis thresholding with dual thresholds
         low_threshold = threshold // 2
+        strong_edges = suppressed >= threshold
+        weak_edges = (suppressed >= low_threshold) & (suppressed < threshold)
         
-        # Strong and weak edge detection
-        strong = suppressed >= high_threshold
-        weak = (suppressed >= low_threshold) & (suppressed < high_threshold)
+        # Initialize with strong edges
+        edges = np.zeros_like(suppressed, dtype=np.uint8)
+        edges[strong_edges] = 255
         
-        # Output initialization with strong edges
-        result = np.zeros_like(suppressed)
-        result[strong] = 255
-        
-        # Connect weak edges to strong ones (8-connected)
-        if np.any(weak):
-            weak_y, weak_x = np.where(weak)
+        # Connect weak edges to strong ones (8-connectivity)
+        if np.any(weak_edges):
+            # Find weak edge pixels
+            weak_y, weak_x = np.where(weak_edges)
             
+            # Check each weak edge for connection to strong edge
             for i, j in zip(weak_y, weak_x):
-                # Check if connected to a strong edge in 3x3 neighborhood
-                if np.any(strong[max(0, i-1):min(height, i+2), max(0, j-1):min(width, j+2)]):
-                    result[i, j] = 255
+                # Get 3×3 neighborhood with bounds checking
+                neighborhood = strong_edges[
+                    max(0, i-1):min(height, i+2),
+                    max(0, j-1):min(width, j+2)
+                ]
+                
+                # Connect if adjacent to any strong edge
+                if np.any(neighborhood):
+                    edges[i, j] = 255
         
         return {
-            "magnitude": result,
+            "magnitude": edges,
             "gradient_x": grad_x,
             "gradient_y": grad_y,
             "direction": theta
         }
     
-    def _normalize_threshold(self, gradient: np.ndarray, threshold: int) -> np.ndarray:
-        """Normalize gradient and apply threshold with proper bounds handling."""
-        if gradient.max() > 0:
-            # Normalize to [0, 255] range
-            norm_grad = np.clip((gradient / gradient.max()) * 255, 0, 255)
-            
-            # Apply threshold
-            thresholded = np.where(norm_grad < threshold, 0, norm_grad)
-            
-            # Re-normalize if needed (avoid division by zero)
-            if thresholded.max() > 0:
-                thresholded = (thresholded / thresholded.max()) * 255
-                
-            return thresholded.astype(np.uint8)
+    def _process_gradients(self, 
+                          grad_x: np.ndarray, 
+                          grad_y: np.ndarray, 
+                          threshold: int) -> GradientResult:
+        """Process gradient components into coherent result.
+
+        Args:
+            grad_x: X-gradient component
+            grad_y: Y-gradient component
+            threshold: Edge sensitivity threshold
+
+        Returns:
+            GradientResult: Processed gradient components
+        """
+        # Compute gradient magnitude with optimized hypot
+        grad = np.hypot(grad_x, grad_y)
         
-        return np.zeros_like(gradient, dtype=np.uint8)
+        # Calculate direction for edge orientation
+        direction = np.arctan2(grad_y, grad_x)
         
+        # Normalize and threshold the magnitude
+        magnitude = self._normalize_gradient(grad, threshold)
+        
+        return {
+            "magnitude": magnitude,
+            "gradient_x": grad_x,
+            "gradient_y": grad_y,
+            "direction": direction
+        }
+    
+    def _normalize_gradient(self, gradient: np.ndarray, threshold: int) -> np.ndarray:
+        """Normalize gradient and apply threshold with zero-division protection.
+
+        Args:
+            gradient: Raw gradient data
+            threshold: Edge sensitivity threshold
+
+        Returns:
+            np.ndarray: Normalized uint8 gradient
+        """
+        # Handle empty gradient case
+        if gradient.size == 0 or np.max(gradient) <= 0:
+            return np.zeros_like(gradient, dtype=np.uint8)
+            
+        # Normalize to [0, 255] range
+        normalized = (gradient * 255 / np.max(gradient)).clip(0, 255)
+        
+        # Apply threshold
+        thresholded = np.where(normalized < threshold, 0, normalized)
+        
+        # Re-normalize if needed
+        if np.max(thresholded) > 0:
+            thresholded = (thresholded * 255 / np.max(thresholded)).clip(0, 255)
+            
+        return thresholded.astype(np.uint8)
+    
     def clear_cache(self) -> None:
-        """Clear internal caches to free memory."""
-        self._cache.clear()
-        # Clear LRU caches
-        self.supersample_image.cache_clear()
+        """Clear all caches to free memory."""
+        with self._lock:
+            self._cache.clear()
+            self.supersample_image.cache_clear()
 
 
 # Initialize the global processor instance
 IMAGE_PROCESSOR = ImageProcessor.get_instance()
 
-# Export primary interface functions
+# Export core API functions
 def supersample_image(image: Image.Image, scale_factor: int) -> Image.Image:
     """Upscale image with system-optimal resampling method."""
     return IMAGE_PROCESSOR.supersample_image(image, scale_factor)
@@ -2600,8 +2627,16 @@ def rgb_to_gray(image_array: np.ndarray) -> np.ndarray:
     """Convert RGB to perceptually-accurate grayscale (ITU-R BT.601)."""
     return IMAGE_PROCESSOR.rgb_to_gray(image_array)
 
-def detect_edges(gray_array: np.ndarray, algorithm: str = "sobel") -> np.ndarray:
-    """Extract edges with specified algorithm and adaptive thresholding."""
+def detect_edges(gray_array: np.ndarray, algorithm: str = "sobel") -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Extract edges with specified algorithm and adaptive thresholding.
+    
+    Args:
+        gray_array: Grayscale image data
+        algorithm: Edge detection algorithm name
+        
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: Magnitude, grad_x, grad_y
+    """
     result = IMAGE_PROCESSOR.detect_edges(gray_array, algorithm)
     return result["magnitude"], result["gradient_x"], result["gradient_y"]
 
@@ -2616,15 +2651,19 @@ class StreamEngine:
     Processes video streams with contextual awareness, dynamic quality adaptation,
     and network resilience. Handles YouTube URLs, local files, and camera inputs
     with automatic parameter optimization based on system capabilities.
+    
+    Attributes:
+        _stream_cache: Cache mapping of URLs to streaming addresses and timestamps
+        _cache_ttl: Cache entry lifetime in seconds
+        _cache_max_size: Maximum number of cache entries to maintain
     """
-    # Type-enforced cache with precise TTL management
     _stream_cache: Dict[str, Tuple[str, float]] = {}
     _cache_ttl: int = 3600  # 1 hour validity
     _cache_max_size: int = 100
     
     @classmethod
     def extract_stream_url(cls, youtube_url: str, resolution: Optional[int] = None) -> str:
-        """Extract adaptive-quality stream URL with optimized resilience.
+        """Extract adaptive-quality stream URL with resilient retry mechanism.
 
         Args:
             youtube_url: YouTube video URL or ID
@@ -2634,13 +2673,13 @@ class StreamEngine:
             Direct streaming URL with optimal format
             
         Raises:
+            DependencyError: If yt-dlp is not available
             StreamExtractionError: When extraction fails after recovery attempts
         """
-        # Validate dependencies early
         if not HAS_YT_DLP:
-            raise DependencyError("yt-dlp", "pip install yt-dlp")
+            raise DependencyError("yt-dlp", "pip install yt-dlp", "YouTube streaming")
         
-        # Cache lookup with TTL validation
+        # Efficient cache lookup with integrated TTL validation
         cache_key = f"{youtube_url}:{resolution}"
         current_time = time.time()
         cls._prune_cache(current_time)
@@ -2650,11 +2689,10 @@ class StreamEngine:
             if current_time - timestamp < cls._cache_ttl:
                 return url
         
-        # Auto-select optimal resolution based on capabilities
+        # Dynamic resolution selection based on system capabilities
         actual_resolution = resolution or cls._determine_optimal_resolution()
         format_spec = f'best[height<={actual_resolution}][ext=mp4]'
         
-        # YouTube-DL options with progressive fallback capability
         ydl_opts = {
             'format': format_spec,
             'quiet': True,
@@ -2663,16 +2701,16 @@ class StreamEngine:
             'socket_timeout': 10,
         }
         
-        # Progressive retry with backoff and format degradation
-        for retry_attempt in range(3):
+        # Progressive fallback with adaptive retry strategy
+        for retry in range(3):
             try:
                 # Status display with environment awareness
+                status_msg = f"🔍 Extracting stream{'.' * (retry + 1)}"
                 if HAS_RICH:
-                    status_indicator = f"🔍 Extracting stream data{'.' * (retry_attempt + 1)}"
-                    with CONSOLE.status(status_indicator, spinner="dots"):
+                    with CONSOLE.status(status_msg, spinner="dots"):
                         extraction_result = cls._perform_extraction(youtube_url, ydl_opts)
                 else:
-                    print("🔍 Extracting stream...", end="", flush=True)
+                    print(f"{status_msg}...", end="", flush=True)
                     extraction_result = cls._perform_extraction(youtube_url, ydl_opts)
                     print(" ✓")
                 
@@ -2682,30 +2720,29 @@ class StreamEngine:
                     return extraction_result.url
                     
                 # Format degradation for retry
-                if retry_attempt == 0:
-                    ydl_opts['format'] = 'best[height<=360]'
-                else:
-                    ydl_opts['format'] = 'worst'
+                ydl_opts['format'] = 'best[height<=360]' if retry == 0 else 'worst'
                 
             except Exception as e:
-                # Error categorization for informed retry decisions
                 error_category = cls._categorize_extraction_error(e)
                 
-                if retry_attempt < 2:
-                    # Apply exponential backoff
-                    time.sleep(1 * (2**retry_attempt))
-                    # Adjust format if network constraints detected
+                if retry < 2:
+                    # Exponential backoff with format adaptation
+                    time.sleep(1 * (2**retry))
                     if error_category in ('network', 'timeout'):
                         ydl_opts['socket_timeout'] = 20
-                        ydl_opts['format'] = 'best[height<=360]' if retry_attempt == 0 else 'worst'
+                        ydl_opts['format'] = 'best[height<=360]' if retry == 0 else 'worst'
                 else:
-                    raise StreamExtractionError(f"Failed to extract stream: {error_category}", original=e)
+                    raise StreamExtractionError(
+                        f"Failed to extract stream: {error_category}", 
+                        original=e, 
+                        category=error_category
+                    )
                 
         raise StreamExtractionError("Stream extraction failed after multiple attempts")
 
     @classmethod
     def _prune_cache(cls, current_time: float) -> None:
-        """Remove expired and excess cache entries using efficient algorithm.
+        """Remove expired and excess cache entries with minimal iterations.
         
         Args:
             current_time: Current timestamp for TTL comparison
@@ -2715,30 +2752,33 @@ class StreamEngine:
                       if current_time - ts > cls._cache_ttl]
         
         for key in expired_keys:
-            del cls._stream_cache[key]
+            cls._stream_cache.pop(key, None)
             
         # Then enforce size limit if still needed
         if len(cls._stream_cache) > cls._cache_max_size:
-            # Sort by timestamp and keep only the newest entries
-            sorted_keys = sorted(cls._stream_cache.keys(), 
-                               key=lambda k: cls._stream_cache[k][1])
-            
-            # Remove oldest entries
-            for key in sorted_keys[:-cls._cache_max_size]:
-                del cls._stream_cache[key]
+            # Keep only the newest entries
+            sorted_items = sorted(
+                cls._stream_cache.items(), 
+                key=lambda item: item[1][1],  # Sort by timestamp
+                reverse=True  # Newest first
+            )
+            # Reset cache with only newest entries
+            cls._stream_cache = dict(sorted_items[:cls._cache_max_size])
 
     @staticmethod
     def _determine_optimal_resolution() -> int:
-        """Select optimal resolution based on system capabilities.
+        """Select optimal resolution based on system capabilities and terminal size.
         
         Returns:
-            Vertical resolution in pixels
+            int: Vertical resolution in pixels
         """
-        system_tier = SYSTEM_CONTEXT.constraints.get("performance_tier", 1)
-        terminal_height = SYSTEM_CONTEXT.attributes.get("terminal_height", 24)
+        system_tier = ENV.capabilities.get("performance_tier", 1)
+        terminal_height = ENV.terminal.get("height", 24)
         
-        # Higher resolution for more capable systems with larger terminals
-        if system_tier >= 2 and terminal_height > 40:
+        # Tiered resolution selection
+        if system_tier >= 3:
+            return 1080 if terminal_height > 60 else 720
+        elif system_tier >= 2 and terminal_height > 40:
             return 720
         elif system_tier >= 1 and terminal_height > 30:
             return 480
@@ -2753,20 +2793,20 @@ class StreamEngine:
             error: Exception from extraction attempt
             
         Returns:
-            Error category identifier
+            str: Error category identifier
         """
         error_str = str(error).lower()
         
+        # Pattern-based error classification
         if "429" in error_str:
             return "rate_limited"
         elif "403" in error_str:
             return "access_denied"
-        elif any(x in error_str for x in ("blocked", "not available in your country")):
+        elif any(x in error_str for x in ("blocked", "not available", "country")):
             return "geo_restricted"
         elif any(x in error_str for x in ("timeout", "timed out", "connection")):
             return "network"
-        else:
-            return "general"
+        return "general"
 
     @staticmethod
     def _perform_extraction(url: str, options: Dict[str, Any]) -> VideoInfo:
@@ -2795,7 +2835,7 @@ class StreamEngine:
     @classmethod
     def process_video_stream(
         cls,
-        source: Union[str, int],
+        source: Union[str, int, Path],
         scale_factor: int = 2,
         block_width: int = 8,
         block_height: int = 8,
@@ -2810,6 +2850,9 @@ class StreamEngine:
     ) -> None:
         """Process video stream with adaptive rendering and performance tuning.
         
+        Streams content from various sources (files, URLs, cameras) with
+        dynamic quality adjustment and performance monitoring.
+        
         Args:
             source: File path, YouTube URL, or camera index
             scale_factor: Detail enhancement factor (1-4)
@@ -2823,396 +2866,330 @@ class StreamEngine:
             show_stats: Display performance metrics
             adaptive_quality: Dynamically adjust quality for performance
             border: Add decorative frame
+            
+        Raises:
+            DependencyError: If OpenCV is not available
+            IOError: If source cannot be opened
         """
-        # Ensure dependency availability with helpful error
         if not HAS_CV2:
-            raise DependencyError("opencv-python", "pip install opencv-python")
+            raise DependencyError("opencv-python", "pip install opencv-python", "Video processing")
             
-        # Source normalization with intelligent YouTube detection
-        stream_url = cls._resolve_stream_source(source)
-        
-        # Stream acquisition with fault tolerance
-        capture, video_info = cls._initialize_stream_capture(stream_url)
-            
-        # Environment-optimized rendering parameters
-        params = cls._configure_rendering_parameters(
-            video_info=video_info,
-            scale=scale_factor,
-            block_width=block_width,
-            block_height=block_height,
-            edge_threshold=edge_threshold,
-            adaptive=adaptive_quality
-        )
-        
-        # Ring buffers for performance metrics
-        metrics = StreamMetrics(sample_size=30)
-        
-        # Prepare UI components
-        renderer = FrameRenderer(
-            terminal_width=SYSTEM_CONTEXT.attributes.get("terminal_width", 80),
-            terminal_height=SYSTEM_CONTEXT.attributes.get("terminal_height", 24),
-            gradient=gradient_str or get_enhanced_gradient_chars(),
-            border=border and UNICODE_ENGINE.supports_unicode,
-            unicode_supported=UNICODE_ENGINE.supports_unicode
-        )
-        
-        # Inform user of stream activation
-        cls._display_stream_header(source, video_info)
-            
+        # Initialize stream with integrated error handling
         try:
-            # Process frames with adaptive timing
-            cls._process_frame_stream(
-                capture=capture,
-                renderer=renderer,
-                params=params,
-                metrics=metrics,
-                fps=fps,
-                show_stats=show_stats,
-                color=color,
-                enhanced_edges=enhanced_edges,
-                adaptive_quality=adaptive_quality
-            )
-                
-        except KeyboardInterrupt:
-            # Clean exit with stats summary
-            cls._display_performance_summary(metrics, params, scale_factor, block_width, block_height)
+            # Normalize source and open capture
+            stream_url = cls._resolve_source(source)
+            capture = cv2.VideoCapture(stream_url)
             
+            if not capture.isOpened():
+                raise IOError(f"Failed to open source: {source}")
+                
+            # Extract video metadata
+            video_info = VideoInfo.from_capture(capture, str(source), 
+                                               "youtube" if isinstance(source, str) and 
+                                               ("youtu" in source or "://y" in source) else "file")
         except Exception as e:
-            # Structured error report
+            cls._handle_stream_error(e, 0)
+            return
+        
+        # Setup rendering parameters with environment optimization
+        params = RenderParameters(
+            scale=scale_factor,
+            width=block_width,
+            height=block_height,
+            threshold=edge_threshold,
+            optimal_width=block_width,
+            optimal_height=block_height
+        )
+        
+        # Performance monitoring
+        metrics = StreamMetrics()
+        frame_buffer = FrameBuffer(capacity=2)
+        
+        # Terminal UI initialization
+        renderer = FrameRenderer(
+            terminal_width=ENV.terminal["width"],
+            terminal_height=ENV.terminal["height"],
+            gradient=gradient_str or get_enhanced_gradient_chars(),
+            border=border and ENV.capabilities["unicode"],
+            unicode_supported=ENV.capabilities["unicode"]
+        )
+        
+        # Display stream information
+        title = f"🎬 Streaming: {video_info.title}"
+        info = [f"Source: {source}"]
+        if video_info.width and video_info.height:
+            info.append(f"Resolution: {video_info.width}×{video_info.height}")
+        if video_info.fps:
+            info.append(f"Original FPS: {video_info.fps:.1f}")
+            
+        if HAS_RICH:
+            CONSOLE.print(Panel("\n".join(info), title=title, border_style="blue"))
+        else:
+            print(f"\n{title}")
+            print("\n".join(info))
+            print("=" * 40)
+            
+        # Performance thresholds for adaptive quality
+        render_thresholds = RenderThresholds.from_target_fps(fps)
+        frame_time = 1.0 / fps  # Target frame time in seconds
+        
+        # Clear screen before streaming
+        renderer.clear_screen()
+        
+        # Process frames with error handling
+        try:
+            running = True
+            last_render_time = time.time()
+            frames_processed = 0
+            
+            while running:
+                start_time = time.time()
+                
+                # Frame capture
+                ret, frame = capture.read()
+                if not ret:
+                    break  # End of stream
+                    
+                # Auto-rotate based on EXIF orientation
+                if hasattr(frame, 'shape') and len(frame.shape) >= 2:
+                    if frame.shape[0] > frame.shape[1] and frame.shape[0] > 720:
+                        # Portrait video - transpose for better terminal fit
+                        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+                
+                # Convert to PIL for processing
+                pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                
+                # Process frame with timing
+                render_start = time.time()
+                art = image_to_unicode_art(
+                    pil_image,
+                    scale_factor=params.scale,
+                    block_width=params.width,
+                    block_height=params.height,
+                    edge_threshold=params.threshold,
+                    gradient_str=gradient_str,
+                    color=color,
+                    enhanced_edges=enhanced_edges
+                )
+                render_time = time.time() - render_start
+                
+                # Update metrics
+                metrics.record_render(render_time)
+                metrics.record_frame()
+                metrics.update_fps()
+                
+                # Render complete frame with border and stats
+                frame_lines = renderer.render_frame(
+                    art=art,
+                    source_name=video_info.title or str(source),
+                    metrics=metrics,
+                    params=params,
+                    show_stats=show_stats
+                )
+                
+                # Add to buffer
+                frame_buffer.add(frame_lines)
+                
+                # Throttle display based on target frame rate
+                elapsed = time.time() - last_render_time
+                if elapsed >= frame_time or frames_processed == 0:
+                    # Display latest frame
+                    renderer.clear_screen()
+                    renderer.display_frame(frame_buffer.get_latest())
+                    last_render_time = time.time()
+                    frames_processed += 1
+                    
+                    # Adapt quality if enabled
+                    if adaptive_quality and frames_processed % 5 == 0:
+                        params.adjust_quality(render_time * 1000, render_thresholds)
+                
+                # Control frame rate with precise timing
+                elapsed_total = time.time() - start_time
+                sleep_time = max(0, frame_time - elapsed_total)
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                else:
+                    metrics.record_dropped()
+                    
+        except KeyboardInterrupt:
+            # Clean exit with statistics
+            renderer.clear_screen()
+            if HAS_RICH:
+                CONSOLE.print("\n[bold green]✓ Stream completed![/bold green]")
+                
+                stats_table = Table(title="📊 Performance Summary")
+                stats_table.add_column("Metric", style="cyan")
+                stats_table.add_column("Value", style="green")
+                
+                perf_stats = metrics.get_stats()
+                stats_table.add_row("Frames processed", str(perf_stats["total_frames"]))
+                stats_table.add_row("Average FPS", f"{perf_stats['avg_fps']:.2f}")
+                stats_table.add_row("Render time", f"{perf_stats['avg_render_time']:.1f}ms")
+                stats_table.add_row("Final quality", f"{params.quality_level.name}")
+                if perf_stats["dropped_frames"] > 0:
+                    stats_table.add_row("Dropped frames", 
+                                      f"{perf_stats['dropped_frames']} ({perf_stats['drop_ratio']*100:.1f}%)")
+                
+                CONSOLE.print(stats_table)
+            else:
+                print("\n✓ Stream completed!")
+                print(f"Frames processed: {metrics.frames_processed}")
+                print(f"Average FPS: {metrics.current_fps:.2f}")
+                print(f"Render time: {metrics.average_render_time:.1f}ms")
+                
+        except Exception as e:
             cls._handle_stream_error(e, metrics.frames_processed)
             
         finally:
-            # Resource cleanup with guaranteed execution
-            cls._release_resources(capture)
+            if capture is not None:
+                capture.release()
 
-class QualityLevel(IntEnum):
-    """Discrete quality levels with semantic meaning for adaptive rendering."""
-    MINIMAL = 0    # Lowest quality, maximum performance
-    LOW = 1        # Reduced quality for constrained systems
-    STANDARD = 2   # Balanced quality and performance
-    HIGH = 3       # Enhanced quality for capable systems
-    MAXIMUM = 4    # Highest quality, performance intensive
-
-
-class VideoInfo(NamedTuple):
-    """Immutable video metadata with validated fields."""
-    url: Optional[str] = None
-    title: str = "Unknown"
-    duration: Optional[int] = None
-    format: str = "unknown"
-    width: Optional[int] = None
-    height: Optional[int] = None
-    fps: Optional[float] = None
-
-    @classmethod
-    def from_capture(cls, capture, source_name: str, stream_format: str) -> 'VideoInfo':
-        """Factory constructor to create VideoInfo from capture device.
+    @staticmethod
+    def _resolve_source(source: Union[str, int, Path]) -> Union[str, int]:
+        """Resolve stream source with YouTube URL extraction when needed.
         
         Args:
-            capture: OpenCV capture object
-            source_name: Name of the source (URL/device)
-            stream_format: Format identifier
-        
-        Returns:
-            Validated VideoInfo instance
-        """
-        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = capture.get(cv2.CAP_PROP_FPS)
-        
-        # Normalize values with validation
-        fps = 30.0 if fps <= 0 or fps > 1000 else fps
-        
-        return cls(
-            title=str(source_name),
-            format=stream_format,
-            width=width if width > 0 else None,
-            height=height if height > 0 else None,
-            fps=fps
-        )
-
-
-class PerformanceStats(TypedDict):
-    """Rich statistical performance metrics."""
-    avg_render_time: float
-    avg_fps: float
-    effective_fps: float
-    total_frames: int
-    dropped_frames: int
-    drop_ratio: float
-    stability: float  # 0-1 rating of render time consistency
-
-
-class StreamMetrics:
-    """High-precision performance tracking with statistical analysis."""
-    
-    def __init__(self, sample_size: int = 30):
-        """Initialize metrics collection with configurable sample size.
-        
-        Args:
-            sample_size: Maximum samples for rolling statistics (higher = more stable, slower response)
-        """
-        self.frames_processed: int = 0
-        self.start_time: Seconds = time.time()
-        self.dropped_frames: int = 0
-        self.render_times: deque[Milliseconds] = collections.deque(maxlen=sample_size)
-        self.fps_values: deque[float] = collections.deque(maxlen=sample_size)
-        self.last_fps_update: Seconds = time.time()
-        self.current_fps: float = 0.0
-        self.frames_since_update: int = 0
-        
-    def update_fps(self) -> float:
-        """Calculate current FPS with time-based accuracy.
-        
-        Returns:
-            Current frames per second
-        """
-        current_time = time.time()
-        elapsed = current_time - self.last_fps_update
-        
-        # Only update if sufficient time has passed
-        if elapsed >= 1.0 and self.frames_since_update > 0:
-            self.current_fps = self.frames_since_update / elapsed
-            self.fps_values.append(self.current_fps)
-            self.last_fps_update = current_time
-            self.frames_since_update = 0
+            source: Original source identifier
             
-        return self.current_fps
+        Returns:
+            Stream URL or device identifier
+        """
+        # Handle Path objects
+        if isinstance(source, Path):
+            return str(source)
+            
+        # Handle numeric camera indices
+        if isinstance(source, int):
+            return source
+            
+        # Handle string URLs/paths
+        source_str = str(source)
         
-    def record_render(self, duration: Seconds) -> None:
-        """Record frame rendering time in milliseconds.
+        # YouTube URL detection and resolution
+        if any(x in source_str.lower() for x in ("youtube.com", "youtu.be", "yt.be")):
+            try:
+                return StreamEngine.extract_stream_url(source_str)
+            except Exception as e:
+                # Fallback to original URL if extraction fails
+                if HAS_RICH:
+                    CONSOLE.print(f"[yellow]⚠️ YouTube extraction failed: {e}[/yellow]")
+                    CONSOLE.print(f"[yellow]Trying direct access...[/yellow]")
+                else:
+                    print(f"⚠️ YouTube extraction failed: {e}")
+                    print("Trying direct access...")
+                    
+        return source_str
+        
+    @staticmethod
+    def _handle_stream_error(error: Exception, frames_processed: int) -> None:
+        """Display user-friendly error with context and recovery guidance.
         
         Args:
-            duration: Render time in seconds
+            error: Exception that occurred
+            frames_processed: Number of frames successfully processed
         """
-        self.render_times.append(duration * 1000)
+        if frames_processed > 0:
+            # Non-fatal error after some successful processing
+            message = "Stream interrupted"
+            style = "yellow"
+        else:
+            # Fatal error during initialization
+            message = "Failed to process stream"
+            style = "red bold"
         
-    def record_frame(self) -> None:
-        """Record successful frame processing."""
-        self.frames_processed += 1
-        self.frames_since_update += 1
-        
-    def record_dropped(self) -> None:
-        """Record dropped frame."""
-        self.dropped_frames += 1
-        
-    @property
-    def average_render_time(self) -> float:
-        """Calculate average render time in milliseconds.
-        
-        Returns:
-            Average render time or 0 if no data
-        """
-        return sum(self.render_times) / len(self.render_times) if self.render_times else 0
-    
-    @property
-    def render_time_variance(self) -> float:
-        """Calculate render time variance as stability measure.
-        
-        Returns:
-            Statistical variance of render times or 0 if insufficient data
-        """
-        return statistics.variance(self.render_times) if len(self.render_times) > 1 else 0
-        
-    @property
-    def effective_fps(self) -> float:
-        """Calculate overall effective FPS across entire runtime.
-        
-        Returns:
-            Overall frames per second
-        """
-        duration = time.time() - self.start_time
-        return self.frames_processed / duration if duration > 0 else 0
-    
-    @property
-    def drop_ratio(self) -> float:
-        """Calculate ratio of dropped frames to total processed.
-        
-        Returns:
-            Ratio of dropped frames (0.0-1.0) or 0 if no frames processed
-        """
-        total = self.frames_processed + self.dropped_frames
-        return self.dropped_frames / total if total > 0 else 0
-    
-    def get_stats(self) -> PerformanceStats:
-        """Generate comprehensive performance statistics.
-        
-        Returns:
-            PerformanceStats with complete metrics
-        """
-        avg_fps = statistics.mean(self.fps_values) if self.fps_values else 0
-        render_times = list(self.render_times)
-        
-        # Calculate stability as inverse of normalized variance
-        stability = 1.0
-        if len(render_times) > 1:
-            variance = statistics.variance(render_times)
-            mean = statistics.mean(render_times)
-            if mean > 0:
-                # Normalize variance and convert to stability score
-                cv = min(1.0, variance / (mean * mean))  # Coefficient of variation capped at 1.0
-                stability = 1.0 - cv
-        
-        return {
-            "avg_render_time": self.average_render_time,
-            "avg_fps": avg_fps,
-            "effective_fps": self.effective_fps,
-            "total_frames": self.frames_processed,
-            "dropped_frames": self.dropped_frames,
-            "drop_ratio": self.drop_ratio,
-            "stability": stability
-        }
+        if HAS_RICH:
+            CONSOLE.print(f"[{style}]🚫 {message}: {type(error).__name__}[/{style}]")
+            
+            if frames_processed == 0:
+                # More detailed error for startup failures
+                CONSOLE.print(f"[dim]{str(error)}[/dim]")
+                
+                if isinstance(error, cv2.error):
+                    CONSOLE.print("[yellow]💡 This may be due to an unsupported video format or codec.[/yellow]")
+                elif "connection" in str(error).lower():
+                    CONSOLE.print("[yellow]💡 Check your network connection or URL.[/yellow]")
+        else:
+            print(f"\n🚫 {message}: {type(error).__name__}")
+            print(f"  {str(error)}")
 
+# Mapping to Legacy Functions For Backward Compatibility
+def process_video_stream(
+    source: Union[str, int, Path],
+    scale_factor: int = 2,
+    block_width: int = 8,
+    block_height: int = 8,
+    edge_threshold: int = 50,
+    gradient_str: Optional[str] = None,
+    color: bool = True,
+    fps: int = 15,
+    enhanced_edges: bool = True,
+    show_stats: bool = True,
+    adaptive_quality: bool = True,
+    border: bool = True
+) -> None:
+    """Process video streams with multidimensional rendering and adaptive quality.
+
+    Provides high-performance stream processing with intelligent buffering, 
+    concurrent rendering, and real-time quality adaptation based on system capabilities.
+    
+    Args:
+        source: Video file path, YouTube URL, camera index, or Path object
+        scale_factor: Detail enhancement multiplier (1-4)
+        block_width: Character cell width in pixels
+        block_height: Character cell height in pixels
+        edge_threshold: Edge detection sensitivity (0-255)
+        gradient_str: Custom density gradient characters (None=auto-select)
+        color: Whether to enable ANSI color output
+        fps: Target frames per second
+        enhanced_edges: Whether to use directional edge characters
+        show_stats: Whether to display performance metrics
+        adaptive_quality: Whether to auto-adjust quality for performance
+        border: Whether to add decorative frame around content
+    
+    Raises:
+        DependencyError: If required dependencies are missing
+        IOError: If the source cannot be opened
+    """
+    StreamEngine.process_video_stream(
+        source=source,
+        scale_factor=scale_factor,
+        block_width=block_width,
+        block_height=block_height,
+        edge_threshold=edge_threshold,
+        gradient_str=gradient_str,
+        color=color,
+        fps=fps,
+        enhanced_edges=enhanced_edges,
+        show_stats=show_stats,
+        adaptive_quality=adaptive_quality,
+        border=border
+    )
 
 @dataclass(frozen=True)
 class RenderThresholds:
-    """Immutable render time thresholds for quality adaptation."""
-    reduce_ms: float  # Threshold to reduce quality (ms)
-    improve_ms: float  # Threshold to improve quality (ms)
+    """Adaptive quality thresholds based on render time performance.
+    
+    Attributes:
+        reduce_ms: Threshold in ms above which quality should be reduced
+        improve_ms: Threshold in ms below which quality can be improved
+    """
+    reduce_ms: float  # Upper threshold to trigger quality reduction
+    improve_ms: float  # Lower threshold to trigger quality improvement
     
     @classmethod
-    def from_target_fps(cls, target_fps: float, reduce_ratio: float = 0.9, improve_ratio: float = 0.6) -> 'RenderThresholds':
-        """Create thresholds from target FPS with safety margins.
+    def from_target_fps(cls, target_fps: float, reduce_ratio: float = 0.9, 
+                       improve_ratio: float = 0.6) -> 'RenderThresholds':
+        """Create optimal thresholds from target FPS with balanced margins.
         
         Args:
             target_fps: Desired frames per second
-            reduce_ratio: Frame budget usage ratio to trigger quality reduction
-            improve_ratio: Frame budget usage ratio to trigger quality improvement
+            reduce_ratio: Percentage of frame budget that triggers quality reduction
+            improve_ratio: Percentage of frame budget that allows quality improvement
             
         Returns:
-            Configured thresholds for adaptive rendering
+            RenderThresholds: Calculated thresholds for adaptive rendering
         """
-        frame_budget_ms = (1.0 / target_fps) * 1000
-        return cls(
-            reduce_ms=frame_budget_ms * reduce_ratio,
-            improve_ms=frame_budget_ms * improve_ratio
-        )
-
-
-class RenderParameters:
-    """Adaptive rendering parameters with quality-driven optimization."""
-    
-    def __init__(
-        self, 
-        scale: int,
-        width: int,
-        height: int,
-        threshold: int,
-        optimal_width: int,
-        optimal_height: int
-    ):
-        """Initialize with base and optimal parameters.
-        
-        Args:
-            scale: Detail enhancement factor (1-4)
-            width: Block width in pixels
-            height: Block height in pixels
-            threshold: Edge detection threshold (0-100)
-            optimal_width: Target block width for ideal quality/performance
-            optimal_height: Target block height for ideal quality/performance
-        """
-        # Core rendering parameters
-        self.scale = max(1, min(4, scale))
-        self.width = max(4, width)
-        self.height = max(2, height)
-        self.threshold = max(0, min(100, threshold))
-        
-        # Reference values for adaptation
-        self.optimal_width = max(4, optimal_width)
-        self.optimal_height = max(2, optimal_height)
-        
-        # State tracking
-        self.quality_level = QualityLevel.STANDARD
-        self.frames_since_adjustment: int = 0
-        self._adjustments: Dict[QualityLevel, Tuple[int, int, int]] = self._build_quality_map()
-        
-    def _build_quality_map(self) -> Dict[QualityLevel, Tuple[int, int, int]]:
-        """Build mapping of quality levels to parameter tuples.
-        
-        Returns:
-            Dictionary mapping quality levels to (scale, width_delta, height_delta)
-        """
-        return {
-            QualityLevel.MINIMAL: (max(1, self.scale - 1), 2, 1),
-            QualityLevel.LOW: (max(1, self.scale - 1), 1, 0),
-            QualityLevel.STANDARD: (self.scale, 0, 0),
-            QualityLevel.HIGH: (min(4, self.scale + 1), -1, 0),
-            QualityLevel.MAXIMUM: (min(4, self.scale + 1), -1, -1)
-        }
-        
-    def adjust_quality(self, render_time: float, thresholds: RenderThresholds) -> bool:
-        """Adjust quality based on render performance.
-        
-        Args:
-            render_time: Current render time in milliseconds
-            thresholds: Performance thresholds for quality decisions
-            
-        Returns:
-            Whether quality level was changed
-        """
-        previous_level = self.quality_level
-        
-        # Determine new quality level based on performance
-        if render_time > thresholds.reduce_ms and self.quality_level > QualityLevel.MINIMAL:
-            self.quality_level = QualityLevel(self.quality_level - 1)
-        elif render_time < thresholds.improve_ms and self.quality_level < QualityLevel.MAXIMUM:
-            self.quality_level = QualityLevel(self.quality_level + 1)
-        
-        # Apply parameter changes if quality level changed
-        if previous_level != self.quality_level:
-            self._apply_quality_parameters()
-            
-        # Reset adjustment counter
-        self.frames_since_adjustment = 0
-        return previous_level != self.quality_level
-        
-    def _apply_quality_parameters(self) -> None:
-        """Apply parameters for current quality level."""
-        scale_delta, width_delta, height_delta = self._adjustments[self.quality_level]
-        
-        self.scale = scale_delta
-        self.width = max(4, self.optimal_width + width_delta)
-        self.height = max(2, self.optimal_height + height_delta)
-
-class QualityLevel(IntEnum):
-    """Discrete quality levels with semantic meaning for adaptive rendering."""
-    MINIMAL = 0    # Lowest quality, maximum performance
-    LOW = 1        # Reduced quality for constrained systems
-    STANDARD = 2   # Balanced quality and performance
-    HIGH = 3       # Enhanced quality for capable systems
-    MAXIMUM = 4    # Highest quality, performance intensive
-
-
-class PerformanceStats(TypedDict):
-    """Rich statistical performance metrics."""
-    avg_render_time: float
-    avg_fps: float
-    effective_fps: float
-    total_frames: int
-    dropped_frames: int
-    drop_ratio: float
-    stability: float  # 0-1 rating of render time consistency
-
-
-@dataclass(frozen=True)
-class RenderThresholds:
-    """Immutable render time thresholds for quality adaptation."""
-    reduce_ms: float  # Threshold to reduce quality (ms)
-    improve_ms: float  # Threshold to improve quality (ms)
-    
-    @classmethod
-    def from_target_fps(cls, target_fps: float, reduce_ratio: float = 0.9, improve_ratio: float = 0.6) -> 'RenderThresholds':
-        """Create thresholds from target FPS with safety margins.
-        
-        Args:
-            target_fps: Desired frames per second
-            reduce_ratio: Frame budget usage ratio to trigger quality reduction
-            improve_ratio: Frame budget usage ratio to trigger quality improvement
-            
-        Returns:
-            Configured thresholds for adaptive rendering
-        """
-        frame_budget_ms = (1.0 / target_fps) * 1000
+        frame_budget_ms = (1000.0 / target_fps)
         return cls(
             reduce_ms=frame_budget_ms * reduce_ratio,
             improve_ms=frame_budget_ms * improve_ratio
@@ -3220,124 +3197,130 @@ class RenderThresholds:
 
 
 class StreamMetrics:
-    """🔄 High-precision performance tracking with statistical analysis."""
+    """High-precision performance metrics with statistical analysis.
+    
+    Thread-safe performance tracking for realtime visualization with
+    rolling statistics and comprehensive analytics.
+    
+    Attributes:
+        frames_processed: Total successfully rendered frames
+        current_fps: Most recently calculated frames per second
+        average_render_time: Mean render time in milliseconds
+    """
     
     def __init__(self, sample_size: int = 30) -> None:
-        """Initialize metrics collection with configurable sample size.
+        """Initialize performance tracking with optimized sample size.
         
         Args:
             sample_size: Maximum samples for rolling statistics
         """
+        self._lock = threading.RLock()
         self.frames_processed: int = 0
-        self.start_time: Seconds = time.time()
         self.dropped_frames: int = 0
-        self.render_times: collections.deque[Milliseconds] = collections.deque(maxlen=sample_size)
-        self.fps_values: collections.deque[float] = collections.deque(maxlen=sample_size)
-        self.last_fps_update: Seconds = time.time()
+        self.start_time: float = time.time()
         self.current_fps: float = 0.0
-        self.frames_since_update: int = 0
-        self._lock = threading.RLock()  # Thread safety
+        
+        # Performance tracking with bounded collections
+        self._render_times = collections.deque[float](maxlen=sample_size)
+        self._fps_samples = collections.deque[float](maxlen=sample_size)
+        self._last_fps_time = time.time()
+        self._frames_since_fps_update = 0
         
     def update_fps(self) -> float:
-        """Calculate current FPS with time-based accuracy.
+        """Calculate current FPS with time-weighted accuracy.
         
         Returns:
-            Current frames per second
+            float: Current frames per second
         """
         with self._lock:
-            current_time = time.time()
-            elapsed = current_time - self.last_fps_update
+            now = time.time()
+            elapsed = now - self._last_fps_time
             
-            if elapsed >= 1.0 and self.frames_since_update > 0:
-                self.current_fps = self.frames_since_update / elapsed
-                self.fps_values.append(self.current_fps)
-                self.last_fps_update = current_time
-                self.frames_since_update = 0
+            # Only update when significant time has passed
+            if elapsed >= 1.0 and self._frames_since_fps_update > 0:
+                self.current_fps = self._frames_since_fps_update / elapsed
+                self._fps_samples.append(self.current_fps)
+                self._last_fps_time = now
+                self._frames_since_fps_update = 0
                 
             return self.current_fps
         
-    def record_render(self, duration: Seconds) -> None:
-        """Record frame rendering time in milliseconds.
+    def record_render(self, duration: float) -> None:
+        """Record frame rendering duration with millisecond precision.
         
         Args:
             duration: Render time in seconds
         """
         with self._lock:
-            self.render_times.append(duration * 1000)
+            self._render_times.append(duration * 1000)
         
     def record_frame(self) -> None:
-        """Record successful frame processing."""
+        """Record successful frame processing with thread safety."""
         with self._lock:
             self.frames_processed += 1
-            self.frames_since_update += 1
+            self._frames_since_fps_update += 1
         
     def record_dropped(self) -> None:
-        """Record dropped frame."""
+        """Record frame drop for performance analytics."""
         with self._lock:
             self.dropped_frames += 1
-        
-    @property
-    def average_render_time(self) -> float:
-        """Calculate average render time in milliseconds.
-        
-        Returns:
-            Average render time or 0 if no data
-        """
-        with self._lock:
-            return statistics.fmean(self.render_times) if self.render_times else 0.0
     
     @property
-    def render_time_variance(self) -> float:
-        """Calculate render time variance as stability measure.
+    def average_render_time(self) -> float:
+        """Calculate mean render time with optimized algorithm.
         
         Returns:
-            Statistical variance of render times or 0 if insufficient data
+            float: Average render time in milliseconds
         """
         with self._lock:
-            return statistics.variance(self.render_times) if len(self.render_times) > 1 else 0.0
-        
+            return (sum(self._render_times) / len(self._render_times) 
+                   if self._render_times else 0.0)
+    
     @property
     def effective_fps(self) -> float:
-        """Calculate overall effective FPS across entire runtime.
+        """Calculate overall FPS across entire runtime.
         
         Returns:
-            Overall frames per second
+            float: Overall frames per second
         """
         with self._lock:
             duration = time.time() - self.start_time
-            return self.frames_processed / duration if duration > 0 else 0.0
+            return self.frames_processed / max(0.001, duration)
     
     @property
     def drop_ratio(self) -> float:
-        """Calculate ratio of dropped frames to total processed.
+        """Calculate percentage of frames dropped.
         
         Returns:
-            Ratio of dropped frames (0.0-1.0) or 0 if no frames processed
+            float: Ratio of dropped frames (0.0-1.0)
         """
         with self._lock:
             total = self.frames_processed + self.dropped_frames
-            return self.dropped_frames / total if total > 0 else 0.0
+            return self.dropped_frames / max(1, total)
     
     def get_stats(self) -> PerformanceStats:
-        """Generate comprehensive performance statistics.
+        """Generate comprehensive performance analytics.
         
         Returns:
-            PerformanceStats with complete metrics
+            PerformanceStats: Complete metrics dictionary
         """
         with self._lock:
-            avg_fps = statistics.fmean(self.fps_values) if self.fps_values else 0.0
+            # Use fast mean calculation with bounds checking
+            avg_fps = (sum(self._fps_samples) / len(self._fps_samples) 
+                      if self._fps_samples else 0.0)
             
-            # Calculate stability as inverse of normalized variance
+            # Calculate stability as inverse of coefficient of variation
             stability = 1.0
-            if len(self.render_times) > 1:
+            if len(self._render_times) > 1:
                 try:
-                    mean = statistics.fmean(self.render_times)
+                    mean = self.average_render_time
                     if mean > 0:
-                        variance = statistics.variance(self.render_times)
-                        # Coefficient of variation capped at 1.0
-                        cv = min(1.0, variance / (mean * mean))
+                        # Calculate variance without full sample replication
+                        variance = sum((t - mean)**2 for t in self._render_times) / len(self._render_times)
+                        # Normalize to 0-1 scale with saturation
+                        cv = min(1.0, math.sqrt(variance) / mean)
                         stability = 1.0 - cv
-                except (statistics.StatisticsError, ZeroDivisionError):
+                except (ZeroDivisionError, OverflowError):
                     pass
             
             return {
@@ -3352,7 +3335,18 @@ class StreamMetrics:
 
 
 class RenderParameters:
-    """🎛️ Adaptive rendering parameters with quality-driven optimization."""
+    """Adaptive rendering parameters with dimensional quality management.
+    
+    Provides intelligent quality scaling across multiple dimensions
+    with optimized parameter sets for different performance targets.
+    
+    Attributes:
+        scale: Detail enhancement factor (1-4)
+        width: Block width in pixels
+        height: Block height in pixels
+        threshold: Edge detection sensitivity (0-100)
+        quality_level: Current quality preset (MINIMAL-MAXIMUM)
+    """
     
     def __init__(
         self, 
@@ -3364,88 +3358,95 @@ class RenderParameters:
         optimal_height: int,
         quality_level: QualityLevel = QualityLevel.STANDARD
     ) -> None:
-        """Initialize with base and optimal parameters.
+        """Initialize with balanced default parameters and constraints.
         
         Args:
-            scale: Detail enhancement factor (1-4)
-            width: Block width in pixels
-            height: Block height in pixels
-            threshold: Edge detection threshold (0-100)
-            optimal_width: Target block width for ideal quality/performance
-            optimal_height: Target block height for ideal quality/performance
-            quality_level: Initial quality level
+            scale: Detail enhancement factor
+            width: Character cell width
+            height: Character cell height
+            threshold: Edge sensitivity
+            optimal_width: Reference width for quality scaling
+            optimal_height: Reference height for quality scaling
+            quality_level: Initial quality preset
         """
-        # Core rendering parameters with bounds checking
+        self._lock = threading.RLock()
+        
+        # Normalize parameters with bounds protection
         self.scale = max(1, min(4, scale))
         self.width = max(4, width)
         self.height = max(2, height)
-        self.threshold = max(0, min(100, threshold))
+        self.threshold = max(30, min(80, threshold))
         
-        # Reference values for adaptation
+        # Quality reference points
         self.optimal_width = max(4, optimal_width)
         self.optimal_height = max(2, optimal_height)
-        
-        # State tracking
         self.quality_level = quality_level
         self.frames_since_adjustment: int = 0
-        self._lock = threading.RLock()  # Thread safety
         
-        # Quality adjustment mappings
-        self._adjustments = self._build_quality_map()
-        
-    def _build_quality_map(self) -> Dict[QualityLevel, Tuple[int, int, int]]:
-        """Build mapping of quality levels to parameter tuples.
-        
-        Returns:
-            Dictionary mapping quality levels to (scale, width_delta, height_delta)
-        """
-        return {
-            QualityLevel.MINIMAL: (max(1, self.scale - 1), 2, 1),
-            QualityLevel.LOW: (max(1, self.scale - 1), 1, 0),
-            QualityLevel.STANDARD: (self.scale, 0, 0),
-            QualityLevel.HIGH: (min(4, self.scale + 1), -1, 0),
-            QualityLevel.MAXIMUM: (min(4, self.scale + 1), -1, -1)
+        # Parameter mappings for efficient quality transitions
+        self._quality_map = {
+            QualityLevel.MINIMAL: (1, 4, 2),  # Fastest rendering
+            QualityLevel.LOW: (max(1, self.scale - 1), 0, 0),
+            QualityLevel.STANDARD: (self.scale, 0, 0),  # Reference quality
+            QualityLevel.HIGH: (min(4, self.scale + 1), -2, -1),
+            QualityLevel.MAXIMUM: (min(4, self.scale + 1), -4, -2)  # Highest detail
         }
         
-    def adjust_quality(self, render_time: float, thresholds: Union[RenderThresholds, Dict[str, float]]) -> bool:
-        """Adjust quality based on render performance.
+    def adjust_quality(self, render_time: float, 
+                      thresholds: Union[RenderThresholds, Dict[str, float]]) -> bool:
+        """Adjust quality based on performance with hysteresis.
+        
+        Intelligently balances quality and performance by adjusting
+        multiple parameters simultaneously based on render times.
         
         Args:
             render_time: Current render time in milliseconds
-            thresholds: Performance thresholds for quality decisions
+            thresholds: Performance boundaries for adjustments
             
         Returns:
-            Whether quality level was changed
+            bool: Whether quality was changed
         """
         with self._lock:
+            # Cache previous level for change detection
             previous_level = self.quality_level
             
-            # Support both RenderThresholds and dictionary interface
-            reduce_ms = thresholds.reduce_ms if isinstance(thresholds, RenderThresholds) else thresholds['reduce']
-            improve_ms = thresholds.improve_ms if isinstance(thresholds, RenderThresholds) else thresholds['improve']
+            # Extract thresholds with protocol compatibility
+            reduce_ms = (thresholds.reduce_ms if isinstance(thresholds, RenderThresholds) 
+                        else thresholds['reduce'])
+            improve_ms = (thresholds.improve_ms if isinstance(thresholds, RenderThresholds) 
+                        else thresholds['improve'])
             
-            # Determine new quality level based on performance
+            # Apply quality transitions with bounds protection
             if render_time > reduce_ms and self.quality_level > QualityLevel.MINIMAL:
                 self.quality_level = QualityLevel(self.quality_level - 1)
             elif render_time < improve_ms and self.quality_level < QualityLevel.MAXIMUM:
                 self.quality_level = QualityLevel(self.quality_level + 1)
             
-            # Apply parameter changes if quality level changed
-            if previous_level != self.quality_level:
+            # Apply parameter changes if quality changed
+            changed = previous_level != self.quality_level
+            if changed:
                 self._apply_quality_parameters()
-                
-            # Reset adjustment counter
-            self.frames_since_adjustment = 0
-            return previous_level != self.quality_level
+            
+            # Track frames since last adjustment
+            self.frames_since_adjustment = 0 if changed else self.frames_since_adjustment + 1
+            return changed
         
     def _apply_quality_parameters(self) -> None:
-        """Apply parameters for current quality level."""
+        """Update rendering parameters for current quality level."""
         with self._lock:
-            scale_delta, width_delta, height_delta = self._adjustments[self.quality_level]
+            # Get parameters for selected quality level
+            new_scale, width_delta, height_delta = self._quality_map[self.quality_level]
             
-            self.scale = scale_delta
+            # Apply parameters with proportional scaling
+            self.scale = new_scale
             self.width = max(4, self.optimal_width + width_delta)
             self.height = max(2, self.optimal_height + height_delta)
+            
+            # Adjust threshold for detail preservation
+            if self.quality_level >= QualityLevel.HIGH:
+                self.threshold = max(30, self.threshold - 10)
+            elif self.quality_level <= QualityLevel.LOW:
+                self.threshold = min(80, self.threshold + 10)
 
 
 class FrameRenderer:
