@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Glyph Stream - Dimensional Unicode Art Transmutation Engine.
+"""Glyph Stream: Dimensional Unicode Art Transmutation Engine.
 
-A high-performance terminal rendering system for transforming visual content into
-elegant Unicode art with adaptive quality, edge detection, and real-time streaming.
+High-performance terminal rendering system for transforming visual content into
+dimensional Unicode art with adaptive quality and real-time processing.
 
 Features:
-    - Multi-algorithm edge detection with directional awareness
-    - Adaptive quality scaling based on system capabilities
-    - Real-time performance monitoring and optimization
-    - Concurrent processing with intelligent resource management
-    - Comprehensive caching for enhanced performance
+    * Multi-algorithm edge detection with directional awareness
+    * Adaptive quality scaling based on system capabilities
+    * Real-time performance monitoring with concurrent processing
+    * Intelligent caching and resource management
+    * Cross-platform terminal rendering with Unicode support
 
 Attributes:
-    THREAD_POOL: Global executor for concurrent operations
-    CONSOLE: Rich console for enhanced terminal output
+    THREAD_POOL (ThreadPoolExecutor): Optimized executor for concurrent operations
+    CONSOLE (Console): Enhanced terminal output interface
 """
 from __future__ import annotations
 
-# Standard library imports - organized by functionality
+# Core system functionality
 import os
 import sys
 import re
@@ -29,15 +29,16 @@ import uuid
 import shlex
 import socket
 import shutil
+import random
 import platform
 import tempfile
 import threading
 import traceback
 import functools
+import argparse
+import importlib
 import unicodedata
 import collections
-import subprocess
-import argparse
 from datetime import datetime
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
@@ -46,46 +47,140 @@ from functools import lru_cache
 from pathlib import Path
 from typing import (
     Any, Dict, List, Literal, Mapping, NamedTuple, 
-    Optional, Tuple, TypedDict, TypeVar, Union, cast
+    Optional, Tuple, TypedDict, TypeVar, Union
 )
 
-# Third-party imports - with robust error handling
-try:
-    import numpy as np
-    from PIL import Image, ImageDraw, ImageFont, ImageOps
-    HAS_PIL = True
-except ImportError:
-    HAS_PIL = False
-    print("Warning: PIL/Pillow not found. Image processing disabled.")
+# Initialize core environment with robust error handling
+def import_module(name: str) -> Optional[Any]:
+    """Import module safely with fallback to None on failure.
+    
+    Args:
+        name: Module name to import
+        
+    Returns:
+        Optional[Any]: Module object if successful, None otherwise
+    """
+    try:
+        return importlib.import_module(name)
+    except ImportError:
+        return None
 
-# Create optimized thread pool with system-aware worker count
+# Load essential rendering components
+numpy = import_module("numpy")
+np = numpy
+
+# Image processing
+cv2 = import_module("opencv-python")
+PIL_Image = import_module("PIL.Image")
+Image = PIL_Image
+
+# Terminal enhancement
+colorama = import_module("colorama")
+if colorama:
+    colorama.init(strip=False, convert=True)
+
+pyfiglet = import_module("pyfiglet")
+
+# Rich UI components
+rich = import_module("rich")
+if rich:
+    from rich.console import Console as RichConsole
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+    from rich.align import Align
+    from rich.prompt import Prompt, Confirm
+    import rich.box
+    
+    class Console(RichConsole):
+        """Enhanced console with rich formatting capabilities."""
+        pass
+        
+    _console_ = Console(highlight=True)
+else:
+    class Console:
+        """Fallback console class for non-rich environments."""
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            """Initialize minimal console."""
+            pass
+
+        def print(self, *args: Any, **kwargs: Any) -> None:
+            """Print text to console."""
+            print(*args)
+
+        def input(self, prompt: str) -> str:
+            """Get user input with prompt."""
+            return input(prompt)
+
+        def clear(self) -> None:
+            """Clear the terminal screen."""
+            os.system('cls' if os.name == 'nt' else 'clear')
+
+        def log(self, *args: Any, **kwargs: Any) -> None:
+            """Log message to console."""
+            print(*args)
+            
+    _console_ = Console()
+
+CONSOLE = _console_
+
+# System monitoring
+psutil = import_module("psutil")
+
+# Set up optimized thread pool with system-aware configuration
+cpu_count = os.cpu_count() or 4
 THREAD_POOL = ThreadPoolExecutor(
-    max_workers=min(32, (os.cpu_count() or 4) * 2),
+    max_workers=min(32, cpu_count * 2),
     thread_name_prefix="glyph_worker"
 )
 
-# Type definitions for enhanced clarity and type checking
-T = TypeVar('T')  # Generic type
-R = TypeVar('R')  # Return type
-Milliseconds = float  # Time in milliseconds
-Seconds = float       # Time in seconds
-Density = float       # Normalized value between 0.0-1.0
+# Define module capability flags
+HAS_NUMPY = numpy is not None
+HAS_CV2 = cv2 is not None
+HAS_PIL = PIL_Image is not None
+HAS_RICH = rich is not None
+HAS_PYFIGLET = pyfiglet is not None
+HAS_PSUTIL = psutil is not None
+
+# Type definitions for enhanced code clarity
+T = TypeVar('T')
+R = TypeVar('R')
+Density = float  # Range 0.0-1.0 for normalized density values
 RGB = Tuple[int, int, int]  # RGB color components
-GradientMap = Dict[str, str]  # Character gradient mapping
+Milliseconds = float  # Time in milliseconds
+Seconds = float  # Time in seconds
+
+# Define numpy array types if numpy is available
+if HAS_NUMPY:
+    NDArray = numpy.ndarray
+    ImageArray = Union[NDArray, Any]
+else:
+    # Fallback type definitions when numpy is unavailable
+    class NDArray:  # type: ignore
+        pass
+    ImageArray = Any
+
+# Standard color mapping with semantic names
+COLOR_MAP: Mapping[str, RGB] = {
+    "red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255),
+    "yellow": (255, 255, 0), "cyan": (0, 255, 255), "magenta": (255, 0, 255),
+    "white": (255, 255, 255), "black": (0, 0, 0), "orange": (255, 165, 0),
+    "purple": (128, 0, 128), "pink": (255, 192, 203), "gray": (128, 128, 128),
+}
 
 
 class EdgeDetector(Enum):
     """Edge detection algorithms optimized for different visual characteristics.
     
     Each algorithm provides specific advantages for different image types,
-    automatically optimizing parameters based on content and system capabilities.
+    with automatic parameter optimization based on image content.
     
     Attributes:
-        SOBEL: Balanced sensitivity with good all-around performance
-        PREWITT: Improved noise handling for high-contrast images
-        SCHARR: Enhanced diagonal edge detection with rotational symmetry
-        LAPLACIAN: Omnidirectional edge detection with detail preservation
-        CANNY: Maximum precision with hysteresis thresholding and noise filtering
+        SOBEL: Balanced sensitivity with superior gradient direction
+        PREWITT: Enhanced noise handling for high-contrast images
+        SCHARR: Superior diagonal detection with rotational symmetry
+        LAPLACIAN: Omnidirectional detection with fine detail preservation
+        CANNY: Maximum precision with hysteresis thresholding
     """
     SOBEL = auto()
     PREWITT = auto()
@@ -119,11 +214,11 @@ class QualityLevel(IntEnum):
     system capabilities and real-time performance metrics.
     
     Attributes:
-        MINIMAL: Lowest quality, maximum performance for constrained systems
-        LOW: Reduced quality with better performance
+        MINIMAL: Maximum performance for constrained systems (lowest quality)
+        LOW: Reduced quality with better performance for limited resources
         STANDARD: Balanced quality/performance for typical usage
-        HIGH: Enhanced quality with more detail for capable systems
-        MAXIMUM: Highest quality with maximum detail, more resource-intensive
+        HIGH: Enhanced detail for capable systems
+        MAXIMUM: Highest detail, more resource-intensive
     """
     MINIMAL = 0
     LOW = 1
@@ -133,18 +228,18 @@ class QualityLevel(IntEnum):
 
 
 class VideoInfo(NamedTuple):
-    """Video metadata container with normalized fields for stream handling.
+    """Video metadata container with normalized fields for stream processing.
     
     Provides comprehensive metadata for video sources with validation
-    and normalization to ensure consistent stream processing.
+    and normalization to ensure consistent stream handling.
     
     Attributes:
         url: Source URL for remote streams
-        title: Video title or identifier string
+        title: Video title or identifier
         duration: Total duration in seconds
-        format: Media format identifier string
-        width: Video frame width in pixels
-        height: Video frame height in pixels
+        format: Media format identifier
+        width: Frame width in pixels
+        height: Frame height in pixels
         fps: Frames per second
     """
     url: Optional[str] = None
@@ -157,10 +252,10 @@ class VideoInfo(NamedTuple):
 
     @classmethod
     def from_capture(cls, capture: Any, source_name: str, stream_format: str) -> VideoInfo:
-        """Extract metadata from capture device with validation.
+        """Extract metadata from capture device with validation and normalization.
         
-        Creates a VideoInfo instance from an OpenCV capture object with
-        safe extraction and normalization of properties.
+        Creates normalized metadata from OpenCV capture object with failsafe
+        extraction and automatic data validation.
         
         Args:
             capture: OpenCV video capture object
@@ -170,45 +265,37 @@ class VideoInfo(NamedTuple):
         Returns:
             VideoInfo: Normalized metadata instance
         """
-        width, height, fps = None, None, None
-        
         try:
-            import cv2
             width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = float(capture.get(cv2.CAP_PROP_FPS))
             
-            # Validate and normalize values
+            # Validate and normalize
             width = width if width > 0 else None
             height = height if height > 0 else None
             fps = fps if 0 < fps < 1000 else 30.0
-        except Exception:
-            pass
             
-        return cls(
-            title=str(source_name),
-            format=stream_format,
-            width=width,
-            height=height,
-            fps=fps
-        )
+            return cls(title=str(source_name), format=stream_format,
+                      width=width, height=height, fps=fps)
+        except Exception:
+            return cls(title=str(source_name), format=stream_format)
 
 
 @dataclass(frozen=True)
 class PerformanceStats:
-    """Immutable performance metrics for analytics and optimization.
+    """Immutable performance metrics for analytics and quality adaptation.
     
     Contains comprehensive performance data for monitoring, analysis,
     and adaptive quality management with consistent metrics.
     
     Attributes:
-        avg_render_time: Mean rendering duration in milliseconds
-        avg_fps: Mean frames per second over sample window
-        effective_fps: Overall frames per second across entire runtime
+        avg_render_time: Mean rendering time in milliseconds
+        avg_fps: Mean frames per second over sampling window
+        effective_fps: Overall frames per second across runtime
         total_frames: Total successfully processed frames
-        dropped_frames: Number of frames that couldn't be processed in time
+        dropped_frames: Frames that couldn't be processed in time
         drop_ratio: Proportion of dropped frames (0.0-1.0)
-        stability: Consistency rating for frame timing (0.0-1.0)
+        stability: Timing consistency rating (0.0-1.0)
     """
     avg_render_time: float
     avg_fps: float
@@ -219,92 +306,17 @@ class PerformanceStats:
     stability: float
 
 
-# Standard color mapping with semantic names and normalized RGB values
-COLOR_MAP: Mapping[str, RGB] = {
-    "red": (255, 0, 0),
-    "green": (0, 255, 0),
-    "blue": (0, 0, 255),
-    "yellow": (255, 255, 0),
-    "cyan": (0, 255, 255),
-    "magenta": (255, 0, 255),
-    "white": (255, 255, 255),
-    "black": (0, 0, 0),
-    "orange": (255, 165, 0),
-    "purple": (128, 0, 128),
-    "pink": (255, 192, 203),
-    "gray": (128, 128, 128),
-}
-
-
-# Dynamic module imports with availability flags
-try:
-    import cv2
-    HAS_CV2 = True
-except ImportError:
-    cv2 = None
-    HAS_CV2 = False
-
-try:
-    import pyfiglet
-    HAS_PYFIGLET = True
-except ImportError:
-    pyfiglet = None
-    HAS_PYFIGLET = False
-
-try:
-    import yt_dlp
-    HAS_YT_DLP = True
-except ImportError:
-    yt_dlp = None
-    HAS_YT_DLP = False
-
-try:
-    import colorama
-    colorama.init(strip=False, convert=True)
-    HAS_COLORAMA = True
-except ImportError:
-    colorama = None
-    HAS_COLORAMA = False
-
-try:
-    from rich.console import Console, Group
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.text import Text
-    from rich.align import Align
-    from rich.prompt import Prompt, Confirm
-    CONSOLE = Console(highlight=True)
-    HAS_RICH = True
-except ImportError:
-    CONSOLE = None
-    HAS_RICH = False
-
-try:
-    import psutil
-    HAS_PSUTIL = True
-except ImportError:
-    psutil = None
-    HAS_PSUTIL = False
-
-try:
-    import pyvirtualdisplay
-    HAS_VIRTUAL_DISPLAY = True
-except ImportError:
-    pyvirtualdisplay = None
-    HAS_VIRTUAL_DISPLAY = False
-
-
 class TextStyle(Enum):
-    """Text rendering style presets with consistent parameter sets.
+    """Text rendering style presets with comprehensive formatting parameters.
     
     Defines configurable style presets for text art generation with
-    comprehensive formatting parameters for various visual effects.
+    comprehensive formatting options for various visual effects.
     
     Attributes:
-        SIMPLE: Basic text without embellishments
-        STYLED: Text with standard formatting and borders
-        RAINBOW: Multi-color gradient effect with enhanced visuals
-        RANDOM: Randomized styling parameters for creative variation
+        SIMPLE: Clean text without decorative elements
+        STYLED: Enhanced text with borders and formatting
+        RAINBOW: Multi-color gradient effects with visual enhancement
+        RANDOM: Dynamic randomized styling for creative variation
     """
     SIMPLE = auto()
     STYLED = auto()
