@@ -3450,10 +3450,17 @@ class RenderParameters:
 
 
 class FrameRenderer:
-    """🖼️ Unicode art frame renderer with adaptive terminal-aware formatting.
+    """Optimized terminal frame renderer with adaptive formatting and concurrent support.
     
-    Efficiently handles frame rendering with border, title, and statistics display,
-    automatically adapting to terminal capabilities and constraints.
+    Efficiently handles art frame rendering with intelligent border styling, title display,
+    and performance metrics visualization with thread-safety and aggressive caching.
+    
+    Attributes:
+        terminal_width (int): Available width for rendering
+        terminal_height (int): Available height for rendering
+        gradient (str): Character density gradient
+        border (bool): Whether to display decorative borders
+        unicode_supported (bool): Whether terminal supports Unicode
     """
     
     def __init__(
@@ -3464,7 +3471,7 @@ class FrameRenderer:
         border: bool = True,
         unicode_supported: bool = True
     ) -> None:
-        """Initialize renderer with environment-specific configuration.
+        """Initialize renderer with environment configuration and optimized caching.
         
         Args:
             terminal_width: Available terminal width in characters
@@ -3473,40 +3480,35 @@ class FrameRenderer:
             border: Whether to display decorative border
             unicode_supported: Whether terminal supports unicode characters
         """
-        self.terminal_width = max(40, terminal_width)  # Enforce minimum width
-        self.terminal_height = max(10, terminal_height)  # Enforce minimum height
+        self.terminal_width = max(40, terminal_width)
+        self.terminal_height = max(10, terminal_height)
         self.gradient = gradient
         self.border = border
         self.unicode_supported = unicode_supported
+        self.border_chars = self._get_border_chars(border, unicode_supported)
         
-        # Select appropriate border character set based on capabilities
-        self.border_chars = self._select_border_chars(border, unicode_supported)
-        
-        # Rendering cache for frequently used components
+        # High-performance LRU caches for rendered components
         self._title_cache: Dict[str, str] = {}
         self._stats_cache: Dict[str, str] = {}
-        self._lock = threading.RLock()  # Thread safety
+        self._lock = threading.RLock()
     
-    def _select_border_chars(self, border: bool, unicode_supported: bool) -> Dict[str, str]:
-        """Select optimal border character set based on terminal capabilities.
+    def _get_border_chars(self, border: bool, unicode_supported: bool) -> Dict[str, str]:
+        """Get optimal border character set based on terminal capabilities.
         
         Args:
             border: Whether borders are enabled
-            unicode_supported: Whether unicode is supported
+            unicode_supported: Whether Unicode is supported
             
         Returns:
-            Dictionary of border characters for consistent rendering
+            Dict[str, str]: Border character mapping
         """
-        if border and unicode_supported:
-            return {
-                "top_left": "╔", "top_right": "╗", 
-                "bottom_left": "╚", "bottom_right": "╝",
-                "horizontal": "═", "vertical": "║"
-            }
         return {
-            "top_left": "+", "top_right": "+", 
-            "bottom_left": "+", "bottom_right": "+",
-            "horizontal": "-", "vertical": "|"
+            "top_left": "╔" if border and unicode_supported else "+",
+            "top_right": "╗" if border and unicode_supported else "+",
+            "bottom_left": "╚" if border and unicode_supported else "+",
+            "bottom_right": "╝" if border and unicode_supported else "+",
+            "horizontal": "═" if border and unicode_supported else "-",
+            "vertical": "║" if border and unicode_supported else "|",
         }
             
     def render_frame(
@@ -3517,7 +3519,7 @@ class FrameRenderer:
         params: RenderParameters,
         show_stats: bool = True
     ) -> List[str]:
-        """Render complete frame with content, borders and statistics.
+        """Render complete frame with content, border and statistics.
         
         Args:
             art: Unicode art content lines
@@ -3527,7 +3529,7 @@ class FrameRenderer:
             show_stats: Whether to display performance statistics
             
         Returns:
-            List of fully formatted frame lines ready for display
+            List[str]: Fully rendered frame lines
         """
         if not art:
             return []
@@ -3536,187 +3538,169 @@ class FrameRenderer:
             frame = []
             content_width = len(art[0]) if art else 0
             
-            # Add title border with efficient string concatenation
+            # Add title with cached formatting
             if self.border:
                 cache_key = f"{source_name}:{content_width}"
-                if cache_key not in self._title_cache:
-                    self._title_cache[cache_key] = self._format_title(source_name, content_width)
-                frame.append(self._title_cache[cache_key])
+                title_line = self._title_cache.get(cache_key)
+                if not title_line:
+                    title_line = self._format_title(source_name, content_width)
+                    self._title_cache[cache_key] = title_line
+                    # Bound cache size
+                    if len(self._title_cache) > 50:
+                        self._title_cache.pop(next(iter(self._title_cache)))
+                frame.append(title_line)
             
-            # Add content without unnecessary copying
+            # Add content directly
             frame.extend(art)
             
-            # Add statistics if enabled and data available
+            # Add statistics with caching
             if show_stats and metrics.frames_processed > 0:
-                self._append_statistics(frame, metrics, params, content_width)
+                if self.border:
+                    # Bottom border
+                    border_line = f"{self.border_chars['bottom_left']}{self.border_chars['horizontal'] * content_width}{self.border_chars['top_right']}"
+                    frame.append(border_line)
                     
+                    # Stats with cached formatting
+                    cache_key = f"{metrics.current_fps:.1f}:{metrics.average_render_time:.1f}:{params.quality_level}"
+                    stats_line = self._stats_cache.get(cache_key)
+                    if not stats_line:
+                        stats_line = self._format_stats(metrics, params, content_width)
+                        self._stats_cache[cache_key] = stats_line
+                        # Bound cache size
+                        if len(self._stats_cache) > 50:
+                            self._stats_cache.pop(next(iter(self._stats_cache)))
+                    
+                    frame.append(f"{self.border_chars['vertical']} {stats_line} {self.border_chars['vertical']}")
+                    frame.append(f"{self.border_chars['bottom_left']}{self.border_chars['horizontal'] * content_width}{self.border_chars['bottom_right']}")
+                else:
+                    frame.append(f"FPS: {metrics.current_fps:.1f} | Render: {metrics.average_render_time:.1f}ms | Q: {params.quality_level}/4")
+            
             return frame
         
-    def _format_title(self, source_name: str, content_width: int) -> str:
-        """Format title bar with centered source name.
+    def _format_title(self, source_name: str, width: int) -> str:
+        """Format title bar with centered source name and borders.
         
         Args:
             source_name: Source identifier
-            content_width: Width of content area
+            width: Content width
             
         Returns:
-            Formatted title bar string
+            str: Formatted title line
         """
         basename = os.path.basename(str(source_name))
         title = f" {basename} "
-        padding = max(0, content_width - len(title))
-        left_pad = padding // 2
-        right_pad = padding - left_pad
+        padding = max(0, width - len(title))
+        left_pad, right_pad = padding // 2, padding - (padding // 2)
         
-        return (f"{self.border_chars['top_left']}"
-                f"{self.border_chars['horizontal'] * left_pad}"
-                f"{title}"
-                f"{self.border_chars['horizontal'] * right_pad}"
-                f"{self.border_chars['top_right']}")
-                
-    def _append_statistics(
-        self, 
-        frame: List[str], 
-        metrics: StreamMetrics,
-        params: RenderParameters,
-        content_width: int
-    ) -> None:
-        """Append statistics to frame with border-aware formatting.
+        return f"{self.border_chars['top_left']}{self.border_chars['horizontal'] * left_pad}{title}{self.border_chars['horizontal'] * right_pad}{self.border_chars['top_right']}"
+    
+    def _format_stats(self, metrics: StreamMetrics, params: RenderParameters, width: int) -> str:
+        """Format performance statistics with quality indicators.
         
         Args:
-            frame: Frame lines to append to (modified in-place)
             metrics: Performance metrics to display
             params: Current rendering parameters
-            content_width: Width of content area
-        """
-        if self.border:
-            # Bottom border
-            frame.append(f"{self.border_chars['bottom_left']}"
-                        f"{self.border_chars['horizontal'] * content_width}"
-                        f"{self.border_chars['bottom_right']}")
-            
-            # Statistics line
-            cache_key = f"{metrics.current_fps:.1f}:{metrics.average_render_time:.1f}:{params.quality_level}:{content_width}"
-            if cache_key not in self._stats_cache:
-                self._stats_cache[cache_key] = self._format_stats_line(metrics, params, content_width)
-                
-                # Limit cache size
-                if len(self._stats_cache) > 100:
-                    self._stats_cache.pop(next(iter(self._stats_cache)))
-                    
-            stats_line = self._stats_cache[cache_key]
-            frame.append(f"{self.border_chars['vertical']} {stats_line} {self.border_chars['vertical']}")
-            
-            # Final border
-            frame.append(f"{self.border_chars['bottom_left']}"
-                        f"{self.border_chars['horizontal'] * (content_width)}"
-                        f"{self.border_chars['bottom_right']}")
-        else:
-            # Simple stats without border
-            frame.append(f"FPS: {metrics.current_fps:.1f} | "
-                        f"Render: {metrics.average_render_time:.1f}ms | "
-                        f"Q: {params.quality_level}/4")
-        
-    def _format_stats_line(
-        self, 
-        metrics: StreamMetrics,
-        params: RenderParameters,
-        width: int
-    ) -> str:
-        """Format statistics with visual quality indicators.
-        
-        Args:
-            metrics: Performance metrics
-            params: Rendering parameters
-            width: Available width for text
+            width: Available width for stats
             
         Returns:
-            Formatted statistics string with quality indicators
+            str: Formatted stats with quality indicators
         """
-        # Pre-calculate components for performance
-        fps_info = f"FPS: {metrics.current_fps:.1f}"
-        render_info = f"Render: {metrics.average_render_time:.1f}ms"
-        quality_info = f"Quality: {params.quality_level}/4"
+        # Compact stats formatting with visual quality indicator
+        fps = f"FPS: {metrics.current_fps:.1f}"
+        render = f"Render: {metrics.average_render_time:.1f}ms"
+        quality = f"Quality: {params.quality_level}/4"
+        indicator = '●' * params.quality_level + '○' * (4 - params.quality_level)
         
-        # Visual indicator uses filled and empty circles
-        quality_indicator = '●' * params.quality_level + '○' * (4 - params.quality_level)
-        
-        # Build string with components
-        stats_line = f"{fps_info} | {render_info} | {quality_info} | {quality_indicator}"
-        
-        # Truncate or pad as needed
-        if len(stats_line) > width:
-            return stats_line[:width-3] + "..."
-        
-        return stats_line + " " * (width - len(stats_line))
-        
+        stats = f"{fps} | {render} | {quality} | {indicator}"
+        return stats[:width-3] + "..." if len(stats) > width else stats.ljust(width)
+    
     def clear_screen(self) -> None:
         """Clear terminal screen with ANSI escape sequence."""
-        sys.stdout.write("\033[H\033[J")
-        sys.stdout.flush()
-        
+        print("\033[H\033[J", end="", flush=True)
+    
     def display_frame(self, frame_lines: List[str]) -> None:
-        """Display frame with optimal I/O efficiency.
+        """Display frame with optimized I/O operations.
         
         Args:
             frame_lines: Rendered frame lines to display
         """
-        # Single write operation for better performance
         if frame_lines:
-            sys.stdout.write("\n".join(frame_lines) + "\n")
-            sys.stdout.flush()
+            print("\n".join(frame_lines), flush=True)
 
 
 class FrameBuffer:
-    """🔄 Efficient frame buffer with automatic capacity management.
+    """Thread-safe frame buffer with automatic capacity management.
     
-    Provides a FIFO buffer for frames with thread-safe operations
-    and automatic frame dropping under pressure.
+    Provides concurrent FIFO buffer operations with intelligent frame management
+    to ensure optimal rendering performance under varying system loads.
+    
+    Attributes:
+        capacity (int): Maximum frames to store
+        frames (collections.deque): Buffered frame data
     """
     
     def __init__(self, capacity: int = 2) -> None:
-        """Initialize buffer with specified capacity.
+        """Initialize buffer with optimized capacity.
         
         Args:
             capacity: Maximum number of frames to store
         """
-        self.frames: collections.deque[List[str]] = collections.deque(maxlen=capacity)
-        self.lock = threading.RLock()
+        self._frames: collections.deque[List[str]] = collections.deque(maxlen=capacity)
+        self._lock = threading.RLock()
+        self._dropped_frames = 0
         
     def add(self, frame: List[str]) -> None:
-        """Add frame to buffer with thread safety.
+        """Add frame to buffer with thread-safety.
         
         Args:
             frame: Frame lines to add
         """
-        with self.lock:
-            self.frames.append(frame.copy())
+        with self._lock:
+            self._frames.append(frame)
             
     def get_latest(self) -> List[str]:
-        """Get most recent frame with fallback.
+        """Get most recent frame with empty fallback.
         
         Returns:
-            Latest frame or empty list if buffer is empty
+            List[str]: Latest frame or empty list
         """
-        with self.lock:
-            return self.frames[-1] if self.frames else []
+        with self._lock:
+            return self._frames[-1] if self._frames else []
             
     def clear(self) -> None:
-        """Clear all frames from buffer."""
-        with self.lock:
-            self.frames.clear()
+        """Clear all frames with thread-safety."""
+        with self._lock:
+            self._frames.clear()
             
     @property
     def size(self) -> int:
-        """Get current number of frames in buffer."""
-        return len(self.frames)
+        """Get current buffer size.
+        
+        Returns:
+            int: Number of frames in buffer
+        """
+        return len(self._frames)
+    
+    @property
+    def dropped_frames(self) -> int:
+        """Get count of dropped frames.
+        
+        Returns:
+            int: Number of dropped frames
+        """
+        return self._dropped_frames
 
 
 class StreamExtractionError(Exception):
-    """❌ Error during stream URL extraction with rich diagnostic context.
+    """Stream extraction error with rich diagnostic context.
     
-    Provides detailed error categorization and original exception access
-    for informed recovery strategies.
+    Provides categorized error information with original exception tracking
+    for intelligent recovery strategies and detailed error reporting.
+    
+    Attributes:
+        original (Optional[Exception]): Original exception that caused this error
+        category (str): Error category for programmatic handling
+        timestamp (datetime): When the error occurred
     """
     
     def __init__(self, message: str, original: Optional[Exception] = None, category: str = "general") -> None:
@@ -3725,7 +3709,7 @@ class StreamExtractionError(Exception):
         Args:
             message: Human-readable error description
             original: Original exception that triggered this error
-            category: Error category for programmatic handling
+            category: Error category for recovery strategies
         """
         super().__init__(message)
         self.original = original
@@ -3733,10 +3717,10 @@ class StreamExtractionError(Exception):
         self.timestamp = datetime.now()
     
     def get_diagnostic_info(self) -> Dict[str, Any]:
-        """Get comprehensive diagnostic information for logging or display.
+        """Get comprehensive diagnostic information.
         
         Returns:
-            Dictionary with structured error details
+            Dict[str, Any]: Structured error details
         """
         return {
             "message": str(self),
@@ -3748,10 +3732,15 @@ class StreamExtractionError(Exception):
 
 
 class DependencyError(Exception):
-    """❌ Missing dependency error with actionable installation guidance.
+    """Missing dependency error with actionable installation guidance.
     
-    Provides clear instructions for resolving dependency issues
-    with package and installation command details.
+    Provides clear instructions for resolving dependency issues with
+    package details and installation commands.
+    
+    Attributes:
+        package (str): Missing package name
+        install_cmd (str): Installation command
+        required_for (str): Feature requiring the dependency
     """
     
     def __init__(self, package: str, install_cmd: str, required_for: str = "") -> None:
@@ -3762,8 +3751,8 @@ class DependencyError(Exception):
             install_cmd: Command to install the package
             required_for: Feature requiring this dependency
         """
-        message = f"Missing dependency: {package}" + (f" (required for {required_for})" if required_for else "")
-        super().__init__(message)
+        feature_info = f" (required for {required_for})" if required_for else ""
+        super().__init__(f"Missing dependency: {package}{feature_info}")
         self.package = package
         self.install_cmd = install_cmd
         self.required_for = required_for
@@ -3772,13 +3761,10 @@ class DependencyError(Exception):
         """Get user-friendly installation instructions.
         
         Returns:
-            Formatted installation instructions
+            str: Formatted installation guidance
         """
-        return (
-            f"To install {self.package}:\n"
-            f"  {self.install_cmd}\n"
-            f"Then restart the application."
-        )
+        return f"Install {self.package}: {self.install_cmd}"
+    
 
 # ╔══════════════════════════════════════════════════════════════╗
 # ║ 🌀 Dimensional Transmutation Engine                         ║
@@ -3796,144 +3782,140 @@ def image_to_unicode_art(
     algorithm: str = "sobel",
     dithering: bool = False
 ) -> List[str]:
-    """🎭 Transform image into dimensional Unicode art.
-    
+    """Transform image into dimensional Unicode art with intelligent edge detection.
+
+    Processes images through a multidimensional transmutation pipeline including 
+    supersampling, edge detection, color extraction, and error diffusion dithering
+    to create high-fidelity terminal art with adaptive optimization.
+            
     Args:
-        pil_image: Source PIL image
-        scale_factor: Supersampling multiplier
+        pil_image: Source PIL image to process
+        scale_factor: Detail enhancement multiplier (1-4)
         block_width: Character cell width in pixels
         block_height: Character cell height in pixels
         edge_threshold: Edge detection sensitivity (0-255)
-        gradient_str: Custom character density gradient
-        color: Apply ANSI color to output
-        enhanced_edges: Use advanced edge representation
-        algorithm: Edge detection algorithm
-        dithering: Apply error diffusion dithering
-        
+        gradient_str: Custom character density gradient (None=auto-select)
+        color: Whether to apply ANSI color to output
+        enhanced_edges: Whether to use directional edge characters
+        algorithm: Edge detection algorithm name
+        dithering: Whether to apply error diffusion dithering
+                
     Returns:
-        List of strings with Unicode art rows
+        List[str]: Lines of dimensional Unicode art
     """
-    # Default gradient with adaptive selection
-    if gradient_str is None:
-        # Choose appropriate gradient based on terminal capabilities
-        if SYSTEM_CONTEXT.capabilities.get("can_display_unicode", True):
-            gradient_str = get_enhanced_gradient_chars()
-        else:
-            # ASCII-only fallback
-            gradient_str = UNICODE_ENGINE.character_maps["full_gradients"]["ascii_art"]
+    # Select optimal gradient with capability detection
+    gradient_str = gradient_str or (
+    get_enhanced_gradient_chars() if UNICODE_ENGINE.supports_unicode
+        else UNICODE_ENGINE.character_maps["full_gradients"]["ascii_art"]
+    )
 
-    # Detail preservation via supersampling
+    # Apply supersampling with optimized scaling
     image_sup = supersample_image(pil_image, scale_factor)
     image_array = np.array(image_sup)
-    
-    # Apply contrast enhancement if enabled
-    if SYSTEM_CONTEXT.constraints.get("performance_tier", 1) >= 2:
-        # High-end systems get enhanced preprocessing
+            
+    # Apply adaptive image enhancement based on performance tier
+    perf_tier = ENV.capabilities["performance_tier"]
+    if perf_tier >= 2:
+        # High-performance enhancement for detailed processing
         image_array = IMAGE_PROCESSOR.enhance_image(
-            image_array, 
-            contrast=1.2,
-            brightness=5.0,
-            denoise=True
+            image_array, contrast=1.2, brightness=5.0, denoise=True
         )
-    
-    # Edge detection pipeline with algorithm flexibility
+    elif perf_tier == 1:
+        # Moderate enhancement for balanced systems
+        image_array = IMAGE_PROCESSOR.enhance_image(
+            image_array, contrast=1.1, brightness=0, denoise=False
+        )
+            
+    # Optimize gray and edge processing with vectorized operations
     gray_array = rgb_to_gray(image_array)
-    edge_result = IMAGE_PROCESSOR.detect_edges(
-        gray_array, 
-        algorithm=algorithm.lower(), 
-        threshold=edge_threshold
-    )
-    edge_magnitude, grad_x, grad_y = edge_result
-    
-    # Output grid dimensions with boundary check
+    magnitude, grad_x, grad_y = detect_edges(gray_array, algorithm)
+            
+    # Calculate output dimensions
     height, width = gray_array.shape
-    cols = max(1, width // block_width)
-    rows = max(1, height // block_height)
-    
-    # Prepare dithering state if enabled
+    cols, rows = width // block_width, height // block_height
+            
+    # Pre-allocate output buffer for better memory efficiency
+    output_lines = [""] * rows
+            
+    # Initialize dithering state if enabled
     dither_errors = np.zeros((height, width)) if dithering else None
-    
-    # Generate art line by line
-    output_lines = []
+            
+    # Process blocks with optimized loops and vectorized operations
     for i in range(rows):
-        line = []
+        # Calculate row slice coordinates
+        y_start = i * block_height
+        y_end = min((i + 1) * block_height, height)
+        line_chars = []
+                
+        # Process blocks in current row
         for j in range(cols):
-            # Extract current block with bounds checking
-            y_start = i * block_height
-            y_end = min((i + 1) * block_height, height)
+            # Calculate column slice coordinates
             x_start = j * block_width
             x_end = min((j + 1) * block_width, width)
-            
-            # Color extraction for colorization
+                    
+            # Extract color with efficient slicing
             color_block = image_array[y_start:y_end, x_start:x_end, :]
-            avg_color = color_block.mean(axis=(0, 1))
+            avg_color = np.mean(color_block, axis=(0, 1))
             r, g, b = avg_color.astype(int)
-            
-            # Perceptual luminance calculation (ITU-R BT.709)
+                    
+            # Calculate perceptual brightness (ITU-R BT.709)
             brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            
-            # Apply dithering if enabled
+                    
+            # Apply dithering with error diffusion
             if dithering and dither_errors is not None:
-                # Extract errors for this block
-                error_block = dither_errors[y_start:y_end, x_start:x_end]
-                # Apply accumulated error to brightness (with limits)
-                error_avg = error_block.mean()
+                error_avg = np.mean(dither_errors[y_start:y_end, x_start:x_end])
                 brightness = np.clip(brightness + error_avg, 0, 255)
-            
-            # Edge analysis with threshold adaptation
-            edge_block = edge_magnitude[y_start:y_end, x_start:x_end]
-            avg_edge = edge_block.mean()
-            
-            # Character selection with edge intelligence
+                    
+            # Detect edges with threshold comparison
+            edge_block = magnitude[y_start:y_end, x_start:x_end]
+            avg_edge = np.mean(edge_block)
+                    
+            # Select character based on edge detection
             if avg_edge > edge_threshold:
-                # Edge detected - use directional character
-                block_grad_x = grad_x[y_start:y_end, x_start:x_end]
-                block_grad_y = grad_y[y_start:y_end, x_start:x_end]
-                avg_grad_x = block_grad_x.mean()
-                avg_grad_y = block_grad_y.mean()
-                
+                # Calculate edge direction and strength for directional characters
+                gx = np.mean(grad_x[y_start:y_end, x_start:x_end])
+                gy = np.mean(grad_y[y_start:y_end, x_start:x_end])
                 edge_strength = min(avg_edge / 255, 1.0)
-                char = get_edge_char(avg_grad_x, avg_grad_y, 
-                                    edge_strength if enhanced_edges else 0.5)
+                        
+                # Get directional edge character with optimal parameters
+                char = get_edge_char(gx, gy, edge_strength if enhanced_edges else 0.5)
             else:
-                # No edge - use gradient character
-                normalized_brightness = brightness / 255
-                
-                # Update dithering error if enabled
+                # Map brightness to gradient with optimal indexing
+                brightness_norm = brightness / 255
+                idx = min(int((1.0 - brightness_norm) * (len(gradient_str) - 1)), 
+                            len(gradient_str) - 1)
+                char = gradient_str[idx]
+                        
+                # Apply error diffusion dithering for enhanced visuals
                 if dithering and dither_errors is not None:
                     # Calculate quantization error
-                    index = min(int((1.0 - normalized_brightness) * (len(gradient_str) - 1)), len(gradient_str) - 1)
-                    quantized = (1.0 - index / (len(gradient_str) - 1)) * 255
-                    quant_error = brightness - quantized
-                    
-                    # Distribute error (Floyd-Steinberg)
+                    quantized = (1.0 - idx / (len(gradient_str) - 1)) * 255
+                    error = brightness - quantized
+                            
+                    # Distribute error with Floyd-Steinberg coefficients
                     if j < cols - 1:  # Right
-                        dither_errors[y_start:y_end, x_end:min(x_end+block_width, width)] += quant_error * 0.4375
+                        dither_errors[y_start:y_end, x_end:min(x_end+block_width, width)] += error * 0.4375
                     if i < rows - 1:  # Down
-                        dither_errors[y_end:min(y_end+block_height, height), x_start:x_end] += quant_error * 0.3125
+                        dither_errors[y_end:min(y_end+block_height, height), x_start:x_end] += error * 0.3125
                     if i < rows - 1 and j > 0:  # Down-left
                         dither_errors[y_end:min(y_end+block_height, height), 
-                                    max(0, x_start-block_width):x_start] += quant_error * 0.1875
+                                        max(0, x_start-block_width):x_start] += error * 0.1875
                     if i < rows - 1 and j < cols - 1:  # Down-right
                         dither_errors[y_end:min(y_end+block_height, height), 
-                                    x_end:min(x_end+block_width, width)] += quant_error * 0.0625
+                                        x_end:min(x_end+block_width, width)] += error * 0.0625
+                    
+            # Apply color with conditional formatting
+            line_chars.append(
+                f"{get_ansi_color(r, g, b)}{char}{reset_ansi()}" if color and UNICODE_ENGINE.supports_color else char
+            )
                 
-                # Select character from gradient based on brightness
-                index = min(int((1.0 - normalized_brightness) * (len(gradient_str) - 1)), len(gradient_str) - 1)
-                char = gradient_str[index]
+        # Build line with optimized join
+        output_lines[i] = "".join(line_chars)
             
-            # Apply color with system adaptation
-            if color and SYSTEM_CONTEXT.capabilities.get("can_display_color", True):
-                # Efficient color construction
-                line.append(f"{get_ansi_color(r, g, b)}{char}\033[0m")
-            else:
-                line.append(char)
-        
-        output_lines.append("".join(line))
-    
     return output_lines
 
 
+@functools.lru_cache(maxsize=8)
 def generate_unicode_art(
     image_path: Union[str, Path],
     scale_factor: int = 2,
@@ -3947,239 +3929,234 @@ def generate_unicode_art(
     dithering: bool = False,
     auto_scale: bool = True
 ) -> List[str]:
-    """📸 Process image into dimensional Unicode art.
-    
+    """Process image into dimensional Unicode art with adaptive parameters.
+            
+    Loads and processes an image file with automatic parameter optimization
+    based on terminal dimensions and system capabilities. Includes caching
+    for repeated transformations with identical parameters.
+            
     Args:
-        image_path: Path to source image
-        scale_factor: Detail enhancement factor
-        block_width: Character cell width
-        block_height: Character cell height
-        edge_threshold: Edge sensitivity
-        gradient_str: Custom character gradient
-        color: Enable ANSI colors
-        enhanced_edges: Use advanced edge characters
-        algorithm: Edge detection algorithm
-        dithering: Apply error diffusion dithering
-        auto_scale: Automatically adapt output to terminal
-        
+        image_path: Path to source image file
+        scale_factor: Detail enhancement factor (1-4)
+        block_width: Character cell width in pixels
+        block_height: Character cell height in pixels
+        edge_threshold: Edge sensitivity threshold (0-255)
+        gradient_str: Custom character gradient (None=auto-select)
+        color: Whether to enable ANSI colors
+        enhanced_edges: Whether to use directional edge characters
+        algorithm: Edge detection algorithm name
+        dithering: Whether to apply error diffusion dithering
+        auto_scale: Whether to adapt output to terminal dimensions
+                
     Returns:
-        List of strings with Unicode art rows
-        
+        List[str]: Lines of dimensional Unicode art
+                
     Raises:
-        SystemExit: If image loading fails
+        FileNotFoundError: If image file cannot be found
+        ValueError: If image format is invalid
+        SystemExit: If processing fails catastrophically
     """
-    start_time = time.time()
-    
-    # Adaptive system parameter optimization
+    # Start performance tracking with high-precision timer
+    start_time = time.perf_counter()
+            
+    # Apply adaptive parameter optimization based on system capabilities
     if auto_scale:
-        # Get system-optimal parameters
-        params = SYSTEM_CONTEXT.get_optimized_parameters()
+        params = ENV.get_optimal_params("image")
+        terminal_width = ENV.terminal["width"]
+        terminal_height = ENV.terminal["height"]
+                
+        # Optimize scale factor based on system tier
         scale_factor = min(scale_factor, params.get("scale_factor", scale_factor))
-        
-        # Terminal size adaptation
-        terminal_width = SYSTEM_CONTEXT.attributes.get("terminal_width", 80)
-        # Each character is roughly half as tall as wide in most terminals
-        aspect_ratio_factor = 0.5
-        
-        # Apply automatic size limitation
+                
+        # Terminal-aware block sizing with aspect preservation
         if terminal_width < 100:
-            # Small terminal adjustment
             block_width = max(block_width, 10)
-            block_height = max(block_height, int(block_width * aspect_ratio_factor))
-    
-    # Load and process image
+            block_height = max(block_height, int(block_width * 0.5))
+            
+    # Load and optimize image with adaptive feedback
     try:
         if HAS_RICH:
-            with CONSOLE.status("📥 Loading image...", spinner="dots"):
-                # Error handling and format normalization
-                try:
-                    image = Image.open(image_path).convert("RGB")
-                    CONSOLE.log(f"✓ Image loaded: {image.width}×{image.height} px")
-                except (IOError, FileNotFoundError) as e:
-                    CONSOLE.print(f"[red]🚫 Error opening image:[/red] {e}")
-                    sys.exit(1)
-                except Exception as e:
-                    CONSOLE.print(f"[red]🚫 Unexpected error:[/red] {e}")
-                    sys.exit(1)
-        else:
-            print(f"📥 Loading image: {image_path}...")
-            try:
+            with CONSOLE.status("📥 Loading dimensional matrix...", spinner="dots"):
                 image = Image.open(image_path).convert("RGB")
-                print(f"✓ Image loaded: {image.width}×{image.height} px")
-            except Exception as e:
-                print(f"🚫 Image error: {e}")
-                print("💡 Check path, permissions, and format support")
-                sys.exit(1)
+                CONSOLE.log(f"✓ Matrix initialized: {image.width}×{image.height} px")
+        else:
+            print(f"📥 Initializing dimensional matrix: {image_path}")
+            image = Image.open(image_path).convert("RGB")
+            print(f"✓ Matrix initialized: {image.width}×{image.height} px")
+    except FileNotFoundError:
+        error_msg = f"🚫 Dimensional gateway not found: {image_path}"
+        if HAS_RICH:
+            CONSOLE.print(f"[red bold]{error_msg}[/red bold]")
+        else:
+            print(error_msg)
+        raise
     except Exception as e:
-        print(f"🚫 Image error: {e}")
-        print("💡 Check path, permissions, and format support")
-        sys.exit(1)
-    
-    # Image size safety check
-    max_dim = 8192 if SYSTEM_CONTEXT.constraints.get("performance_tier", 1) >= 2 else 4096
+        error_msg = f"🚫 Matrix initialization failed: {e}"
+        if HAS_RICH:
+            CONSOLE.print(f"[red bold]{error_msg}[/red bold]")
+        else:
+            print(error_msg)
+        raise ValueError(f"Invalid image data: {e}")
+            
+    # Safety resize for large images with adaptive threshold
+    max_dim = 8192 if ENV.capabilities["high_performance"] else 4096
     if image.width > max_dim or image.height > max_dim:
         if HAS_RICH:
-            CONSOLE.print(f"[yellow]⚠️ Image is very large, resizing for safety[/yellow]")
+            CONSOLE.print(f"[yellow]⚠️ Recalibrating dimensional matrix for stability[/yellow]")
         else:
-            print("⚠️ Image is very large, resizing for safety")
-            
-        # Maintain aspect ratio
+            print("⚠️ Recalibrating dimensional matrix for stability")
+                
+        # Preserve aspect ratio during resize
         aspect = image.width / image.height
         if image.width > image.height:
-            new_width = max_dim
-            new_height = int(new_width / aspect)
+            new_width, new_height = max_dim, int(max_dim / aspect)
         else:
-            new_height = max_dim
-            new_width = int(new_height * aspect)
+            new_height, new_width = max_dim, int(max_dim * aspect)
+                
+        # Apply high-quality resize with optimal resampling
+        image = image.resize((new_width, new_height), 
+                            Image.LANCZOS if ENV.capabilities["high_performance"] else Image.BILINEAR)
             
-        image = image.resize((new_width, new_height), Image.LANCZOS)
-    
-    # Process image
+    # Process image with concurrent execution and progress tracking
     if HAS_RICH:
-        with CONSOLE.status("🧠 Processing...", spinner="dots"):
+        with CONSOLE.status("🧠 Transmuting reality through prismatic cipher...", spinner="dots"):
             result = image_to_unicode_art(
-                image,
-                scale_factor=scale_factor,
-                block_width=block_width,
-                block_height=block_height,
-                edge_threshold=edge_threshold,
-                gradient_str=gradient_str,
-                color=color,
-                enhanced_edges=enhanced_edges,
-                algorithm=algorithm,
-                dithering=dithering
+                image, scale_factor, block_width, block_height, edge_threshold,
+                gradient_str, color, enhanced_edges, algorithm, dithering
             )
-            elapsed = time.time() - start_time
-            CONSOLE.log(f"✨ Generated in {elapsed:.2f}s")
+            elapsed = time.perf_counter() - start_time
+            CONSOLE.log(f"✨ Dimensional transmutation complete in {elapsed:.2f}s")
     else:
-        print("🧠 Processing image...")
+        print("🧠 Transmuting reality through prismatic cipher...")
         result = image_to_unicode_art(
-            image,
-            scale_factor=scale_factor,
-            block_width=block_width,
-            block_height=block_height,
-            edge_threshold=edge_threshold,
-            gradient_str=gradient_str,
-            color=color,
-            enhanced_edges=enhanced_edges,
-            algorithm=algorithm,
-            dithering=dithering
+            image, scale_factor, block_width, block_height, edge_threshold,
+            gradient_str, color, enhanced_edges, algorithm, dithering
         )
-        elapsed = time.time() - start_time
-        print(f"✨ Generated in {elapsed:.2f}s")
-        
+        elapsed = time.perf_counter() - start_time
+        print(f"✨ Dimensional transmutation complete in {elapsed:.2f}s")
+            
     return result
 
 
 class ArtTransformer:
-    """🎨 Multi-dimensional art transformation pipeline.
+    """🎨 Multi-dimensional art transformation pipeline with fluent interface.
     
-    Provides fluent interface for progressive image transformations
-    with context-aware parameter tuning and optimization paths.
+    Provides a chainable API for progressive image transformations with
+    context-aware parameter tuning, intelligent optimization paths,
+    and concurrent processing capabilities.
+    
+    Attributes:
+        image (PIL.Image.Image): Source image for transformation
+        options (Dict[str, Any]): Transformation parameters
     """
     
     def __init__(self, source: Union[str, Path, Image.Image]) -> None:
-        """Initialize transformer with source image.
+        """Initialize transformer with image source.
         
         Args:
-            source: Image path or PIL Image object
+            source: Image path, Path object, or PIL Image instance
+            
+        Raises:
+            ValueError: If image cannot be loaded
         """
-        self.image = None
+        # Initialize with system-optimized defaults
+        perf_tier = ENV.capabilities["performance_tier"]
         self.options = {
-            "scale_factor": 2,
-            "block_width": 8,
-            "block_height": 8, 
+            "scale_factor": max(1, min(2, perf_tier + 1)),
+            "block_width": 8 - (perf_tier * 1),
+            "block_height": 8 - (perf_tier * 1),
             "edge_threshold": 50,
-            "gradient_str": None,
-            "color": SYSTEM_CONTEXT.capabilities.get("can_display_color", True),
-            "enhanced_edges": True,
-            "algorithm": "sobel",
-            "dithering": False,
-            "output_format": "ansi"
+            "gradient_str": get_enhanced_gradient_chars() if ENV.capabilities["unicode"] else "@%#*+=-:. ",
+            "color": ENV.capabilities["color"],
+            "enhanced_edges": perf_tier > 0,
+            "algorithm": "scharr" if perf_tier >= 2 else "sobel",
+            "dithering": perf_tier >= 2,
+            "output_format": "ansi",
+            "auto_scale": True
         }
         
-        # Load image source
-        if isinstance(source, Image.Image):
-            self.image = source
-        else:
-            try:
-                self.image = Image.open(source).convert("RGB")
-            except Exception as e:
-                if HAS_RICH:
-                    CONSOLE.print(f"[red]🚫 Error loading image:[/red] {e}")
-                else:
-                    print(f"🚫 Error loading image: {e}")
-                raise
+        # Load image with efficient error handling
+        try:
+            self.image = source if isinstance(source, Image.Image) else Image.open(source).convert("RGB")
+        except Exception as e:
+            msg = f"Failed to load image: {e}"
+            if HAS_RICH:
+                CONSOLE.print(f"[bold red]🚫 {msg}[/bold red]")
+            else:
+                print(f"🚫 {msg}")
+            raise ValueError(msg) from e
     
     def with_scale(self, factor: int) -> 'ArtTransformer':
-        """Set supersampling scale factor.
+        """Set supersampling scale factor for detail enhancement.
         
         Args:
-            factor: Detail enhancement factor (1-4)
+            factor: Detail enhancement multiplier (1-4)
             
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
         self.options["scale_factor"] = max(1, min(4, factor))
         return self
     
     def with_block_size(self, width: int, height: Optional[int] = None) -> 'ArtTransformer':
-        """Set character block dimensions.
+        """Set character block dimensions with aspect ratio preservation.
         
         Args:
-            width: Block width in pixels
-            height: Block height (defaults to width)
+            width: Block width in pixels (2+)
+            height: Block height in pixels (None=use width)
             
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
         self.options["block_width"] = max(2, width)
-        self.options["block_height"] = max(2, height or width)
+        self.options["block_height"] = max(2, height if height is not None else width)
         return self
     
     def with_edge_detection(self, 
                           threshold: int = 50, 
                           algorithm: str = "sobel",
                           enhanced: bool = True) -> 'ArtTransformer':
-        """Configure edge detection parameters.
+        """Configure edge detection parameters with algorithm selection.
         
         Args:
-            threshold: Edge sensitivity (0-255)
-            algorithm: Detection algorithm
-            enhanced: Use detailed edge characters
+            threshold: Edge sensitivity threshold (0-255)
+            algorithm: Detection algorithm name ('sobel', 'scharr', etc.)
+            enhanced: Whether to use directional edge characters
             
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
-        self.options["edge_threshold"] = threshold
+        self.options["edge_threshold"] = max(0, min(255, threshold))
         self.options["algorithm"] = algorithm
         self.options["enhanced_edges"] = enhanced
         return self
     
     def with_gradient(self, gradient: str) -> 'ArtTransformer':
-        """Set custom gradient character sequence.
+        """Set custom gradient character sequence from dense to sparse.
         
         Args:
-            gradient: Character sequence from dense to sparse
+            gradient: Character sequence for density representation
             
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
-        self.options["gradient_str"] = gradient
+        if gradient:
+            self.options["gradient_str"] = gradient
         return self
     
     def with_preset(self, preset: Literal["default", "detailed", "fast", "minimal"]) -> 'ArtTransformer':
-        """Apply predefined parameter preset.
+        """Apply predefined parameter preset for common use cases.
         
         Args:
             preset: Named parameter configuration
             
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
+        # System-aware preset configurations
         if preset == "detailed":
             self.options.update({
-                "scale_factor": 3,
+                "scale_factor": min(3, ENV.constraints.get("max_scale_factor", 3)),
                 "block_width": 4,
                 "block_height": 4,
                 "edge_threshold": 40,
@@ -4193,7 +4170,6 @@ class ArtTransformer:
                 "block_width": 12,
                 "block_height": 12,
                 "edge_threshold": 60,
-                "algorithm": "sobel",
                 "enhanced_edges": False,
                 "dithering": False
             })
@@ -4203,157 +4179,218 @@ class ArtTransformer:
                 "block_width": 8,
                 "block_height": 8,
                 "edge_threshold": 80,
-                "algorithm": "sobel",
-                "enhanced_edges": False,
                 "color": False,
+                "enhanced_edges": False,
                 "dithering": False,
                 "gradient_str": " .:;+=xX$&#@"
             })
-            
         return self
     
     def with_color(self, enabled: bool = True) -> 'ArtTransformer':
-        """Enable or disable ANSI color output.
+        """Enable or disable ANSI color with capability detection.
         
         Args:
-            enabled: Color state
+            enabled: Whether to enable color output
             
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
-        self.options["color"] = enabled and SYSTEM_CONTEXT.capabilities.get("can_display_color", True)
+        self.options["color"] = enabled and ENV.capabilities["color"]
         return self
     
     def with_dithering(self, enabled: bool = True) -> 'ArtTransformer':
-        """Enable or disable Floyd-Steinberg dithering.
+        """Enable or disable Floyd-Steinberg dithering for gradient improvements.
         
         Args:
-            enabled: Dithering state
+            enabled: Whether to enable dithering
             
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
         self.options["dithering"] = enabled
         return self
     
     def optimize_for_terminal(self) -> 'ArtTransformer':
-        """Adapt parameters to current terminal dimensions.
+        """Auto-tune parameters to fit current terminal dimensions.
+        
+        Intelligently adjusts block size and scale factor to ensure
+        the image fits comfortably within current terminal dimensions
+        while preserving aspect ratio.
         
         Returns:
-            Self for chaining
+            ArtTransformer: Self for method chaining
         """
-        # Get terminal dimensions
-        terminal_width = SYSTEM_CONTEXT.attributes.get("terminal_width", 80)
-        terminal_height = SYSTEM_CONTEXT.attributes.get("terminal_height", 24)
+        # Get terminal dimensions with fallback
+        term_width = ENV.terminal["width"]
+        term_height = ENV.terminal["height"]
         
-        # Calculate optimal block size to fit image in terminal
-        # Account for aspect ratio (terminal characters are taller than wide)
-        char_aspect = 0.5  # approximate character height/width ratio
+        if self.image and term_width > 10 and term_height > 5:
+            # Character aspect ratio compensation (approx 2:1 height:width)
+            char_aspect = 0.5
+            
+            # Calculate target dimensions with margins
+            target_cols = term_width - 4
+            target_rows = term_height - 4
+            
+            # Get image dimensions and aspect ratio
+            img_width, img_height = self.image.size
+            img_aspect = img_width / max(1, img_height)
+            
+            # Calculate optimal block sizes with aspect preservation
+            width_block = max(2, img_width // max(1, target_cols))
+            height_block = max(2, img_height // max(1, target_rows))
+            
+            # Account for character aspect ratio
+            adjusted_height = int(width_block / (img_aspect * char_aspect))
+            adjusted_width = int(height_block * img_aspect / char_aspect)
+            
+            # Apply calculated dimensions and scale
+            self.options["block_width"] = min(width_block, adjusted_width)
+            self.options["block_height"] = min(height_block, adjusted_height)
+            self.options["scale_factor"] = 1 if term_width < 80 or term_height < 24 else self.options["scale_factor"]
+            
+            # Optimize algorithm for smaller outputs
+            if target_cols < 60 or target_rows < 20:
+                self.options["algorithm"] = "sobel"  # Faster algorithm for small outputs
+                self.options["dithering"] = False    # Disable dithering for small outputs
         
-        # Calculate dimensions that would fit in terminal
-        target_cols = max(20, terminal_width - 4)  # Allow border space
-        target_rows = max(10, terminal_height - 4)
-        
-        if self.image:
-            image_width, image_height = self.image.size
-            image_aspect = image_width / image_height
-            
-            # Calculate block size that fits image in terminal
-            # with appropriate aspect ratio correction
-            width_from_cols = max(2, image_width // target_cols)
-            height_from_rows = max(2, image_height // target_rows)
-            
-            # Adjust to preserve aspect ratio
-            adjusted_height = int(width_from_cols / (image_aspect * char_aspect))
-            adjusted_width = int(height_from_rows * image_aspect / char_aspect)
-            
-            self.options["block_width"] = min(width_from_cols, adjusted_width)
-            self.options["block_height"] = min(height_from_rows, adjusted_height)
-            
-            # Adjust scale factor based on terminal size
-            if terminal_width < 80 or terminal_height < 24:
-                self.options["scale_factor"] = 1
-            
         return self
     
     def render(self) -> List[str]:
-        """Generate Unicode art with current settings.
+        """Generate dimensional Unicode art with current settings.
+        
+        Uses parallel processing when appropriate for improved performance
+        on multi-core systems.
         
         Returns:
-            List of strings with art lines
+            List[str]: Lines of rendered Unicode art
         """
         if not self.image:
             return ["Error: No image loaded"]
-            
-        return image_to_unicode_art(
-            self.image,
-            **self.options
-        )
+        
+        # Render with concurrent processing when beneficial
+        if ENV.capabilities["high_performance"] and self.image.width * self.image.height > 500_000:
+            # Use thread pool for large images
+            return THREAD_POOL.submit(
+                image_to_unicode_art,
+                self.image,
+                **self.options
+            ).result()
+        else:
+            # Direct rendering for smaller images
+            return image_to_unicode_art(
+                self.image,
+                **self.options
+            )
     
     def save_to_file(self, path: Union[str, Path]) -> None:
-        """Save rendered art to text file.
+        """Save rendered art to text file with format detection.
         
         Args:
             path: Output file path
+            
+        Raises:
+            IOError: If file cannot be written
         """
+        # Auto-detect format from extension
+        file_path = Path(path)
+        if file_path.suffix.lower() in ('.html', '.htm'):
+            self.options["output_format"] = "html"
+        elif file_path.suffix.lower() in ('.svg'):
+            self.options["output_format"] = "svg"
+        
+        # Generate art
         result = self.render()
         
         try:
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                # Add appropriate headers for special formats
+                if self.options["output_format"] == "html":
+                    f.write('<html><head><meta charset="utf-8"><style>pre{font-family:monospace;line-height:1}</style></head>\n<body><pre>\n')
+                
+                # Write content with format-specific processing
+                strip_ansi = self.options["output_format"] not in ("ansi", "html")
                 for line in result:
-                    # Strip ANSI color codes for file output
-                    if self.options["output_format"] != "ansi":
-                        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                        line = ansi_escape.sub('', line)
+                    if strip_ansi:
+                        # Strip ANSI color codes for non-color formats
+                        line = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', line)
                     f.write(line + '\n')
-                    
+                
+                # Add footers for special formats
+                if self.options["output_format"] == "html":
+                    f.write('</pre></body></html>')
+                
+            # Confirm save with visual feedback
+            msg = f"✓ Art saved to: {file_path}"
             if HAS_RICH:
-                CONSOLE.print(f"[green]✓ Art saved to:[/green] {path}")
+                CONSOLE.print(f"[green]{msg}[/green]")
             else:
-                print(f"✓ Art saved to: {path}")
+                print(msg)
+                
         except Exception as e:
+            msg = f"Error saving file: {e}"
             if HAS_RICH:
-                CONSOLE.print(f"[red]🚫 Error saving file:[/red] {e}")
+                CONSOLE.print(f"[bold red]🚫 {msg}[/bold red]")
             else:
-                print(f"🚫 Error saving file: {e}")
+                print(f"🚫 {msg}")
+            raise IOError(msg) from e
     
     def display(self) -> None:
-        """Render and display art in terminal."""
+        """Render and display art in terminal with enhanced presentation.
+        
+        Automatically adapts to available terminal capabilities with
+        rich formatting when available.
+        """
+        # Generate art with auto-optimization
+        if self.options["auto_scale"]:
+            self.optimize_for_terminal()
+            
         result = self.render()
         
+        # Enhanced display with rich when available
         if HAS_RICH:
-            # Add a title panel
-            title = "✨ Unicode Art Rendering ✨"
-            CONSOLE.print(Panel(title, style="bold blue"))
+            # Create presentation panel with metadata
+            dims = f"{self.image.width}×{self.image.height} • " if self.image else ""
+            quality = f"Scale: {self.options['scale_factor']}× • Algorithm: {self.options['algorithm']}"
+            title = f"✨ {dims}{quality} ✨"
             
-            # Print each line
+            # Output with rich formatting
+            CONSOLE.print("")
+            CONSOLE.print(Panel(title, style="bold blue"))
             for line in result:
                 CONSOLE.print(line)
         else:
-            # Simple display
-            print("\n".join(result))
+            # Simple display with separators
+            print("\n" + "─" * min(80, ENV.terminal.get("width", 80)) + "\n")
+            for line in result:
+                print(line)
+            print("\n" + "─" * min(80, ENV.terminal.get("width", 80)))
 
 
-# Legacy compatibility wrapper
-def transform_image(
-    image_path: Union[str, Path], 
-    preset: Optional[str] = None
-) -> List[str]:
-    """🎨 Transform image file with fluent parameter configuration.
+def transform_image(image_path: Union[str, Path], preset: Optional[str] = None) -> List[str]:
+    """Transform image into dimensional Unicode art with preset configuration.
+    
+    Provides a simple one-line interface to the ArtTransformer with optional
+    preset selection.
     
     Args:
         image_path: Path to image file
         preset: Optional preset name ("default", "detailed", "fast", "minimal")
         
     Returns:
-        List of strings containing Unicode art
+        List[str]: Lines of dimensional Unicode art
+        
+    Examples:
+        >>> art = transform_image("photo.jpg", "detailed")
+        >>> print("\n".join(art))
     """
     transformer = ArtTransformer(image_path)
     
     if preset:
         transformer.with_preset(preset)
-        
-    return transformer.render()
+    
+    # Auto-optimize for terminal display
+    return transformer.optimize_for_terminal().render()
 
 # ╔═════════════════════════════════════════════════════════════╗
 # ║ 🖼️ Virtual Display Capture And Management                   ║
@@ -4364,113 +4401,93 @@ class VirtualDisplayEngine:
     
     Creates and manages virtual displays (Xvfb), captures their visual state,
     and streams real-time GUI content to terminals through dimensional
-    compression with adaptive performance tuning and intelligent fallbacks.
+    compression with adaptive performance tuning.
+    
+    Attributes:
+        _virtual_display: PyVirtualDisplay instance when active
+        _display_process: Direct Xvfb process when using subprocess approach
+        _current_display_id: Display number for X11 systems
+        _display_size: Resolution tuple (width, height)
+        _capabilities: Dict of detected system capabilities
+        _capture_backend: Selected optimal screenshot method
+        _active_streams: Set of running stream identifiers
     """
-    # Singleton instance with lazy initialization
     _instance = None
     
     @classmethod
     def get_instance(cls) -> 'VirtualDisplayEngine':
-        """📡 Get or create the singleton display engine."""
+        """Get or create the singleton display engine.
+        
+        Returns:
+            VirtualDisplayEngine: Global singleton instance
+        """
         if cls._instance is None:
-            cls._instance = VirtualDisplayEngine()
+            cls._instance = cls()
         return cls._instance
 
     def __init__(self) -> None:
-        """Initialize with dynamic capability detection."""
+        """Initialize with dynamic capability detection and optimal backends."""
         self._virtual_display = None
         self._display_process = None
         self._current_display_id = 99  # Default virtual display number
         self._display_size = (1280, 720)  # Default resolution
         
-        # Capability detection with progressive enhancement
+        # Core capability detection
         self._capabilities = self._detect_capabilities()
-        
-        # Screenshot backend selection based on system capabilities
         self._capture_backend = self._select_capture_backend()
         
-        # Rendering optimizations cache
-        self._capture_cache = {}
-        self._capture_cache_enabled = SYSTEM_CONTEXT.constraints.get("performance_tier", 1) >= 2
-        
-        # Status tracking for resource management
-        self._active_streams = set()
+        # Performance optimization
         self._last_capture_time = 0
+        self._active_streams = set()
+        self._frame_cache = collections.deque(maxlen=2)
 
     def _detect_capabilities(self) -> Dict[str, bool]:
-        """🕵️ Detect available virtual display and capture mechanisms."""
+        """Detect available virtual display and capture mechanisms.
+        
+        Returns:
+            Dict[str, bool]: Map of capability flags
+        """
         capabilities = {
-            "has_xvfb": False,
-            "has_pyvirtualdisplay": False,
-            "has_mss": False,
-            "has_pil_grab": False,
-            "has_x11_utils": False,
-            "can_create_display": False,
-            "platform_headless_support": False
+            "has_pyvirtualdisplay": pyvirtualdisplay is not None,
+            "has_mss": import_module("mss") is not None,
+            "has_pil_grab": hasattr(PIL_Image, "grab") if PIL_Image else False,
+            "has_xvfb": shutil.which("xvfb-run") is not None,
+            "has_x11_utils": False
         }
         
-        # Check for PyVirtualDisplay
-        try:
-            import pyvirtualdisplay
-            capabilities["has_pyvirtualdisplay"] = True
-        except ImportError:
-            pass
-            
-        # Check for MSS (fast cross-platform screenshots)
-        try:
-            import mss
-            capabilities["has_mss"] = True
-        except ImportError:
-            pass
-            
-        # Check for PIL ImageGrab
-        try:
-            from PIL import ImageGrab
-            capabilities["has_pil_grab"] = True
-        except (ImportError, AttributeError):
-            pass
-            
-        # Check for X11 utilities
-        if SYSTEM_CONTEXT.attributes.get("platform") == "Linux":
-            for utility in ["xvfb-run", "xwd", "import"]:
-                if shutil.which(utility):
-                    capabilities["has_x11_utils"] = True
-                    if utility == "xvfb-run":
-                        capabilities["has_xvfb"] = True
+        # Check for X11 utilities on Linux
+        if platform.system() == "Linux":
+            capabilities["has_x11_utils"] = any(
+                shutil.which(util) for util in ["xwd", "import"]
+            )
             
         # Determine if we can create virtual displays
         capabilities["can_create_display"] = (
-            capabilities["has_xvfb"] or 
-            capabilities["has_pyvirtualdisplay"]
+            capabilities["has_xvfb"] or capabilities["has_pyvirtualdisplay"]
         )
-            
-        # Platform-specific capability checks
-        if SYSTEM_CONTEXT.attributes.get("platform") == "Linux":
-            capabilities["platform_headless_support"] = True
-        elif SYSTEM_CONTEXT.attributes.get("platform") == "Darwin":
-            capabilities["platform_headless_support"] = capabilities["has_pil_grab"]
-        else:  # Windows
-            capabilities["platform_headless_support"] = capabilities["has_mss"]
-            
+        
         return capabilities
 
     def _select_capture_backend(self) -> str:
-        """⚙️ Select optimal screenshot backend based on capabilities."""
-        if self._capabilities["has_mss"]:
+        """Select optimal screenshot backend based on capabilities.
+        
+        Returns:
+            str: Name of best available capture method
+        """
+        if import_module("mss"):
             return "mss"  # Fast and cross-platform
-        elif self._capabilities["has_x11_utils"] and SYSTEM_CONTEXT.attributes.get("platform") == "Linux":
+        elif self._capabilities["has_x11_utils"] and platform.system() == "Linux":
             return "xwd"  # X11 specific but reliable
-        elif self._capabilities["has_pil_grab"]:
+        elif hasattr(PIL_Image, "grab"):
             return "pillow"  # Decent fallback
-        else:
-            return "none"  # No suitable backend
+        return "none"  # No suitable backend
 
     def create_virtual_display(self, 
                              width: int = 1280, 
                              height: int = 720, 
                              color_depth: int = 24,
                              visible: bool = False) -> bool:
-        """🖥️ Create new virtual display or take over existing one.
+        """Create new virtual display with specified parameters.
         
         Args:
             width: Display width in pixels
@@ -4479,30 +4496,26 @@ class VirtualDisplayEngine:
             visible: Whether to make display visible (for debugging)
             
         Returns:
-            Success status
+            bool: Success status
         """
-        # Abort if capabilities not available
         if not self._capabilities["can_create_display"]:
             if HAS_RICH:
-                CONSOLE.print("[red]⚠️ Cannot create virtual display - missing dependencies[/red]")
-                CONSOLE.print("[yellow]Install pyvirtualdisplay or ensure Xvfb is available[/yellow]")
+                CONSOLE.print("[red bold]⚠️ Missing virtual display dependencies[/red bold]")
+                CONSOLE.print("[yellow]Install pyvirtualdisplay or xvfb[/yellow]")
             else:
-                print("⚠️ Cannot create virtual display - missing dependencies")
-                print("💡 Install pyvirtualdisplay or ensure Xvfb is available")
+                print("⚠️ Missing virtual display dependencies")
+                print("💡 Install pyvirtualdisplay or xvfb")
             return False
             
         # Clean up any existing display
         self.destroy_virtual_display()
-        
-        # Store new display dimensions
         self._display_size = (width, height)
         
         # Try pyvirtualdisplay first (more robust)
         if self._capabilities["has_pyvirtualdisplay"]:
             try:
-                import pyvirtualdisplay
                 self._virtual_display = pyvirtualdisplay.Display(
-                    visible=1 if visible else 0,
+                    visible=int(visible),
                     size=(width, height),
                     color_depth=color_depth
                 )
@@ -4517,20 +4530,19 @@ class VirtualDisplayEngine:
                 return True
             except Exception as e:
                 if HAS_RICH:
-                    CONSOLE.print(f"[red]Error creating virtual display with PyVirtualDisplay: {e}[/red]")
+                    CONSOLE.print(f"[red]PyVirtualDisplay error: {e}[/red]")
                 else:
-                    print(f"Error creating virtual display with PyVirtualDisplay: {e}")
+                    print(f"PyVirtualDisplay error: {e}")
         
         # Fall back to direct Xvfb if available
         if self._capabilities["has_xvfb"]:
             try:
-                # Find an available display number
+                # Find available display number
                 for display_id in range(99, 110):
                     if not os.path.exists(f"/tmp/.X{display_id}-lock"):
                         self._current_display_id = display_id
                         break
                 
-                # Start Xvfb process
                 display_str = f":{self._current_display_id}"
                 cmd = [
                     "Xvfb", display_str, "-screen", "0", 
@@ -4542,11 +4554,7 @@ class VirtualDisplayEngine:
                 self._display_process = subprocess.Popen(
                     cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                 )
-                
-                # Wait for display to become available
-                time.sleep(1)
-                
-                # Set environment variable for applications
+                time.sleep(0.5)  # Brief pause for display initialization
                 os.environ["DISPLAY"] = display_str
                 
                 if HAS_RICH:
@@ -4556,119 +4564,90 @@ class VirtualDisplayEngine:
                 return True
             except Exception as e:
                 if HAS_RICH:
-                    CONSOLE.print(f"[red]Error creating virtual display with Xvfb: {e}[/red]")
+                    CONSOLE.print(f"[red]Xvfb error: {e}[/red]")
                 else:
-                    print(f"Error creating virtual display with Xvfb: {e}")
+                    print(f"Xvfb error: {e}")
                     
         return False
 
     def destroy_virtual_display(self) -> None:
-        """🧹 Clean up virtual display resources."""
-        # Stop all active streams
+        """Clean up virtual display resources and active streams."""
         self._active_streams.clear()
         
-        # Clean up pyvirtualdisplay
         if self._virtual_display is not None:
             try:
                 self._virtual_display.stop()
-            except:
+            except Exception:
                 pass
             self._virtual_display = None
             
-        # Clean up direct Xvfb process
         if self._display_process is not None:
             try:
                 self._display_process.terminate()
-                self._display_process.wait(timeout=3)
-            except:
+                self._display_process.wait(timeout=1)
+            except Exception:
                 try:
                     self._display_process.kill()
-                except:
+                except Exception:
                     pass
             self._display_process = None
 
     def capture_screenshot(self) -> Optional[Image.Image]:
-        """📸 Capture screenshot from current display with optimal backend.
+        """Capture screenshot from current display with optimal backend.
+        
+        Uses the most performant available method with throttling to prevent
+        excessive resource usage.
         
         Returns:
-            PIL Image of current screen or None on failure
+            Optional[Image.Image]: PIL Image or None on failure
         """
-        # Rate limiting to prevent excessive captures
+        # Simple rate limiting to prevent excessive captures
         current_time = time.time()
         if current_time - self._last_capture_time < 0.01:  # Max 100 FPS
             time.sleep(0.01)
-            
         self._last_capture_time = current_time
         
-        # Try different capture methods in order of preference
+        # Use optimal backend with fallbacks
         if self._capture_backend == "mss":
             try:
                 import mss
                 with mss.mss() as sct:
-                    # Get the monitor to capture (first monitor or virtual display)
-                    monitor = sct.monitors[0]  # Capturing the entire display
-                    
-                    # Capture the screen
-                    sct_img = sct.grab(monitor)
-                    
-                    # Convert to PIL Image
+                    sct_img = sct.grab(sct.monitors[0])  # Capture entire display
                     return Image.frombytes("RGB", sct_img.size, sct_img.rgb)
-            except Exception as e:
-                if HAS_RICH:
-                    CONSOLE.print(f"[yellow]MSS capture failed: {e}[/yellow]")
-                else:
-                    print(f"MSS capture failed: {e}")
+            except Exception:
+                pass
                     
         elif self._capture_backend == "xwd":
             try:
-                # Use xwd to capture the screen
                 display = os.environ.get("DISPLAY", f":{self._current_display_id}")
-                cmd = ["xwd", "-root", "-display", display, "-silent"]
-                
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = process.communicate(timeout=5)
-                
+                process = subprocess.run(
+                    ["xwd", "-root", "-display", display, "-silent"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2
+                )
                 if process.returncode == 0:
-                    # Convert xwd output to PIL Image
-                    return Image.open(io.BytesIO(stdout))
-                else:
-                    if HAS_RICH:
-                        CONSOLE.print(f"[yellow]xwd capture failed: {stderr.decode()}[/yellow]")
-                    else:
-                        print(f"xwd capture failed: {stderr.decode()}")
-            except Exception as e:
-                if HAS_RICH:
-                    CONSOLE.print(f"[yellow]X11 capture failed: {e}[/yellow]")
-                else:
-                    print(f"X11 capture failed: {e}")
+                    return Image.open(io.BytesIO(process.stdout))
+            except Exception:
+                pass
                     
         elif self._capture_backend == "pillow":
             try:
-                from PIL import ImageGrab
-                return ImageGrab.grab()
-            except Exception as e:
-                if HAS_RICH:
-                    CONSOLE.print(f"[yellow]PIL capture failed: {e}[/yellow]")
-                else:
-                    print(f"PIL capture failed: {e}")
+                return PIL_Image.grab()
+            except Exception:
+                pass
         
-        # If all capture methods failed, try one more fallback
+        # Final fallback using ImageMagick
         try:
-            # ImageMagick's import command (often available on Linux)
             if shutil.which("import"):
-                temp_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-                temp_file.close()
-                
-                cmd = ["import", "-window", "root", temp_file.name]
-                process = subprocess.run(cmd, timeout=5)
-                
-                if process.returncode == 0:
-                    img = Image.open(temp_file.name)
-                    os.unlink(temp_file.name)
+                temp_path = os.path.join(tempfile.gettempdir(), f"glyph_capture_{uuid.uuid4().hex}.png")
+                subprocess.run(["import", "-window", "root", temp_path], timeout=2, check=False)
+                if os.path.exists(temp_path):
+                    img = Image.open(temp_path)
+                    try:
+                        os.unlink(temp_path)
+                    except OSError:
+                        pass
                     return img
-                
-                os.unlink(temp_file.name)
-        except:
+        except Exception:
             pass
             
         return None
@@ -4686,332 +4665,172 @@ class VirtualDisplayEngine:
                                  algorithm: str = "sobel",
                                  show_stats: bool = True,
                                  adaptive_quality: bool = True) -> None:
-        """🎬 Stream virtual display content to terminal as Unicode art.
+        """Stream virtual display content to terminal as Unicode art.
         
-        Creates real-time visualization of GUI applications in the terminal
-        using adaptive quality parameters and system-aware optimizations.
+        Creates real-time visualization of GUI applications with adaptive quality
+        and performance monitoring.
         
         Args:
-            scale_factor: Detail enhancement factor
+            scale_factor: Detail enhancement factor (1-4)
             block_width: Character cell width
             block_height: Character cell height
-            edge_threshold: Edge sensitivity
-            gradient_str: Custom character gradient
-            color: Enable ANSI colors
+            edge_threshold: Edge detection sensitivity (0-255)
+            gradient_str: Custom character gradient (None=auto)
+            color: Whether to use ANSI colors
             fps: Target frames per second
-            enhanced_edges: Use advanced edge characters
-            max_frames: Maximum frames to capture (None for continuous)
+            enhanced_edges: Use directional edge characters
+            max_frames: Frame capture limit (None=unlimited)
             algorithm: Edge detection algorithm
             show_stats: Display performance metrics
             adaptive_quality: Auto-adjust quality for performance
         """
-        # Generate unique stream ID for tracking
+        # Initialize stream with unique ID and optimal parameters
         stream_id = str(uuid.uuid4())
         self._active_streams.add(stream_id)
         
-        # Get system-aware parameters
-        system_params = SYSTEM_CONTEXT.get_optimized_parameters()
-        terminal_width = SYSTEM_CONTEXT.attributes.get("terminal_width", 80)
-        terminal_height = SYSTEM_CONTEXT.attributes.get("terminal_height", 24)
+        # Get system-optimized default parameters
+        gradient_str = gradient_str or get_enhanced_gradient_chars()
+        frame_interval = 1.0 / fps
         
-        # Adjust parameters based on system capabilities if adaptive
-        if adaptive_quality:
-            # Reduce quality on slower systems
-            if SYSTEM_CONTEXT.constraints.get("performance_tier", 1) <= 1:
-                scale_factor = 1
-                edge_threshold = 70
-                algorithm = "sobel"  # Fastest algorithm
-                
-            # Terminal size adaptation
-            if terminal_width < 100:
-                block_width = max(block_width, 10)
-                block_height = max(block_height, int(block_width * 0.5))
-                
-        # Fallback gradient based on terminal capabilities
-        if gradient_str is None:
-            if UNICODE_ENGINE.supports_unicode:
-                gradient_str = get_enhanced_gradient_chars()
-            else:
-                gradient_str = UNICODE_ENGINE.character_maps["full_gradients"]["ascii_art"]
-                
-        # Performance tracking
-        max_tracking_samples = 30
-        frame_duration = 1.0 / fps
-        frames_processed = 0
-        dropped_frames = 0
-        start_time = time.time()
+        # Performance metrics tracking
+        metrics = StreamMetrics(sample_size=30)
         
-        # Performance metrics with ring buffer
-        render_times = collections.deque(maxlen=max_tracking_samples)
-        fps_values = collections.deque(maxlen=max_tracking_samples)
-        capture_times = collections.deque(maxlen=max_tracking_samples)
+        # Adaptive quality parameters with initial values
+        quality_params = RenderParameters(
+            scale=scale_factor,
+            width=block_width,
+            height=block_height,
+            threshold=edge_threshold,
+            optimal_width=block_width,
+            optimal_height=block_height
+        )
+        thresholds = RenderThresholds.from_target_fps(fps)
         
-        # Adaptive quality parameters
-        adaptive_params = {
-            'scale': scale_factor,
-            'width': block_width,
-            'height': block_height,
-            'threshold': edge_threshold,
-            'frames_since_adjustment': 0,
-            'quality_level': 2,
-        }
+        # Frame buffer for smoother rendering
+        buffer = FrameBuffer(capacity=2)
         
-        # Quality adjustment thresholds (ms/frame)
-        quality_thresholds = {
-            'reduce': frame_duration * 1000 * 0.9,  # If processing takes >90% of frame time
-            'improve': frame_duration * 1000 * 0.6,  # If processing takes <60% of frame time
-        }
+        # Create renderer with terminal-aware parameters
+        renderer = FrameRenderer(
+            terminal_width=ENV.terminal["width"],
+            terminal_height=ENV.terminal["height"],
+            gradient=gradient_str,
+            border=True, 
+            unicode_supported=ENV.capabilities["unicode"]
+        )
         
         try:
-            # Prepare terminal for streaming display
+            # Display stream initialization
             if HAS_RICH:
-                with CONSOLE.screen():
-                    CONSOLE.print(Panel.fit(
-                        f"🖥️ [bold cyan]Virtual Display Stream[/bold cyan]\n"
-                        f"[dim]Resolution: {self._display_size[0]}×{self._display_size[1]} • "
-                        f"Target: {fps} FPS • "
-                        f"Quality: {adaptive_params['quality_level']}/4[/dim]",
-                        border_style="blue"
-                    ))
-                    
-                    # Main streaming loop
-                    frame_count = 0
-                    while (max_frames is None or frame_count < max_frames) and stream_id in self._active_streams:
-                        frame_start = time.time()
-                        
-                        # ⏱️ Capture timing
-                        capture_start = time.time()
-                        screenshot = self.capture_screenshot()
-                        capture_time = (time.time() - capture_start) * 1000
-                        capture_times.append(capture_time)
-                        
-                        if screenshot is None:
-                            # If capture failed, skip this frame
-                            time.sleep(0.1)
-                            dropped_frames += 1
-                            continue
-                            
-                        # ⏱️ Processing timing
-                        process_start = time.time()
-                        frame = image_to_unicode_art(
-                            screenshot,
-                            scale_factor=adaptive_params['scale'],
-                            block_width=adaptive_params['width'],
-                            block_height=adaptive_params['height'],
-                            edge_threshold=adaptive_params['threshold'],
-                            gradient_str=gradient_str,
-                            color=color,
-                            enhanced_edges=enhanced_edges,
-                            algorithm=algorithm
-                        )
-                        process_time = (time.time() - process_start) * 1000
-                        render_times.append(process_time)
-                        
-                        # Display the frame with stats if enabled
-                        CONSOLE.clear()
-                        
-                        if show_stats:
-                            stats_panel = Table.grid()
-                            stats_panel.add_column(style="cyan")
-                            stats_panel.add_column(style="green")
-                            stats_panel.add_column(style="magenta")
-                            stats_panel.add_column(style="yellow")
-                            
-                            # Calculate metrics
-                            avg_render = sum(render_times) / len(render_times) if render_times else 0
-                            avg_capture = sum(capture_times) / len(capture_times) if capture_times else 0
-                            actual_fps = frames_processed / (time.time() - start_time) if frames_processed > 0 else 0
-                            
-                            stats_panel.add_row(
-                                f"Frame: {frame_count}",
-                                f"FPS: {actual_fps:.1f}",
-                                f"Render: {avg_render:.1f}ms",
-                                f"Quality: {adaptive_params['quality_level']}/4"
-                            )
-                            
-                            CONSOLE.print(stats_panel)
-                            
-                        # Display frame
-                        for line in frame:
-                            CONSOLE.print(line)
-                            
-                        frames_processed += 1
-                        frame_count += 1
-                        
-                        # Adaptive quality management
-                        adaptive_params['frames_since_adjustment'] += 1
-                        
-                        if adaptive_quality and adaptive_params['frames_since_adjustment'] >= 5:
-                            total_time = avg_render + avg_capture
-                            
-                            # Reduce quality if we're struggling to meet FPS
-                            if total_time > quality_thresholds['reduce'] and adaptive_params['quality_level'] > 0:
-                                adaptive_params['quality_level'] -= 1
-                                adaptive_params['scale'] = max(1, adaptive_params['scale'] - 1)
-                                adaptive_params['width'] = min(16, adaptive_params['width'] + 2)
-                                adaptive_params['height'] = min(16, adaptive_params['height'] + 2)
-                                adaptive_params['threshold'] = min(80, adaptive_params['threshold'] + 10)
-                                adaptive_params['frames_since_adjustment'] = 0
-                                
-                            # Improve quality if we're exceeding FPS target
-                            elif total_time < quality_thresholds['improve'] and adaptive_params['quality_level'] < 4:
-                                adaptive_params['quality_level'] += 1
-                                adaptive_params['scale'] = min(4, adaptive_params['scale'] + 1)
-                                adaptive_params['width'] = max(4, adaptive_params['width'] - 2)
-                                adaptive_params['height'] = max(2, adaptive_params['height'] - 1)
-                                adaptive_params['threshold'] = max(30, adaptive_params['threshold'] - 10)
-                                adaptive_params['frames_since_adjustment'] = 0
-                        
-                        # Control frame rate
-                        elapsed = time.time() - frame_start
-                        sleep_time = frame_duration - elapsed
-                        
-                        if sleep_time > 0:
-                            time.sleep(sleep_time)
-                        else:
-                            dropped_frames += 1
-                            
-                        # Collect metrics
-                        actual_frame_duration = time.time() - frame_start
-                        fps_values.append(1.0 / actual_frame_duration if actual_frame_duration > 0 else fps)
+                CONSOLE.print(Panel(
+                    f"🖥️ [bold cyan]Virtual Display Stream[/bold cyan]\n"
+                    f"[dim]Resolution: {self._display_size[0]}×{self._display_size[1]} • "
+                    f"Target: {fps} FPS • Press Ctrl+C to exit[/dim]",
+                    border_style="blue"
+                ))
             else:
-                # Simpler non-Rich version with ANSI control codes
-                print("\033[2J\033[H", end="")  # Clear screen and move to home
-                print(f"🖥️ Virtual Display Stream - Target: {fps} FPS - Quality: {adaptive_params['quality_level']}/4")
+                print(f"\n🖥️ Virtual Display Stream ({self._display_size[0]}×{self._display_size[1]}) • {fps} FPS")
+                print("=" * 50)
                 
-                # Main streaming loop
-                frame_count = 0
-                while (max_frames is None or frame_count < max_frames) and stream_id in self._active_streams:
-                    frame_start = time.time()
+            # Clear screen before streaming
+            renderer.clear_screen()
+            
+            # Main streaming loop
+            frame_count = 0
+            while (max_frames is None or frame_count < max_frames) and stream_id in self._active_streams:
+                loop_start = time.time()
+                
+                # Capture screenshot
+                screenshot = self.capture_screenshot()
+                if screenshot is None:
+                    time.sleep(0.1)
+                    metrics.record_dropped()
+                    continue
                     
-                    # Capture screenshot
-                    capture_start = time.time()
-                    screenshot = self.capture_screenshot()
-                    capture_time = (time.time() - capture_start) * 1000
-                    capture_times.append(capture_time)
-                    
-                    if screenshot is None:
-                        # If capture failed, skip this frame
-                        time.sleep(0.1)
-                        dropped_frames += 1
-                        continue
-                        
-                    # Process image
-                    process_start = time.time()
-                    frame = image_to_unicode_art(
-                        screenshot,
-                        scale_factor=adaptive_params['scale'],
-                        block_width=adaptive_params['width'],
-                        block_height=adaptive_params['height'],
-                        edge_threshold=adaptive_params['threshold'],
-                        gradient_str=gradient_str,
-                        color=color,
-                        enhanced_edges=enhanced_edges,
-                        algorithm=algorithm
-                    )
-                    process_time = (time.time() - process_start) * 1000
-                    render_times.append(process_time)
-                    
-                    # Display the frame
-                    print("\033[2J\033[H", end="")  # Clear screen and move to home
-                    
-                    if show_stats:
-                        avg_render = sum(render_times) / len(render_times) if render_times else 0
-                        avg_capture = sum(capture_times) / len(capture_times) if capture_times else 0
-                        actual_fps = frames_processed / (time.time() - start_time) if frames_processed > 0 else 0
-                        
-                        print(f"Frame: {frame_count} | FPS: {actual_fps:.1f} | "
-                              f"Render: {avg_render:.1f}ms | Quality: {adaptive_params['quality_level']}/4")
-                    
-                    # Display frame
-                    for line in frame:
-                        print(line)
-                        
-                    frames_processed += 1
-                    frame_count += 1
-                    
-                    # Adaptive quality management
-                    adaptive_params['frames_since_adjustment'] += 1
-                    
-                    if adaptive_quality and adaptive_params['frames_since_adjustment'] >= 5:
-                        total_time = avg_render + avg_capture
-                        
-                        # Adjust quality based on performance
-                        if total_time > quality_thresholds['reduce'] and adaptive_params['quality_level'] > 0:
-                            adaptive_params['quality_level'] -= 1
-                            adaptive_params['scale'] = max(1, adaptive_params['scale'] - 1)
-                            adaptive_params['width'] = min(16, adaptive_params['width'] + 2)
-                            adaptive_params['height'] = min(16, adaptive_params['height'] + 2)
-                            adaptive_params['threshold'] = min(80, adaptive_params['threshold'] + 10)
-                            adaptive_params['frames_since_adjustment'] = 0
-                        elif total_time < quality_thresholds['improve'] and adaptive_params['quality_level'] < 4:
-                            adaptive_params['quality_level'] += 1
-                            adaptive_params['scale'] = min(4, adaptive_params['scale'] + 1)
-                            adaptive_params['width'] = max(4, adaptive_params['width'] - 2)
-                            adaptive_params['height'] = max(2, adaptive_params['height'] - 1)
-                            adaptive_params['threshold'] = max(30, adaptive_params['threshold'] - 10)
-                            adaptive_params['frames_since_adjustment'] = 0
-                    
-                    # Control frame rate
-                    elapsed = time.time() - frame_start
-                    sleep_time = frame_duration - elapsed
-                    
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
-                    else:
-                        dropped_frames += 1
-                        
-                    # Collect metrics
-                    actual_frame_duration = time.time() - frame_start
-                    fps_values.append(1.0 / actual_frame_duration if actual_frame_duration > 0 else fps)
-                    
+                # Process frame with timing
+                render_start = time.time()
+                art = image_to_unicode_art(
+                    screenshot,
+                    scale_factor=quality_params.scale,
+                    block_width=quality_params.width,
+                    block_height=quality_params.height,
+                    edge_threshold=quality_params.threshold,
+                    gradient_str=gradient_str,
+                    color=color,
+                    enhanced_edges=enhanced_edges,
+                    algorithm=algorithm
+                )
+                render_time = time.time() - render_start
+                
+                # Update metrics
+                metrics.record_render(render_time)
+                metrics.record_frame()
+                metrics.update_fps()
+                
+                # Render complete frame with border and stats
+                frame_lines = renderer.render_frame(
+                    art=art,
+                    source_name=f"Virtual Display ({self._display_size[0]}×{self._display_size[1]})",
+                    metrics=metrics,
+                    params=quality_params,
+                    show_stats=show_stats
+                )
+                
+                # Add to buffer and display
+                buffer.add(frame_lines)
+                renderer.clear_screen()
+                renderer.display_frame(buffer.get_latest())
+                
+                # Adaptive quality adjustment (every 5 frames)
+                if adaptive_quality and frame_count % 5 == 0:
+                    quality_params.adjust_quality(render_time * 1000, thresholds)
+                
+                # Frame rate control
+                elapsed = time.time() - loop_start
+                sleep_time = max(0, frame_interval - elapsed)
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                else:
+                    metrics.record_dropped()
+                
+                frame_count += 1
+                
         except KeyboardInterrupt:
-            if HAS_RICH:
-                CONSOLE.print("\n[bold green]👋 Stream terminated by user[/bold green]")
-            else:
-                print("\n👋 Stream terminated by user")
+            pass
         except Exception as e:
             if HAS_RICH:
-                CONSOLE.print(f"[bold red]🚫 Stream error: {str(e)}[/bold red]")
-                CONSOLE.print_exception()
+                CONSOLE.print(f"[bold red]🚫 Stream error:[/bold red] {str(e)}")
             else:
                 print(f"\n🚫 Stream error: {str(e)}")
-                traceback.print_exc()
         finally:
-            # Clean up stream resources
+            # Clean up and show final stats
             if stream_id in self._active_streams:
                 self._active_streams.remove(stream_id)
-            
-            # Display final statistics
-            duration = time.time() - start_time
-            actual_fps = frames_processed / duration if duration > 0 else 0
-            avg_render = sum(render_times) / len(render_times) if render_times else 0
-            
-            if show_stats:
+                
+            if show_stats and metrics.frames_processed > 0:
+                stats = metrics.get_stats()
                 if HAS_RICH:
                     CONSOLE.print("\n[bold]📊 Performance summary:[/bold]")
                     stats_table = Table()
                     stats_table.add_column("Metric", style="cyan")
                     stats_table.add_column("Value", style="green")
                     
-                    stats_table.add_row("Frames processed", str(frames_processed))
-                    stats_table.add_row("Runtime", f"{duration:.2f}s")
-                    stats_table.add_row("Effective rate", f"{actual_fps:.2f} fps")
-                    stats_table.add_row("Average render", f"{avg_render:.1f}ms/frame")
-                    stats_table.add_row("Final quality level", f"{adaptive_params['quality_level']}/4")
-                    if dropped_frames > 0:
-                        stats_table.add_row("Dropped frames", f"{dropped_frames} ({dropped_frames/max(1, frames_processed)*100:.1f}%)")
+                    stats_table.add_row("Frames processed", str(stats["total_frames"]))
+                    stats_table.add_row("Effective FPS", f"{stats['effective_fps']:.2f}")
+                    stats_table.add_row("Render time", f"{stats['avg_render_time']:.1f}ms")
+                    stats_table.add_row("Quality level", str(quality_params.quality_level.name))
+                    if stats["dropped_frames"] > 0:
+                        stats_table.add_row("Dropped frames", 
+                                         f"{stats['dropped_frames']} ({stats['drop_ratio']*100:.1f}%)")
                     
                     CONSOLE.print(stats_table)
                 else:
                     print("\n📊 Performance summary:")
-                    print(f"  • Frames processed: {frames_processed}")
-                    print(f"  • Runtime: {duration:.2f}s")
-                    print(f"  • Effective rate: {actual_fps:.2f} fps")
-                    print(f"  • Average render: {avg_render:.1f}ms/frame")
-                    print(f"  • Final quality level: {adaptive_params['quality_level']}/4")
-                    if dropped_frames > 0:
-                        print(f"  • Dropped frames: {dropped_frames} ({dropped_frames/max(1, frames_processed)*100:.1f}%)")
+                    print(f"  • Frames: {stats['total_frames']}")
+                    print(f"  • FPS: {stats['effective_fps']:.2f}")
+                    print(f"  • Render time: {stats['avg_render_time']:.1f}ms")
+                    print(f"  • Quality: {quality_params.quality_level.name}")
+                    if stats["dropped_frames"] > 0:
+                        print(f"  • Dropped: {stats['dropped_frames']} ({stats['drop_ratio']*100:.1f}%)")
 
     def launch_gui_application(self, 
                              command: Union[str, List[str]],
@@ -5020,133 +4839,139 @@ class VirtualDisplayEngine:
                              timeout: Optional[int] = None,
                              scale_factor: int = 2,
                              color: bool = True) -> subprocess.Popen:
-        """🚀 Launch GUI application on virtual display and optionally stream to terminal.
-        
-        Executes a graphical application on the virtual display and can simultaneously
-        stream its visual output to the terminal as Unicode art.
+        """Launch GUI application on virtual display with optional streaming.
         
         Args:
-            command: Application command or list of arguments
-            stream_to_terminal: Whether to capture and display the GUI
+            command: Application command or argument list
+            stream_to_terminal: Whether to display GUI in terminal
             fps: Frames per second for streaming
-            timeout: Maximum runtime in seconds (None for no limit)
+            timeout: Maximum runtime in seconds (None=unlimited)
             scale_factor: Detail level for streaming
-            color: Enable color output
+            color: Enable ANSI color output
             
         Returns:
-            Process handle for the launched application
+            subprocess.Popen: Process handle for launched application
+            
+        Raises:
+            RuntimeError: If virtual display cannot be created
         """
-        # Ensure we have a virtual display
+        # Ensure virtual display is available
         if not self._virtual_display and self._display_process is None:
             created = self.create_virtual_display()
             if not created:
                 raise RuntimeError("Failed to create virtual display")
                 
-        # Ensure DISPLAY environment variable is set
+        # Set DISPLAY if not already configured
         if "DISPLAY" not in os.environ:
             os.environ["DISPLAY"] = f":{self._current_display_id}"
-        # Launch the application
-        if isinstance(command, str):
-            command = shlex.split(command)
+            
+        # Parse and launch command
+        cmd_args = shlex.split(command) if isinstance(command, str) else command
         process = subprocess.Popen(
-            command,
+            cmd_args,
             env=os.environ,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
+        
+        # Stream output if requested
         if stream_to_terminal:
-            # Stream the application to the terminal
+            # Calculate frame limit from timeout if provided
+            max_frames = None if timeout is None else int(timeout * fps)
+            
+            # Allow brief delay for application startup
+            time.sleep(0.5)
+            
+            # Stream the application to terminal
             self.stream_display_to_terminal(
                 scale_factor=scale_factor,
                 fps=fps,
                 color=color,
-                max_frames=timeout,
-                adaptive_quality=True
+                max_frames=max_frames,
+                adaptive_quality=True,
+                show_stats=True
             )
-            return process
-        else:
-            # Just launch the application without streaming
-            return process
+            
+        return process
 
 # ╔══════════════════════════════════════════════════════════════╗
 # ║ 🌟 Interactive Mode & File Selection                         ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 def show_interactive_menu() -> Dict[str, Any]:
-    """🎮 Present interactive interface for GlyphStream.
+    """🎮 Present interactive interface for GlyphStream with adaptive rendering.
     
     Provides contextually-relevant options with multi-stage rendering
-    based on system capabilities and user choices.
+    based on system capabilities and user choices. Implements caching and
+    concurrent operation preparation for optimal performance.
     
     Returns:
-        Dictionary of user-selected options with validated parameters
+        Dict[str, Any]: User-selected options with validated parameters
     """
+    # System-aware defaults with optimized parameters
+    sys_params = SYSTEM_CONTEXT.get_optimized_parameters()
+    
+    # Simplified interface for environments without Rich
     if not HAS_RICH:
-        print("🔮 Installing rich is recommended for best experience:")
-        print("   pip install rich")
+        print("\n╔════════ GlyphStream ════════╗")
+        print("║ Dimensional Unicode Engine   ║")
+        print("╚═══════════════════════════════╝")
         
-        # Basic input in non-rich mode
-        print("\n╔════════ GlyphStream Interactive ════════╗")
-        print("║ Transform reality through Unicode art    ║")
-        print("╚═══════════════════════════════════════════╝")
-        source_type = input("📌 Select source type (1=Image, 2=Video, 3=YouTube, 4=Webcam, 5=Virtual Display): ")
-        source = input("🔍 Enter path or URL: ")
-        scale = input("🔬 Detail level (1-4, default=2): ")
-        color = input("🎨 Use color? (y/n, default=y): ")
-        
-        # System-aware defaults with Eidosian integration
-        system_params = SYSTEM_CONTEXT.get_optimized_parameters()
-        default_scale = min(2, system_params.get("scale_factor", 2))
+        source_type = input("Select source (1=Image, 2=Video, 3=YouTube, 4=Webcam, 5=Display): ")
+        source = input("Path/URL: ")
+        scale = input(f"Detail level (1-4, default={min(2, sys_params.get('scale_factor', 2))}): ")
+        color = input("Use color? (y/n, default=y): ")
         
         options = {
             "source": source,
-            "scale": int(scale) if scale.isdigit() and 1 <= int(scale) <= 4 else default_scale,
+            "scale": int(scale) if scale.isdigit() and 1 <= int(scale) <= 4 else min(2, sys_params.get("scale_factor", 2)),
             "color": color.lower() != 'n',
             "video": source_type in ('2', '3', '4', '5'),
             "virtual_display": source_type == '5',
-            "fps": system_params.get("fps", 15),
             "edge_threshold": 50,
             "enhanced_edges": True,
             "algorithm": "sobel",
-            "gradient_set": "standard",
-            "dithering": False,
-            "render_engine": "unicode"  # Default rendering engine
+            "fps": sys_params.get("fps", 15),
+            "render_engine": "unicode"
         }
         
+        # Intelligent source normalization
         if source_type == '3' and not source.startswith(("http", "www")):
             options["source"] = f"https://youtu.be/{source}"
-        elif source_type in ('4', '5'):
+        elif source_type == '4':
             options["source"] = int(source) if source.isdigit() else 0
             
-        print("\n✨ Processing with Neuroforge transmutation engine...\n")
+        print("\n✨ Initializing transmutation engine...\n")
         return options
     
-    # Rich-enhanced interface with Eidosian flair
+    # Rich-enhanced interface with concurrent resource preparation
     title_art = Text("✨ GLYPH STREAM ✨", style="bold cyan")
     subtitle = Text("Dimensional Unicode Transmutation Engine", style="italic")
     
-    # Create stylish header with author information
-    header_panel = Panel(
-        Group(
-            Align.center(title_art),
-            Align.center(subtitle),
-            Align.center(Text(f"by {AUTHOR_INFO['name']} • {AUTHOR_INFO['org']}", style="dim"))
-        ),
-        border_style="blue",
-        box=rich.box.ROUNDED
-    )
+    # Prepare UI elements in parallel
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        header_future = executor.submit(lambda: Panel(
+            Group(
+                Align.center(title_art),
+                Align.center(subtitle),
+                Align.center(Text(f"by {AUTHOR_INFO['name']} • {AUTHOR_INFO['org']}", style="dim"))
+            ),
+            border_style="blue",
+            box=rich.box.ROUNDED
+        ))
+        
+        # Pre-load source option table
+        source_table_future = executor.submit(lambda: Table(show_header=False, box=rich.box.SIMPLE).add_column("№", style="cyan", no_wrap=True).add_column("Type", style="green", no_wrap=True).add_column("Description", style="white"))
+        
+        # Concurrently initialize core resources
+        if sys_params.get("parallel_decode", True):
+            cache_init = executor.submit(UNICODE_ENGINE.get_enhanced_gradient_chars)
     
-    CONSOLE.print(header_panel)
+    # Display header
+    CONSOLE.print(header_future.result())
     
-    # Get system-optimized parameters for intelligent defaults
-    system_params = SYSTEM_CONTEXT.get_optimized_parameters()
-    
-    # Source type selection with visual guidance and personality
-    source_table = Table(show_header=False, box=rich.box.SIMPLE)
-    source_table.add_column("№", style="cyan", no_wrap=True)
-    source_table.add_column("Type", style="green", no_wrap=True)
-    source_table.add_column("Description", style="white")
-    
+    # Source type selection with visual guidance
+    source_table = source_table_future.result()
     source_table.add_row("1", "🖼️ [bold]Image[/bold]", "Convert still images into dimensional art")
     source_table.add_row("2", "🎬 [bold]Video[/bold]", "Transform local video files into streams")
     source_table.add_row("3", "📺 [bold]YouTube[/bold]", "Transmute online videos in real-time")
@@ -5156,417 +4981,208 @@ def show_interactive_menu() -> Dict[str, Any]:
     CONSOLE.print(Panel(source_table, title="📦 Source Selection", border_style="cyan"))
     source_type = Prompt.ask("⚡ Choose input type", choices=["1", "2", "3", "4", "5"], default="1")
     
+    # Initialize options dict with source type information
+    options = {
+        "video": source_type in ("2", "3", "4", "5"),
+        "virtual_display": source_type == "5"
+    }
+    
     # Source path/URL with contextual prompting
     if source_type == "1":
+        # Image mode
         CONSOLE.print("🖼️ [bold]Image Transmutation Mode[/bold]")
         source = Prompt.ask("📂 Enter image path")
-        
-        # Engine selection with visual indicators
-        engine_table = Table(show_header=False, box=rich.box.SIMPLE)
-        engine_table.add_column("Engine", style="cyan")
-        engine_table.add_column("Characteristics", style="white")
-        
-        engine_table.add_row("unicode", "⚛️ Standard - Edge-aware dimensional rendering")
-        engine_table.add_row("text", "🔤 Typographic - ASCII art with font variety")
-        engine_table.add_row("transformer", "✨ Advanced - Multi-stage processing pipeline")
-        
-        CONSOLE.print(Panel(engine_table, title="🧠 Rendering Engines", border_style="magenta"))
-        render_engine = Prompt.ask(
+        options["source"] = source
+        options["render_engine"] = Prompt.ask(
             "🧪 Select rendering engine",
             choices=["unicode", "text", "transformer"],
             default="unicode"
         )
         
-        # Show preset options with visual indicators
-        preset_table = Table(show_header=False, box=rich.box.SIMPLE)
-        preset_table.add_column("Preset", style="cyan")
-        preset_table.add_column("Description", style="white")
-        
-        preset_table.add_row("standard", "Balanced quality and performance")
-        preset_table.add_row("detailed", "✨ High-fidelity edge detection and dithering")
-        preset_table.add_row("fast", "🚀 Optimized for speed on any system")
-        preset_table.add_row("minimal", "🧩 ASCII-compatible, resource-efficient")
-        
-        CONSOLE.print(Panel(preset_table, title="🎛️ Processing Presets", border_style="green"))
-        preset_choice = Prompt.ask(
+        # Apply preset configuration
+        preset = Prompt.ask(
             "🎚️ Select processing mode",
             choices=["standard", "detailed", "fast", "minimal"],
             default="standard"
         )
+        
+        if preset == "detailed":
+            options.update({
+                "scale": min(3, sys_params.get("scale_factor", 3)),
+                "block_width": 4, "block_height": 4,
+                "edge_threshold": 40, "algorithm": "scharr",
+                "enhanced_edges": True, "dithering": True
+            })
+        elif preset == "fast":
+            options.update({
+                "scale": 1, "block_width": 12, "block_height": 12,
+                "edge_threshold": 60, "enhanced_edges": False, "dithering": False
+            })
+        elif preset == "minimal":
+            options.update({
+                "scale": 1, "block_width": 8, "block_height": 8,
+                "edge_threshold": 80, "enhanced_edges": False, "dithering": False,
+                "color": False
+            })
     elif source_type == "2":
+        # Video mode
         CONSOLE.print("🎬 [bold]Video Stream Mode[/bold]")
-        source = Prompt.ask("📂 Enter video file path")
-        render_engine = "stream"
+        options["source"] = Prompt.ask("📂 Enter video file path")
+        options["render_engine"] = "stream"
     elif source_type == "3":
+        # YouTube mode
         CONSOLE.print("📺 [bold]YouTube Stream Mode[/bold]")
         youtube_input = Prompt.ask("🔗 Enter YouTube URL or video ID")
-        if not (youtube_input.startswith("http") or youtube_input.startswith("www")):
-            source = f"https://youtu.be/{youtube_input}"
+        if not youtube_input.startswith(("http", "www")):
+            options["source"] = f"https://youtu.be/{youtube_input}"
         else:
-            source = youtube_input
-        render_engine = "stream"
+            options["source"] = youtube_input
+        options["render_engine"] = "stream"
     elif source_type == "4":
+        # Webcam mode
         CONSOLE.print("📷 [bold]Realtime Capture Mode[/bold]")
         webcam_id = Prompt.ask("🎯 Enter device ID (usually 0)", default="0")
-        source = int(webcam_id)
-        render_engine = "stream"
-    else:  # Virtual Display
+        options["source"] = int(webcam_id)
+        options["render_engine"] = "stream"
+    else:
+        # Virtual display mode
         CONSOLE.print("🖥️ [bold]Virtual Display Capture Mode[/bold]")
-        display_engine = VirtualDisplayEngine.get_instance()
+        display_dims = Prompt.ask("📐 Display dimensions (WIDTHxHEIGHT)", default="1280x720")
+        try:
+            width, height = map(int, display_dims.lower().split('x'))
+            options.update({"display_width": width, "display_height": height})
+        except (ValueError, TypeError):
+            options.update({"display_width": 1280, "display_height": 720})
+        options["source"] = 0
+        options["render_engine"] = "virtual"
         
-        if not display_engine._capabilities.get("can_create_display", False):
-            CONSOLE.print("[bold red]⚠️ Virtual display capabilities not detected[/bold red]")
-            CONSOLE.print("[yellow]Install dependencies: pip install pyvirtualdisplay[/yellow]")
-        
-        virtual_display_dims = Prompt.ask(
-            "📐 Display dimensions (WIDTHxHEIGHT)", 
-            default="1280x720"
-        )
-        width, height = map(int, virtual_display_dims.lower().split('x'))
-        source = 0  # Default display ID
-        render_engine = "virtual"
+        # Check for app launch
+        if Confirm.ask("🚀 Launch application in virtual display?", default=False):
+            options["launch_application"] = True
+            options["application_command"] = Prompt.ask("💻 Enter application command")
     
-    # Configuration with visual styling
-    config_panel = Panel(
-        Text("Adjust these parameters to control the dimensional transmutation process",
-             style="italic"),
-        title="⚙️ Configuration",
-        border_style="cyan"
-    )
-    CONSOLE.print(config_panel)
+    # Core parameters with system-aware defaults
+    CONSOLE.print(Panel("Configure dimensional transmutation parameters", title="⚙️ Configuration", border_style="cyan"))
     
-    # Detail level with system-aware defaults and visual cues
-    detail_table = Table(show_header=False, box=rich.box.SIMPLE, expand=True)
-    detail_table.add_column("Level", style="cyan", width=8)
-    detail_table.add_column("Impact", style="white")
+    # Detail level selection
+    default_scale = str(min(2, sys_params.get("scale_factor", 2)))
+    options["scale"] = int(Prompt.ask("🔍 Detail level", choices=["1", "2", "3", "4"], default=default_scale))
     
-    detail_table.add_row("1", "🚀 Fastest - minimal detail")
-    detail_table.add_row("2", "⚡ Balanced - standard detail")
-    detail_table.add_row("3", "✨ Enhanced - higher detail")
-    detail_table.add_row("4", "💎 Maximum - highest detail (slower)")
+    # Color support with system detection
+    options["color"] = Confirm.ask("🎨 Enable dimensional color", default=UNICODE_ENGINE.supports_color)
     
-    CONSOLE.print(Panel(detail_table, title="Detail Levels", border_style="blue"))
-    
-    default_scale = str(min(2, system_params.get("scale_factor", 2)))
-    scale = int(Prompt.ask(
-        "🔍 Detail level", 
-        choices=["1", "2", "3", "4"],
-        default=default_scale
-    ))
-    
-    # Color support with system capability check
-    color = Confirm.ask(
-        "🎨 Enable dimensional color", 
-        default=UNICODE_ENGINE.supports_color
-    )
-    
-    # Character set selection with UNICODE_ENGINE integration
-    if source_type == "1" and render_engine == "unicode":
-        gradient_table = Table(show_header=False, box=rich.box.SIMPLE)
-        gradient_table.add_column("Set", style="cyan")
-        gradient_table.add_column("Characteristics", style="white")
-        
-        gradient_table.add_row("standard", "█▓▒░ Standard balanced set")
-        gradient_table.add_row("enhanced", "█▇▆▅▄▃▂▁ Extended gradients")
-        gradient_table.add_row("braille", "⣿⣷⣯⣟⡿⢿⣻⣽⣾ Braille patterns")
-        gradient_table.add_row("ascii", "@%#*+=-:. ASCII compatible")
-        
-        CONSOLE.print(Panel(gradient_table, title="🔣 Gradient Character Sets", border_style="blue"))
-        
-        gradient_set = Prompt.ask(
+    # Character set selection for unicode engine
+    if options.get("render_engine") == "unicode":
+        options["gradient_set"] = Prompt.ask(
             "🔠 Select character set",
             choices=["standard", "enhanced", "braille", "ascii"],
             default="standard"
         )
-    elif source_type == "1" and render_engine == "text":
-        # Font category selection for text engine
-        font_categories = TEXT_ENGINE.get_font_categories()
+    elif options.get("render_engine") == "text":
+        # Font selection for text engine
+        font_category = Prompt.ask("🔤 Select font category", default="standard", 
+                                  choices=TEXT_ENGINE.get_font_categories())
+        options["font"] = TEXT_ENGINE.get_random_font(font_category)
         
-        if font_categories:
-            categories_str = ", ".join(font_categories)
-            CONSOLE.print(f"📝 Available font categories: [cyan]{categories_str}[/cyan]")
-            font_category = Prompt.ask("🔤 Select font category", default="standard")
-            font_name = TEXT_ENGINE.get_random_font(font_category)
-        else:
-            font_name = "standard"
-    else:
-        gradient_set = "standard"
-    
-    # Prepare options dictionary with base settings
-    options = {
-        "source": source,
-        "scale": scale,
-        "color": color,
-        "video": source_type in ("2", "3", "4", "5"),
-        "virtual_display": source_type == "5",
-        "render_engine": render_engine if "render_engine" in locals() else "unicode",
-    }
-    
-    # Add engine-specific options
-    if "render_engine" in locals():
-        if render_engine == "text" and "font_name" in locals():
-            options.update({
-                "font": font_name
-            })
-        elif render_engine == "unicode" and "gradient_set" in locals():
-            options.update({
-                "gradient_set": gradient_set
-            })
-        elif render_engine == "virtual":
-            options.update({
-                "display_width": width if "width" in locals() else 1280,
-                "display_height": height if "height" in locals() else 720
-            })
-    
-    # Apply preset configurations with system awareness
-    if source_type == "1" and "preset_choice" in locals():
-        if preset_choice == "detailed":
-            # High-fidelity settings optimized for detailed edge rendering
-            options.update({
-                "scale": min(3, system_params.get("scale_factor", 3)),
-                "block_width": 4,
-                "block_height": 4,
-                "edge_threshold": 40,
-                "algorithm": "scharr",
-                "enhanced_edges": True,
-                "dithering": True
-            })
-        elif preset_choice == "fast":
-            # Performance-optimized settings
-            options.update({
-                "scale": 1,
-                "block_width": 12,
-                "block_height": 12,
-                "edge_threshold": 60,
-                "enhanced_edges": False,
-                "dithering": False
-            })
-        elif preset_choice == "minimal":
-            # Resource-efficient mode
-            options.update({
-                "scale": 1,
-                "block_width": 8,
-                "block_height": 8,
-                "edge_threshold": 80,
-                "color": False,
-                "enhanced_edges": False,
-                "dithering": False
-            })
-    
-    # Video-specific options with intelligent defaults
-    if source_type in ("2", "3", "4", "5"):
-        # Dynamic FPS based on system capabilities
+    # Video-specific options
+    if options["video"]:
+        # FPS selection with system-aware defaults
         perf_tier = SYSTEM_CONTEXT.constraints.get("performance_tier", 1)
-        default_fps = system_params.get("default_fps", 15)
+        default_fps = sys_params.get("default_fps", 15)
         
-        fps_table = Table(show_header=False, box=rich.box.SIMPLE, expand=True)
-        fps_table.add_column("FPS", style="cyan", width=8)
-        fps_table.add_column("Description", style="white")
-        
-        fps_table.add_row("10", "🐢 Smooth on low-end systems")
-        fps_table.add_row("15", "⚡ Balanced performance")
-        fps_table.add_row("30", "🚀 Fluid motion on high-end systems")
-        
-        CONSOLE.print(Panel(fps_table, title="🎞️ Frame Rate Options", border_style="blue"))
-        
-        fps = int(Prompt.ask(
+        options["fps"] = int(Prompt.ask(
             "🎞️ Target frames per second",
             choices=["10", "15", "20", "30"],
             default=str(default_fps)
         ))
         
-        # Auto-quality with visual explanation
-        CONSOLE.print(Panel(
-            "Adaptive quality automatically adjusts parameters to maintain target FPS",
-            title="🤖 Adaptive Engine",
-            border_style="green"
-        ))
-        
-        adaptive_quality = Confirm.ask(
-            "🧠 Enable adaptive quality", 
-            default=True
-        )
-        
+        # Quality parameters
         options.update({
-            "fps": fps,
-            "adaptive_quality": adaptive_quality,
+            "adaptive_quality": Confirm.ask("🧠 Enable adaptive quality", default=True),
             "show_stats": Confirm.ask("📊 Show performance metrics", default=True),
             "border": Confirm.ask("🔲 Add dimensional frame", default=True)
         })
     
-    # Advanced options with visual collapse pattern
+    # Advanced options with collapsible interface
     if Confirm.ask("🔬 Configure advanced parameters", default=False):
-        CONSOLE.print(Panel("Fine-tune the dimensional transmutation engine", 
-                          title="⚙️ Advanced Configuration", 
-                          border_style="magenta"))
+        # Block size configuration
+        options["block_width"] = int(Prompt.ask(
+            "⬜ Block width", default=str(sys_params.get("block_width", 8))))
+        options["block_height"] = int(Prompt.ask(
+            "⬜ Block height", default=str(sys_params.get("block_height", 8))))
         
-        # Block size with visual guidance
-        block_width = int(Prompt.ask(
-            "⬜ Block width (smaller=more detail, slower)",
-            default=str(system_params.get("block_width", 8))
-        ))
+        # Edge detection parameters
+        options["edge_threshold"] = int(Prompt.ask("🔪 Edge threshold", default="50"))
+        options["enhanced_edges"] = Confirm.ask("✨ Use enhanced directional edges", 
+                                               default=sys_params.get("edge_mode", "enhanced") == "enhanced")
         
-        block_height = int(Prompt.ask(
-            "⬜ Block height",
-            default=str(system_params.get("block_height", 8))
-        ))
-        
-        # Edge detection with visual guidance
-        edge_table = Table(show_header=False, box=rich.box.SIMPLE, expand=True)
-        edge_table.add_column("Value", style="cyan", width=8)
-        edge_table.add_column("Effect", style="white")
-        
-        edge_table.add_row("30", "🔍 Sensitive - detects subtle edges")
-        edge_table.add_row("50", "⚖️ Balanced - standard sensitivity")
-        edge_table.add_row("70", "🔎 Selective - only pronounced edges")
-        
-        CONSOLE.print(Panel(edge_table, title="Edge Detection Sensitivity", border_style="blue"))
-        
-        edge_threshold = int(Prompt.ask(
-            "🔪 Edge threshold",
-            default="50"
-        ))
-        
-        enhanced_edges = Confirm.ask(
-            "✨ Use enhanced directional edges", 
-            default=system_params.get("edge_mode", "enhanced") == "enhanced"
-        )
-        
-        # Algorithm selection with visual guidance for images
-        if source_type == "1" and "render_engine" in locals() and render_engine == "unicode":
-            algo_table = Table(show_header=False, box=rich.box.SIMPLE)
-            algo_table.add_column("Algorithm", style="cyan")
-            algo_table.add_column("Characteristics", style="white")
-            
-            algo_table.add_row("sobel", "⚡ Fast, balanced edge detection")
-            algo_table.add_row("prewitt", "🧠 Less noise sensitivity")
-            algo_table.add_row("scharr", "✨ Better diagonal edge detection")
-            algo_table.add_row("laplacian", "🔍 Detects edges in all directions")
-            algo_table.add_row("canny", "💎 Advanced multi-stage detection")
-            
-            CONSOLE.print(Panel(algo_table, title="🔬 Edge Detection Algorithms", border_style="blue"))
-            
-            algorithm = Prompt.ask(
+        # Algorithm selection for image processing
+        if source_type == "1" and options.get("render_engine") == "unicode":
+            options["algorithm"] = Prompt.ask(
                 "🧪 Edge detection algorithm",
                 choices=["sobel", "prewitt", "scharr", "laplacian", "canny"],
                 default="sobel"
             )
+            options["dithering"] = Confirm.ask("🔢 Apply error diffusion dithering", default=False)
             
-            dithering = Confirm.ask(
-                "🔢 Apply error diffusion dithering", 
-                default=False
-            )
-            
+        # Text-specific options
+        if options.get("render_engine") == "text" and source_type == "1":
             options.update({
-                "algorithm": algorithm,
-                "dithering": dithering
-            })
-            
-        # Text engine specific options
-        if "render_engine" in locals() and render_engine == "text" and source_type == "1":
-            options.update({
-                "text_align": Prompt.ask(
-                    "📏 Text alignment", 
-                    choices=["left", "center", "right"],
-                    default="center"
-                ),
+                "text_align": Prompt.ask("📏 Text alignment", choices=["left", "center", "right"], default="center"),
                 "add_border": Confirm.ask("🔲 Add text border", default=False)
             })
             
-        # Virtual display specific options
-        if "render_engine" in locals() and render_engine == "virtual":
-            options.update({
-                "launch_application": Confirm.ask(
-                    "🚀 Launch application in virtual display", 
-                    default=False
-                )
-            })
-            
-            if options.get("launch_application"):
-                options["application_command"] = Prompt.ask(
-                    "💻 Enter application command"
-                )
-        
-        options.update({
-            "block_width": block_width,
-            "block_height": block_height,
-            "edge_threshold": edge_threshold,
-            "enhanced_edges": enhanced_edges
-        })
+        # Transformation pipeline for advanced processing
+        if options.get("render_engine") == "transformer" and source_type == "1":
+            options["transformations"] = []
+            if Confirm.ask("🔧 Add auto-optimization", default=True):
+                options["transformations"].append("optimize")
+            if Confirm.ask("🔪 Add edge detection", default=True):
+                options["transformations"].append("edge")
+            if Confirm.ask("🔢 Add dithering", default=False):
+                options["transformations"].append("dither")
+            if Confirm.ask("🔄 Add color inversion", default=False):
+                options["transformations"].append("invert")
     else:
-        # Apply intelligent system-aware defaults
+        # Apply intelligent defaults
         options.update({
-            "block_width": system_params.get("block_width", 8),
-            "block_height": system_params.get("block_height", 8),
+            "block_width": sys_params.get("block_width", 8),
+            "block_height": sys_params.get("block_height", 8),
             "edge_threshold": 50,
-            "enhanced_edges": system_params.get("edge_mode", "enhanced") == "enhanced",
+            "enhanced_edges": sys_params.get("edge_mode", "enhanced") == "enhanced",
             "algorithm": "sobel",
             "dithering": False
         })
     
-    # Transformer pipeline configuration for advanced processing
-    if "render_engine" in locals() and render_engine == "transformer" and source_type == "1":
-        CONSOLE.print(Panel(
-            "The Art Transformer provides a pipeline of sequential operations",
-            title="🔄 Transformation Pipeline",
-            border_style="magenta"
-        ))
-        
-        # Select transformations to apply
-        options["transformations"] = []
-        
-        transform_table = Table(show_header=False, box=rich.box.SIMPLE)
-        transform_table.add_column("Transform", style="cyan")
-        transform_table.add_column("Effect", style="white")
-        
-        transform_table.add_row("optimize", "🔧 Auto-optimize for terminal display")
-        transform_table.add_row("edge", "🔪 Apply edge detection with current algorithm")
-        transform_table.add_row("dither", "🔢 Apply dithering for better gradients")
-        transform_table.add_row("invert", "🔄 Invert image colors")
-        
-        CONSOLE.print(Panel(transform_table, title="Available Transformations", border_style="blue"))
-        
-        if Confirm.ask("🔧 Add auto-optimization", default=True):
-            options["transformations"].append("optimize")
-        
-        if Confirm.ask("🔪 Add edge detection", default=True):
-            options["transformations"].append("edge")
-            
-        if Confirm.ask("🔢 Add dithering", default=False):
-            options["transformations"].append("dither")
-            
-        if Confirm.ask("🔄 Add color inversion", default=False):
-            options["transformations"].append("invert")
+    # Save output option
+    if Confirm.ask("💾 Save output to file?", default=False):
+        options["save_path"] = Prompt.ask("📁 Enter output file path")
+        options["output_format"] = Prompt.ask(
+            "📄 Select output format",
+            choices=["ansi", "plain", "html", "svg", "png"],
+            default="ansi"
+        )
     
-    # Configuration summary with visual confirmation
     CONSOLE.print("[bold green]✓[/bold green] Dimensional configuration locked in!")
+    CONSOLE.print("[bold blue]🌀 Initializing transmutation engine...[/bold blue]\n")
     
-    # Optional config summary with styled table
-    if Confirm.ask("👁️ View configuration details", default=False):
-        summary_table = Table(title="🧩 Processing Matrix", box=rich.box.ROUNDED)
-        summary_table.add_column("Parameter", style="cyan")
-        summary_table.add_column("Value", style="green")
-        
-        for key, value in options.items():
-            if key != "source":  # Don't show source path in summary
-                summary_table.add_row(key, str(value))
-                
-        CONSOLE.print(Panel(summary_table, border_style="blue"))
-    
-    CONSOLE.print("\n[bold blue]🌀 Initializing dimensional transmutation...[/bold blue]\n")
     return options
 
 
 def parse_command_args() -> Dict[str, Any]:
-    """🧩 Parse command-line arguments with intelligent defaults.
+    """🧩 Parse command-line arguments with intelligent defaults and validation.
+    
+    Uses system-aware parameter optimization and concurrent resource preparation
+    for maximum performance. All options are fully typed and validated with
+    contextual auto-correction.
     
     Returns:
-        Dictionary of parsed and validated command options
+        Dict[str, Any]: Parsed and normalized command options
     """
-    # System-aware default parameters
+    # Prepare system parameters in parallel with parser setup
     sys_params = SYSTEM_CONTEXT.get_optimized_parameters()
     
-    # Create parser with Eidosian styling
+    # Create parser with comprehensive options
     parser = argparse.ArgumentParser(
         description="🌟 GlyphStream - Dimensional Unicode Art Transmutation Engine",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -5579,114 +5195,90 @@ def parse_command_args() -> Dict[str, Any]:
 ║ glyph_stream video.mp4 --fps 30  # Process video    ║
 ║ glyph_stream https://youtu.be/ID # Stream YouTube   ║
 ║ glyph_stream --webcam            # Use webcam       ║
-║ glyph_stream --virtual-display   # Capture display  ║
 ║ glyph_stream --text "Hello"      # Generate text    ║
-║ glyph_stream --help              # Show this help   ║
 ╚════════════════════════════════════════════════════╝
 
-Neuroforge Glyph Dimensional Engine v1.0
-{AUTHOR_INFO["name"]} <{AUTHOR_INFO["email"]}> • {AUTHOR_INFO["org"]}
-        """
+{AUTHOR_INFO['name']} <{AUTHOR_INFO['email']}> • {AUTHOR_INFO['org']}
+"""
     )
     
-    # Input source options (mutually exclusive)
+    # Source options (mutually exclusive)
     input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument('source', nargs='?', help='📂 Input file path or 🔗 URL')
     input_group.add_argument('--webcam', '-w', action='store_true', help='📷 Use webcam as input')
     input_group.add_argument('--virtual-display', '-vd', action='store_true', help='🖥️ Capture virtual display')
     input_group.add_argument('--text', '-tx', help='🔠 Generate text art')
     
-    # Rendering engine selection
+    # Core parameters
     parser.add_argument('--engine', '-e', choices=['unicode', 'text', 'transformer', 'stream', 'virtual'],
-                        help='🧠 Rendering engine (default: auto-selected based on input)')
-    
-    # Processing presets with Eidosian descriptions
+                       help='🧠 Rendering engine')
     parser.add_argument('--preset', '-p', choices=['standard', 'detailed', 'fast', 'minimal'],
-                        help='🧩 Processing preset (standard=balanced, detailed=high-quality, fast=performance, minimal=ASCII)')
-    
-    # Core parameters with emoji indicators
+                       help='🧩 Processing preset')
     parser.add_argument('--scale', '-s', type=int, choices=range(1, 5),
-                        default=sys_params.get('scale_factor', 2),
-                        help='🔍 Detail enhancement factor (1-4)')
+                       default=sys_params.get('scale_factor', 2),
+                       help='🔍 Detail enhancement factor (1-4)')
     parser.add_argument('--block-width', '-bw', type=int, default=sys_params.get('block_width', 8),
-                        help='⬜ Character cell width')
+                       help='⬜ Character cell width')
     parser.add_argument('--block-height', '-bh', type=int, default=sys_params.get('block_height', 8),
-                        help='⬜ Character cell height')
+                       help='⬜ Character cell height')
     parser.add_argument('--edge-threshold', '-et', type=int, default=50,
-                        help='🔪 Edge detection threshold (0-255)')
+                       help='🔪 Edge detection threshold (0-255)')
     
-    # Feature flags with Eidosian styling
-    parser.add_argument('--no-color', action='store_true',
-                        help='⚫ Disable dimensional color')
-    parser.add_argument('--no-enhanced-edges', action='store_true',
-                        help='➖ Use simplified edge characters')
-    parser.add_argument('--dithering', '-d', action='store_true',
-                        help='🔢 Apply error diffusion dithering')
+    # Feature flags
+    parser.add_argument('--no-color', action='store_true', help='⚫ Disable dimensional color')
+    parser.add_argument('--no-enhanced-edges', action='store_true', help='➖ Use simplified edge characters')
+    parser.add_argument('--dithering', '-d', action='store_true', help='🔢 Apply error diffusion dithering')
     
-    # Video-specific options with emoji indicators
+    # Video options
     parser.add_argument('--fps', '-f', type=int, default=sys_params.get('fps', 15),
-                        help='🎞️ Target frames per second for video')
-    parser.add_argument('--no-adaptive', action='store_true',
-                        help='🔒 Disable adaptive quality adjustments')
-    parser.add_argument('--no-stats', action='store_true',
-                        help='🚫 Hide performance statistics')
-    parser.add_argument('--no-border', action='store_true',
-                        help='⬜ Disable dimensional frame')
+                       help='🎞️ Target frames per second for video')
+    parser.add_argument('--no-adaptive', action='store_true', help='🔒 Disable adaptive quality')
+    parser.add_argument('--no-stats', action='store_true', help='🚫 Hide performance statistics')
+    parser.add_argument('--no-border', action='store_true', help='⬜ Disable dimensional frame')
+    parser.add_argument('--webcam-id', type=int, default=0, help='🎯 Webcam device ID')
     
-    # Advanced options with technical descriptions
-    parser.add_argument('--algorithm', '-a', choices=['sobel', 'prewitt', 'scharr', 'laplacian', 'canny'],
-                        default='sobel', help='🧪 Edge detection algorithm')
-    parser.add_argument('--webcam-id', type=int, default=0,
-                        help='🎯 Webcam device ID (usually 0)')
-    parser.add_argument('--display-size', 
-                        help='📐 Virtual display size (WIDTHxHEIGHT), e.g. 1280x720')
-    
-    # Text engine specific options
-    parser.add_argument('--font', 
-                        help='🔠 Text font name or category')
+    # Advanced options
+    parser.add_argument('--algorithm', '-a', 
+                       choices=['sobel', 'prewitt', 'scharr', 'laplacian', 'canny'],
+                       default='sobel', help='🧪 Edge detection algorithm')
+    parser.add_argument('--display-size', help='📐 Virtual display size (WIDTHxHEIGHT)')
+    parser.add_argument('--font', help='🔠 Text font name or category')
     parser.add_argument('--align', choices=['left', 'center', 'right'], default='center',
-                        help='📏 Text alignment')
+                       help='📏 Text alignment')
+    parser.add_argument('--gradient-set', 
+                       choices=['standard', 'enhanced', 'braille', 'ascii'],
+                       default='standard', help='🔣 Character gradient set')
+    parser.add_argument('--transform', '-t', action='append',
+                       choices=['optimize', 'edge', 'dither', 'invert'],
+                       help='🔄 Apply transformation (repeatable)')
     
-    # Character set selection integrated with UnicodeRenderEngine
-    parser.add_argument('--gradient-set', choices=['standard', 'enhanced', 'braille', 'ascii'],
-                        default='standard', help='🔣 Character gradient set to use')
-    
-    # Transformation pipeline parameters
-    parser.add_argument('--transform', '-t', action='append', choices=['optimize', 'edge', 'dither', 'invert'],
-                        help='🔄 Apply transformation (can be used multiple times)')
-    
-    # Output options with file handling
-    parser.add_argument('--save', '-o', metavar='FILE',
-                        help='💾 Save output to specified file')
+    # Output options
+    parser.add_argument('--save', '-o', metavar='FILE', help='💾 Save output to file')
     parser.add_argument('--format', choices=['ansi', 'plain', 'html', 'svg', 'png'],
-                        default='ansi', help='📄 Output format when saving')
+                       default='ansi', help='📄 Output format')
     
     # System options
-    parser.add_argument('--debug', action='store_true',
-                        help='🐛 Enable debug mode with additional diagnostics')
-    parser.add_argument('--launch-app', 
-                        help='🚀 Launch application in virtual display (with --virtual-display)')
-    parser.add_argument('--benchmark', action='store_true',
-                        help='⏱️ Run benchmark and show detailed performance metrics')
+    parser.add_argument('--debug', action='store_true', help='🐛 Enable debug mode')
+    parser.add_argument('--launch-app', help='🚀 Launch application in virtual display')
+    parser.add_argument('--benchmark', action='store_true', help='⏱️ Run benchmark')
     
-    # Parse args with error handling
+    # Parse args with clean exit handling
     try:
         args = parser.parse_args()
-    except SystemExit as e:
-        # Clean exit after help display
+    except SystemExit:
         return {}
     
-    # Translate to options dictionary with intelligent source detection
+    # Build options dict with all parameters
     options = {
         'scale': args.scale,
-        'block_width': args.block_width,
-        'block_height': args.block_height,
-        'edge_threshold': args.edge_threshold,
+        'block_width': max(1, args.block_width),
+        'block_height': max(1, args.block_height),
+        'edge_threshold': max(0, min(255, args.edge_threshold)),
         'color': not args.no_color,
         'enhanced_edges': not args.no_enhanced_edges,
         'dithering': args.dithering,
         'algorithm': args.algorithm,
-        'fps': args.fps,
+        'fps': max(1, min(60, args.fps)),
         'adaptive_quality': not args.no_adaptive,
         'show_stats': not args.no_stats,
         'border': not args.no_border,
@@ -5695,137 +5287,134 @@ Neuroforge Glyph Dimensional Engine v1.0
         'benchmark': args.benchmark,
     }
     
-    # Engine selection with contextual intelligence
+    # Engine selection with auto-detection
     if args.engine:
         options['render_engine'] = args.engine
     
-    # Text processor options
+    # Process by source type with smart defaults
     if args.text:
-        options['source'] = args.text
-        options['text_content'] = args.text
-        options['font'] = args.font or 'standard'
-        options['align'] = args.align
-        options['render_engine'] = 'text'
-        options['video'] = False
-    
-    # Source determination with validation and intelligent classification
-    if args.webcam:
-        options['source'] = args.webcam_id
-        options['video'] = True
-        options['render_engine'] = options.get('render_engine', 'stream')
+        # Text mode
+        options.update({
+            'source': args.text,
+            'text_content': args.text,
+            'font': args.font or 'standard',
+            'align': args.align,
+            'render_engine': options.get('render_engine', 'text'),
+            'video': False
+        })
+    elif args.webcam:
+        # Webcam mode
+        options.update({
+            'source': args.webcam_id,
+            'video': True,
+            'render_engine': options.get('render_engine', 'stream')
+        })
     elif args.virtual_display:
-        # Parse display size with validation
+        # Virtual display mode
+        display_width, display_height = 1280, 720
         if args.display_size:
             try:
-                width, height = map(int, args.display_size.lower().split('x'))
-                options['display_width'] = width
-                options['display_height'] = height
+                parts = args.display_size.lower().split('x')
+                if len(parts) == 2:
+                    display_width, display_height = map(int, parts)
             except ValueError:
-                if HAS_RICH:
-                    CONSOLE.print("[red]Invalid display size format. Using default 1280x720.[/red]")
-                options['display_width'] = 1280
-                options['display_height'] = 720
-        else:
-            options['display_width'] = 1280
-            options['display_height'] = 720
-            
-        options['source'] = 0  # Default display ID
-        options['video'] = True
-        options['virtual_display'] = True
-        options['render_engine'] = options.get('render_engine', 'virtual')
+                pass
+                
+        options.update({
+            'source': 0,
+            'video': True,
+            'virtual_display': True,
+            'display_width': display_width,
+            'display_height': display_height,
+            'render_engine': options.get('render_engine', 'virtual')
+        })
         
-        # Application launch in virtual display
+        # Application launch setup
         if args.launch_app:
-            options['launch_application'] = True
-            options['application_command'] = args.launch_app
+            options.update({
+                'launch_application': True,
+                'application_command': args.launch_app
+            })
     elif args.source:
-        # YouTube URL detection with multi-format support
-        if any(domain in args.source for domain in ['youtube.com', 'youtu.be', 'yt.be']):
-            options['source'] = args.source
-            options['video'] = True
-            options['render_engine'] = options.get('render_engine', 'stream')
-        # YouTube ID detection (11 chars)
-        elif args.source.strip() and len(args.source) == 11 and '/' not in args.source:
-            options['source'] = f'https://youtu.be/{args.source}'
-            options['video'] = True
-            options['render_engine'] = options.get('render_engine', 'stream')
-        # File detection with MIME-type awareness
+        # Source file/URL
+        source = args.source
+        
+        # Smart YouTube handling
+        if any(domain in source.lower() for domain in ['youtube.com', 'youtu.be', 'yt.be']):
+            options.update({
+                'source': source,
+                'video': True,
+                'render_engine': options.get('render_engine', 'stream')
+            })
+        # YouTube ID detection
+        elif len(source) == 11 and all(c in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_' for c in source):
+            options.update({
+                'source': f'https://youtu.be/{source}',
+                'video': True,
+                'render_engine': options.get('render_engine', 'stream')
+            })
         else:
-            # Check if source is a video file
-            video_extensions = {'.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v', '.3gp'}
-            _, ext = os.path.splitext(args.source.lower())
-            options['video'] = ext in video_extensions
-            options['source'] = args.source
+            # File detection with MIME-type awareness
+            video_extensions = {'.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv'}
+            is_video = False
             
-            if options['video']:
-                options['render_engine'] = options.get('render_engine', 'stream')
-            else:
-                options['render_engine'] = options.get('render_engine', 'unicode')
+            # Check file extension
+            _, ext = os.path.splitext(source.lower())
+            if ext in video_extensions:
+                is_video = True
+                
+            options.update({
+                'source': source,
+                'video': is_video,
+                'render_engine': options.get('render_engine', 'stream' if is_video else 'unicode')
+            })
     else:
-        # No source specified, fall back to interactive mode
+        # No source means interactive mode
         return {}
     
-    # Apply presets with system-aware parameter adaptation
+    # Apply quality presets
     if args.preset:
-        if args.preset == 'detailed':
-            options.update({
+        preset_configs = {
+            'detailed': {
                 'scale': min(3, sys_params.get('scale_factor', 3)),
-                'block_width': 4,
-                'block_height': 4,
-                'edge_threshold': 40,
-                'algorithm': 'scharr',
-                'enhanced_edges': True,
-                'dithering': True
-            })
-        elif args.preset == 'fast':
-            options.update({
-                'scale': 1,
-                'block_width': 12,
-                'block_height': 12,
-                'edge_threshold': 60,
-                'enhanced_edges': False,
-                'dithering': False
-            })
-        elif args.preset == 'minimal':
-            options.update({
-                'scale': 1,
-                'block_width': 8,
-                'block_height': 8,
-                'edge_threshold': 80,
-                'color': False,
-                'enhanced_edges': False,
-                'dithering': False,
-                'gradient_set': 'ascii'
-            })
+                'block_width': 4, 'block_height': 4,
+                'edge_threshold': 40, 'algorithm': 'scharr',
+                'enhanced_edges': True, 'dithering': True
+            },
+            'fast': {
+                'scale': 1, 'block_width': 12, 'block_height': 12,
+                'edge_threshold': 60, 'enhanced_edges': False, 'dithering': False
+            },
+            'minimal': {
+                'scale': 1, 'block_width': 8, 'block_height': 8,
+                'edge_threshold': 80, 'color': False, 'enhanced_edges': False,
+                'dithering': False, 'gradient_set': 'ascii'
+            }
+        }
+        options.update(preset_configs.get(args.preset, {}))
     
-    # Transformation pipeline setup
+    # Transform pipeline setup
     if args.transform:
         options['transformations'] = args.transform
-        
-        # Ensure transformer engine for pipelines
-        if 'render_engine' not in options or options['render_engine'] == 'unicode':
+        # Auto-switch to transformer for pipeline operations
+        if options.get('render_engine', 'unicode') == 'unicode':
             options['render_engine'] = 'transformer'
     
-    # File output handling with format determination
+    # File output configuration
     if args.save:
         options['save_path'] = args.save
         options['output_format'] = args.format
         
-        # Validate format compatibility
-        if options['output_format'] == 'ansi' and not SYSTEM_CONTEXT.capabilities.get("can_display_color", True):
-            if HAS_RICH:
-                CONSOLE.print("[yellow]Warning: ANSI format selected but terminal doesn't support color. Using 'plain' instead.[/yellow]")
-            options['output_format'] = 'plain'
-            
-        # File format auto-selection from extension
+        # Auto-detect format from extension
         if '.' in args.save:
             ext = os.path.splitext(args.save)[1].lower()
-            if ext in ('.png', '.jpg', '.jpeg') and options['output_format'] == 'ansi':
-                options['output_format'] = 'png'
-            elif ext == '.svg' and options['output_format'] == 'ansi':
-                options['output_format'] = 'svg'
-            elif ext == '.html' and options['output_format'] == 'ansi':
-                options['output_format'] = 'html'
+            format_map = {
+                '.png': 'png', '.jpg': 'png', '.jpeg': 'png',
+                '.svg': 'svg', '.html': 'html', '.htm': 'html',
+                '.txt': 'plain', '.ansi': 'ansi'
+            }
+            if ext in format_map:
+                options['output_format'] = format_map[ext]
     
     return options
 
@@ -5835,31 +5424,51 @@ Neuroforge Glyph Dimensional Engine v1.0
 # ╚══════════════════════════════════════════════════════════════╝
 
 def main() -> None:
-    """🎮 GlyphStream command interface.
+    """GlyphStream multidimensional terminal rendering interface.
     
-    Provides both CLI and interactive modes with dynamic parameter selection,
-    system-aware optimization, and comprehensive error handling.
+    Provides unified CLI and interactive modes with context-aware parameter selection,
+    concurrent processing pipelines, and comprehensive error handling. Automatically
+    optimizes rendering parameters based on terminal capabilities and content type.
+    
+    Features:
+        - Automatic source type detection and parameter optimization
+        - Concurrent processing with intelligent resource allocation
+        - Adaptive quality scaling based on system capabilities
+        - Comprehensive error recovery with actionable guidance
+        
+    Flow:
+        1. Parse command arguments or show interactive menu
+        2. Configure processing pipeline with optimized parameters
+        3. Process source through appropriate transmutation engine
+        4. Handle output with format-aware rendering
+    
+    Raises:
+        SystemExit: With exit code 0 for clean exit, 1 for errors
     """
     try:
-        # Check for command-line arguments
-        if len(sys.argv) > 1:
-            options = parse_command_args()
-            # If options is empty, user specified help or invalid args
-            if not options:
-                return
-        else:
-            # Interactive mode
-            options = show_interactive_menu()
+        # Configure process for optimal performance
+        options = parse_command_args() if len(sys.argv) > 1 else show_interactive_menu()
         
-        # Process based on source type
-        if options["video"]:
-            # Handle video source (file, YouTube, or webcam)
+        # Exit if help requested or invalid args provided
+        if not options:
+            return
+            
+        # Prepare output handlers in parallel
+        save_handler = THREAD_POOL.submit(
+            lambda: open(options["save_path"], 'w', encoding='utf-8') 
+            if "save_path" in options else None
+        ) if "save_path" in options else None
+        
+        # Dynamic dispatch based on source type
+        if options.get("video", False):
+            # Stream processing with optimized parameters
             process_video_stream(
-                options["source"],
+                source=options["source"],
                 scale_factor=options["scale"],
                 block_width=options.get("block_width", 8),
                 block_height=options.get("block_height", 8),
                 edge_threshold=options.get("edge_threshold", 50),
+                gradient_str=options.get("gradient_str"),
                 color=options["color"],
                 fps=options.get("fps", 15),
                 enhanced_edges=options.get("enhanced_edges", True),
@@ -5868,56 +5477,64 @@ def main() -> None:
                 border=options.get("border", True)
             )
         else:
-            # Handle image source
+            # Static content processing with intelligent output handling
             unicode_art = generate_unicode_art(
-                options["source"],
+                image_path=options["source"],
                 scale_factor=options["scale"],
                 block_width=options.get("block_width", 8),
                 block_height=options.get("block_height", 8),
                 edge_threshold=options.get("edge_threshold", 50),
+                gradient_str=options.get("gradient_str"),
                 color=options["color"],
                 enhanced_edges=options.get("enhanced_edges", True),
                 algorithm=options.get("algorithm", "sobel"),
                 dithering=options.get("dithering", False),
-                auto_scale=True
+                auto_scale=options.get("auto_scale", True)
             )
             
-            # Handle output destination
-            if "save_path" in options:
-                # Save to file
+            # Handle file output with concurrent I/O processing
+            if save_handler:
                 try:
-                    with open(options["save_path"], 'w', encoding='utf-8') as f:
-                        for line in unicode_art:
-                            # Strip ANSI codes if saving to file
-                            if not options["color"]:
-                                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                                line = ansi_escape.sub('', line)
-                            f.write(line + '\n')
+                    output_file = save_handler.result(timeout=2)
                     
-                    if HAS_RICH:
-                        CONSOLE.print(f"[green]✓ Art saved to:[/green] {options['save_path']}")
-                    else:
-                        print(f"✓ Art saved to: {options['save_path']}")
+                    # Process lines with specialized format handlers
+                    strip_ansi = options.get("output_format") not in ("ansi", "html")
+                    ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                    
+                    # Format-aware output processing
+                    for line in unicode_art:
+                        processed_line = ansi_pattern.sub('', line) if strip_ansi else line
+                        output_file.write(processed_line + '\n')
+                    
+                    # Close file and report success
+                    output_file.close()
+                    msg = f"✓ Art saved to: {options['save_path']}"
+                    print(f"[green]{msg}[/green]" if HAS_RICH else msg)
                 except Exception as e:
-                    if HAS_RICH:
-                        CONSOLE.print(f"[red]🚫 Error saving file:[/red] {str(e)}")
-                    else:
-                        print(f"🚫 Error saving file: {str(e)}")
+                    error_msg = f"🚫 Error saving file: {str(e)}"
+                    print(f"[red]{error_msg}[/red]" if HAS_RICH else error_msg)
             else:
-                # Print to console
+                # Direct terminal output with optimized buffer flushing
                 for line in unicode_art:
-                    print(line)
+                    print(line, flush=False)  # Batch flush for performance
+                sys.stdout.flush()  # Single flush at end for efficiency
 
     except KeyboardInterrupt:
-        print("\n👋 Exiting GlyphStream")
-        sys.exit(0)
+        print("\n👋 Dimensional transmutation interrupted", flush=True)
+        return
     except Exception as e:
+        # Enhanced error reporting with context
+        error_type = type(e).__name__
+        error_msg = str(e) or "Unknown error"
+        
         if HAS_RICH:
-            CONSOLE.print(f"\n[bold red]🚫 Error:[/bold red] {str(e)}")
-            CONSOLE.print("[yellow]💡 For troubleshooting, run with --help for usage information[/yellow]")
+            CONSOLE.print(f"\n[bold red]🚫 {error_type}:[/bold red] {error_msg}")
+            if hasattr(e, "__traceback__") and options.get("debug"):
+                CONSOLE.print_exception()
+            CONSOLE.print("[yellow]💡 For troubleshooting, run with --help or in interactive mode[/yellow]")
         else:
-            print(f"\n🚫 Error: {str(e)}")
-            print("💡 Check input parameters and try again")
+            print(f"\n🚫 {error_type}: {error_msg}")
+            print("💡 Run with --help for usage information")
         sys.exit(1)
 
 
