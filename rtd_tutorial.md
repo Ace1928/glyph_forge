@@ -261,7 +261,7 @@ Setting stable as the default
 
 To set stable as the default version, rather than latest, so that users see the stable documentation when they visit the root URL of your documentation:
 
-    In the the ⚙ Admin menu of your project home, go to the Settings link, choose stable in the “Default version*” dropdown, and hit Save at the bottom.
+    In the ⚙ Admin menu of your project home, go to the Settings link, choose stable in the “Default version*” dropdown, and hit Save at the bottom.
 
 Modifying versions
 
