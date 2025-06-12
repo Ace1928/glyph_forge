@@ -23,7 +23,7 @@ from typing import TypedDict, Final, Literal
 from pathlib import Path
 from functools import lru_cache
 
-from .services import image_to_glyph
+from .services import image_to_glyph, text_to_banner, video_to_glyph_frames
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 📊 Version and identity - The essence of our being
@@ -198,7 +198,7 @@ try:
     from .utils import setup_logger, configure, measure_performance, detect_capabilities
 
     # Integration services for common workflows
-    from .services import text_to_banner, video_to_Glyph_frames
+    from .services import text_to_banner, video_to_glyph_frames
 except ImportError as e:
     # Handle partial installations with grace - no component left behind
     logger.warning(f"Module initialization incomplete: {e}")
@@ -221,7 +221,7 @@ except ImportError as e:
     def detect_capabilities() -> Dict[str, Any]: return {}
     def image_to_glyph(*args: Any, **kwargs: Any) -> str: return ""
     def text_to_banner(*args: Any, **kwargs: Any) -> str: return ""
-    def video_to_Glyph_frames(*args: Any, **kwargs: Any) -> List[str]: return []
+    def video_to_glyph_frames(*args: Any, **kwargs: Any) -> List[str]: return []
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔧 Core functions - Essential operational capabilities
@@ -381,7 +381,7 @@ __all__: List[str] = [
     "setup_logger", "configure", "measure_performance", "detect_capabilities",
     
     # Services
-    "image_to_glyph", "text_to_banner", "video_to_Glyph_frames",
+    "image_to_glyph", "text_to_banner", "video_to_glyph_frames",
     
     # Type definitions
     "TransformerMap", "RenderOptions", "GlyphMatrix", "Renderer", "Transformer",

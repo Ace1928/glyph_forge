@@ -55,7 +55,7 @@ def run_verification() -> Tuple[bool, Dict[str, List[str]]]:
     
     # Verify specific Glyph Forge modules are importable
     forge_modules = [
-        "glyph_forge.services.image_to_Glyph",
+        "glyph_forge.services.image_to_glyph",
         "glyph_forge.utils.alphabet_manager",
     ]
     for module in forge_modules:

@@ -82,6 +82,7 @@ class BannerGeneratorScreen(Screen):
         elif button_id == "btn_back":
             self.app.pop_screen()
 
+
 class ImageConverterScreen(Screen):
     """Image conversion screen with zero-compromise functionality."""
     

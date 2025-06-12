@@ -43,17 +43,19 @@ pip install -e ".[docs]"   # Documentation system
 
 ```python
 from glyph_forge import image_to_glyph
+from glyph_forge.api import get_api
 
 # Minimal approach
 print(image_to_glyph("cat.jpg"))
 
-# Precision control
-from glyph_forge.transformers import ImageTransformer
-from glyph_forge.renderers import ANSIRenderer
-
-transformer = ImageTransformer(width=80, char_set="block")
-renderer = ANSIRenderer(color_mode="truecolor")
-glyph_art = transformer.transform("portrait.jpg", renderer=renderer)
+# Precision control via API
+api = get_api()
+glyph_art = api.image_to_Glyph(
+    "portrait.jpg",
+    width=80,
+    charset="block",
+    color_mode="ansi",
+)
 print(glyph_art)  # Behold the transformation ✨
 ```
 
