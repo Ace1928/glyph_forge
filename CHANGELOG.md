@@ -29,7 +29,7 @@ This document maps the evolution pathway of Glyph Forge through its structural i
 - Multi-format renderer ecosystem (Text, ANSI, HTML, SVG)
 - Terminal-aware color system with fallback pathways
 - Image processing pipeline with density mapping
-- CLI entry points: `glyphfy` and `bannerize`
+- CLI entry points: `imagize` (alias: `glyphfy`) and `bannerize`
 - Comprehensive type annotations across all interfaces
 - Documentation system with practical examples
 

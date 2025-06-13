@@ -69,7 +69,7 @@ src/glyph_forge/
 │   └── glyph_forge_api.py  # Core interface - functionality access points
 ├── cli/                    # Command system - terminal interaction layer
 │   ├── __init__.py         # Command registry - interaction entry points
-│   ├── glyphfy.py          # Image transformer - pixels to glyphs
+│   ├── imagize.py          # Image transformer - pixels to glyphs (`glyphfy.py` retained as alias)
 │   └── bannerize.py        # Text enhancer - typography system
 ├── config/                 # Settings matrix - behavior control center
 │   ├── __init__.py         # Config registry - parameter discovery
