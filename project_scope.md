@@ -48,6 +48,7 @@ Essential processing components:
   - `typer` → CLI interface framework
 - **Performance**: 0.09s average image processing time
 - **Commands**: `imagize` & `bannerize` entry points (`glyphfy` remains as a compatibility alias)
+
 - **Configuration**: Runtime-adaptable parameters
 
 ## 📈 Release Timeline
