@@ -91,6 +91,7 @@ docs = [
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [project.scripts]
 glyphfy = "glyph_forge.cli.glyphfy:main"     # Image/video transformer
+imagize = "glyph_forge.cli.imagize:main"    # Image optimization tool
 bannerize = "glyph_forge.cli.bannerize:main" # Text banner generator
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
