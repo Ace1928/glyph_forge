@@ -106,14 +106,6 @@ BORDERS = {
     }
 }
 
-# Glyph fallback mapping for terminals without Unicode support
-Glyph_FALLBACK = {
-    "single": "Glyph",
-    "double": "Glyph",
-    "rounded": "Glyph",
-    "bold": "Glyph",
-}
-
 
 def apply_style(Glyph_art: str, style_name: str = "minimal", **kwargs: Any) -> str:
     """
