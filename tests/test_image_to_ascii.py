@@ -1,4 +1,4 @@
-# filepath: /home/lloyd/repos/glyph_forge/tests/test_image_to_Glyph.py
+# tests/test_image_to_ascii.py
 """
 ⚡ Eidosian Test Suite: ImageGlyphConverter ⚡
 
