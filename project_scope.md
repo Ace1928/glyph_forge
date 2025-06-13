@@ -47,7 +47,8 @@ Essential processing components:
   - `colorama` → Cross-platform color handling
   - `typer` → CLI interface framework
 - **Performance**: 0.09s average image processing time
-- **Commands**: `imagize` & `bannerize` entry points (`glyphfy` remains as a compatibility shim)
+- **Commands**: `imagize` & `bannerize` entry points (`glyphfy` remains as a compatibility alias)
+
 - **Configuration**: Runtime-adaptable parameters
 
 ## 📈 Release Timeline
