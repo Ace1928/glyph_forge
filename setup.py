@@ -129,6 +129,7 @@ if __name__ == "__main__":
         entry_points={
             "console_scripts": [
                 "glyphfy=glyph_forge.cli.glyphfy:main",
+                "imagize=glyph_forge.cli.imagize:main",
                 "bannerize=glyph_forge.cli.bannerize:main",
             ],
         },
