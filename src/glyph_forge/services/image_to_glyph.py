@@ -1,5 +1,5 @@
 from PIL import Image
-from typing import Optional, Union, List, Tuple, TypeVar
+from typing import Optional, Union, List, Tuple, TypeVar, Any
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from numpy.typing import NDArray
@@ -441,3 +441,54 @@ class ImageGlyphConverter:
         Glyph_art.append("</pre>")
         
         return "".join(Glyph_art)
+
+
+def image_to_glyph(
+    image_path: Union[str, Image.Image],
+    output_path: Optional[str] = None,
+    style: Optional[str] = None,
+    color_mode: str = "none",
+    **kwargs: Any,
+) -> str:
+    """High-level helper for quick image conversion.
+
+    This convenience wrapper instantiates :class:`ImageGlyphConverter` with the
+    provided parameters and performs a single image conversion. It mirrors the
+    constructor arguments of :class:`ImageGlyphConverter` and supports both
+    grayscale and color output modes.
+
+    Args:
+        image_path: Path to an image file or ``PIL.Image`` object.
+        output_path: Optional destination to save the resulting glyph art.
+        style: Optional style name forwarded to :meth:`ImageGlyphConverter.convert`.
+        color_mode: ``"none"`` for grayscale, ``"ansi"`` or ``"html"`` for color.
+        **kwargs: Additional parameters for :class:`ImageGlyphConverter`.
+
+    Returns:
+        Glyph art string.
+    """
+
+    params = {
+        k: v
+        for k, v in kwargs.items()
+        if k
+        in {
+            "charset",
+            "width",
+            "height",
+            "invert",
+            "brightness",
+            "contrast",
+            "auto_scale",
+            "dithering",
+            "threads",
+        }
+    }
+    converter = ImageGlyphConverter(**params)
+
+    if color_mode.lower() in {"ansi", "html"}:
+        return converter.convert_color(
+            image_path, output_path=output_path, color_mode=color_mode
+        )
+
+    return converter.convert(image_path, output_path=output_path, style=style)
