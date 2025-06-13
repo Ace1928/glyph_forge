@@ -24,6 +24,12 @@ from pathlib import Path
 from functools import lru_cache
 
 from .services import image_to_glyph
+from .eidos_profile import (
+    load_profile as load_eidos_profile,
+    save_profile as save_eidos_profile,
+    update_profile as update_eidos_profile,
+    EidosProfile,
+)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 📊 Version and identity - The essence of our being
@@ -386,9 +392,10 @@ __all__: List[str] = [
     # Type definitions
     "TransformerMap", "RenderOptions", "GlyphMatrix", "Renderer", "Transformer",
     "SystemCapabilities", "ColorMode", "DitherAlgorithm",
-    
+
     # Global functions
     "get_config", "get_project_info", "get_system_capabilities",
+    "load_eidos_profile", "save_eidos_profile", "update_eidos_profile", "EidosProfile",
     
     # Version info
     "__version__", "__author__", "__license__", "__email__"
