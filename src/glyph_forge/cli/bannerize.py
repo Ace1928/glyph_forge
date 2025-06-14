@@ -20,6 +20,7 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 import signal
 import threading
 from functools import wraps
+import typer
 
 # Ensure project path is in Python path for development mode
 project_root = Path(__file__).parent.parent.parent.parent
