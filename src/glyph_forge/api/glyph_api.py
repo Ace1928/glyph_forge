@@ -1,41 +1,44 @@
-from typing import Dict, Any, List, Optional, Union, Tuple
-import os
 import logging
+import os
+from typing import Any, Dict, List, Optional
 
+from ..config.settings import get_config
 from ..core.banner_generator import BannerGenerator
 from ..core.style_manager import get_available_styles
 from ..services.image_to_glyph import ImageGlyphConverter
 from ..utils.alphabet_manager import AlphabetManager
-from ..config.settings import get_config
 
 logger = logging.getLogger(__name__)
+
 
 class GlyphForgeAPI:
     """
     Public API for the Glyph Forge library.
-    
+
     Provides a streamlined, unified interface to all Glyph Forge capabilities
     with intelligent caching, configuration management, and error handling.
     """
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         """Initialize the API with configuration and core components."""
         logger.debug("Initializing Glyph Forge API")
         self.config = get_config()
         self._initialize_components()
-    
-    def _initialize_components(self):
+
+    def _initialize_components(self) -> None:
         """Initialize core components with optimal laziness."""
         # Default banner generator
         default_font = self.config.get('banner', 'default_font', 'slant')
         default_width = self.config.get('banner', 'default_width', 80)
         self._banner_generator = BannerGenerator(font=default_font, width=default_width)
-        
+
         # Image converter will be initialized on first use (lazy loading)
-        self._image_converter = None
-        
-        logger.debug(f"Core components initialized with font='{default_font}', width={default_width}")
-    
+        self._image_converter: Optional[ImageGlyphConverter] = None
+
+        logger.debug(
+            f"Core components initialized with font='{default_font}', width={default_width}"
+        )
+
     def _get_image_converter(self) -> ImageGlyphConverter:
         """Get or lazily initialize image converter."""
         if self._image_converter is None:
@@ -43,23 +46,27 @@ class GlyphForgeAPI:
             default_charset = self.config.get('image', 'default_charset', 'general')
             default_width = self.config.get('image', 'default_width', 100)
             self._image_converter = ImageGlyphConverter(
-                charset=default_charset,
-                width=default_width
+                charset=default_charset, width=default_width
             )
-            logger.debug(f"Image converter initialized with charset='{default_charset}', width={default_width}")
-        
+            logger.debug(
+                f"Image converter initialized with charset='{default_charset}', width={default_width}"
+            )
+
+        assert self._image_converter is not None
         return self._image_converter
-    
-    def generate_banner(self, 
-                       text: str, 
-                       style: Optional[str] = None, 
-                       font: Optional[str] = None,
-                       width: Optional[int] = None,
-                       effects: Optional[List[str]] = None,
-                       color: bool = False) -> str:
+
+    def generate_banner(
+        self,
+        text: str,
+        style: Optional[str] = None,
+        font: Optional[str] = None,
+        width: Optional[int] = None,
+        effects: Optional[List[str]] = None,
+        color: bool = False,
+    ) -> str:
         """
         Generate an Glyph art banner from text with intelligent parameter handling.
-        
+
         Args:
             text: Text to convert into banner
             style: Style preset to apply (default from config)
@@ -67,43 +74,45 @@ class GlyphForgeAPI:
             width: Width for the banner (default from config)
             effects: Special effects to apply (default from style)
             color: Whether to apply ANSI color to output
-        
+
         Returns:
             Glyph art banner
         """
         # Use defaults from config if not specified
         if style is None:
             style = self.config.get('banner', 'default_style', 'minimal')
-        
+
         # Regenerate banner generator if font or width changed
         if font is not None or width is not None:
             temp_font = font if font is not None else self._banner_generator.font
             temp_width = width if width is not None else self._banner_generator.width
             generator = BannerGenerator(font=temp_font, width=temp_width)
             return generator.generate(text, style=style, effects=effects, color=color)
-        
+
         # Use existing generator
         return self._banner_generator.generate(
-            text=text, 
+            text,
             style=style,
             effects=effects,
-            color=color
+            color=color,
         )
-    
-    def image_to_Glyph(self, 
-                      image_path: str, 
-                      output_path: Optional[str] = None,
-                      charset: Optional[str] = None, 
-                      width: Optional[int] = None, 
-                      height: Optional[int] = None,
-                      invert: bool = False,
-                      brightness: Optional[float] = None,
-                      contrast: Optional[float] = None,
-                      dithering: bool = False,
-                      color_mode: str = "none") -> str:
+
+    def image_to_Glyph(
+        self,
+        image_path: str,
+        output_path: Optional[str] = None,
+        charset: Optional[str] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        invert: bool = False,
+        brightness: Optional[float] = None,
+        contrast: Optional[float] = None,
+        dithering: bool = False,
+        color_mode: str = "none",
+    ) -> str:
         """
         Convert an image to Glyph art with comprehensive parameter support.
-        
+
         Args:
             image_path: Path to the image file
             output_path: Path to save the result (optional)
@@ -115,13 +124,13 @@ class GlyphForgeAPI:
             contrast: Contrast adjustment factor (0.0-2.0)
             dithering: Whether to apply dithering
             color_mode: Color output mode ("none", "ansi", "html")
-        
+
         Returns:
             Glyph art representation of the image
         """
         # Get or create image converter
         converter = self._get_image_converter()
-        
+
         # Apply any parameter overrides
         if charset is not None or width is not None or height is not None or invert:
             # Create a new converter with specified parameters
@@ -132,116 +141,113 @@ class GlyphForgeAPI:
                 width=temp_width,
                 height=height,
                 invert=invert,
-                dithering=dithering
+                dithering=dithering,
             )
-        
+
         # Set optional brightness and contrast
         if brightness is not None or contrast is not None:
             converter.set_image_params(
                 brightness=brightness or converter.brightness,
-                contrast=contrast or converter.contrast
+                contrast=contrast or converter.contrast,
             )
-        
+
         # Convert with or without color
         if color_mode.lower() in ("ansi", "html"):
             return converter.convert_color(
-                image_path=image_path, 
+                image_path=image_path,
                 output_path=output_path,
-                color_mode=color_mode.lower()
+                color_mode=color_mode.lower(),
             )
         else:
-            return converter.convert(
-                image_path=image_path, 
-                output_path=output_path
-            )
-    
+            return converter.convert(image_path=image_path, output_path=output_path)
+
     def get_available_fonts(self) -> List[str]:
         """
         Get a list of available font names.
-        
+
         Returns:
             List of available font names
         """
         return self._banner_generator.available_fonts()
-    
+
     def get_available_styles(self) -> Dict[str, Dict[str, Any]]:
         """
         Get a dictionary of available style presets.
-        
+
         Returns:
             Dictionary mapping style names to their configurations
         """
         return get_available_styles()
-    
+
     def get_available_alphabets(self) -> List[str]:
         """
         Get a list of available character sets/alphabets.
-        
+
         Returns:
             List of available alphabet names
         """
         return AlphabetManager.list_available_alphabets()
-    
+
     def save_to_file(self, Glyph_art: str, file_path: str) -> bool:
         """
         Save Glyph art to a file with proper directory creation.
-        
+
         Args:
             Glyph_art: Glyph art text to save
             file_path: Path to save the file
-        
+
         Returns:
             True if saved successfully, False otherwise
         """
         try:
             # Ensure directory exists
             os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-            
+
             # Write file with UTF-8 encoding for maximum compatibility
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(Glyph_art)
-                
+
             logger.debug(f"Saved Glyph art to {file_path}")
             return True
         except (IOError, OSError) as e:
             logger.error(f"Failed to save file: {str(e)}")
             return False
-    
+
     def preview_font(self, font: str, text: str = "Glyph Forge") -> str:
         """
         Generate a preview of a specific font.
-        
+
         Args:
             font: Name of the font to preview
             text: Text to use for preview
-        
+
         Returns:
             Glyph art using specified font
         """
         generator = BannerGenerator(font=font, width=self._banner_generator.width)
         return generator.generate(text)
-    
+
     def preview_style(self, style: str, text: str = "Glyph Forge") -> str:
         """
         Generate a preview of a specific style.
-        
+
         Args:
             style: Name of the style to preview
             text: Text to use for preview
-        
+
         Returns:
             Glyph art using specified style
         """
         return self._banner_generator.generate(text, style=style)
-    
+
     def convert_text_to_art(self, text: str, font: str = "standard") -> str:
         """
         Convert plain text to Glyph art without additional styling.
-        
+
         Args:
             text: Text to convert
             font: Font to use
-        
+
         Returns:
             Glyph art representation
         """
@@ -252,10 +258,11 @@ class GlyphForgeAPI:
 # Singleton API instance
 _api_instance = None
 
+
 def get_api() -> GlyphForgeAPI:
     """
     Get the GlyphForgeAPI singleton instance with zero redundant initialization.
-    
+
     Returns:
         GlyphForgeAPI instance
     """

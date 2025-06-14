@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, TypedDict
+from typing import Any, Dict, TypedDict, cast
 
 import yaml
 
 logger = logging.getLogger(__name__)
 
-PROFILE_PATH = Path(__file__).resolve().parent.parent / "eidos_profile.yml"
+# Default path two levels above this file (project root)
+PROFILE_PATH = Path(__file__).resolve().parents[2] / "eidos_profile.yml"
+
 
 class BigFive(TypedDict):
     openness: float
@@ -25,17 +27,20 @@ class BigFive(TypedDict):
     agreeableness: float
     neuroticism: float
 
+
 class Psychology(TypedDict):
     mbti: str
     big_five: BigFive
     cognitive_style: str
     creativity: float
 
+
 class Identity(TypedDict):
     official_name: str
     alias: str
     motto: str
     tagline: str
+
 
 class EidosProfile(TypedDict, total=False):
     identity: Identity
@@ -65,7 +70,7 @@ def save_profile(profile: EidosProfile, path: Path | None = None) -> None:
 def update_profile(updates: Dict[str, Any], path: Path | None = None) -> EidosProfile:
     """Merge updates into the profile and save the result."""
     profile = load_profile(path)
-    _merge_dict(profile, updates)
+    _merge_dict(cast(Dict[str, Any], profile), updates)
     save_profile(profile, path)
     return profile
 
