@@ -94,6 +94,7 @@ glyphfy = "glyph_forge.cli.glyphfy:main"     # Image/video transformer
 imagize = "glyph_forge.cli.imagize:main"    # Image optimization tool
 bannerize = "glyph_forge.cli.bannerize:main" # Text banner generator
 glyph-forge = "glyph_forge.cli:main"        # Unified command interface
+glyph_forge = "glyph_forge.cli:main"        # Alias with underscore
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔗 Project Links - External connections

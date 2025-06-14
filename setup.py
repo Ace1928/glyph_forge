@@ -136,6 +136,7 @@ if __name__ == "__main__":
                 "imagize=glyph_forge.cli.imagize:main",
                 "bannerize=glyph_forge.cli.bannerize:main",
                 "glyph-forge=glyph_forge.cli:main",
+                "glyph_forge=glyph_forge.cli:main",
             ],
         },
         # Dependencies with quantum entanglement
