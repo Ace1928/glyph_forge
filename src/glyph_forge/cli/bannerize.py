@@ -525,5 +525,60 @@ def main() -> int:
         return 1
 
 
+app = typer.Typer(help="Generate Glyph banners")
+
+
+@app.command()
+def cli(
+    text: str = typer.Argument(None, help="Text to transform"),
+    font: str = typer.Option(None, "--font", "-f", help="Font to use"),
+    style: str = typer.Option(None, "--style", "-s", help="Style preset"),
+    width: int = typer.Option(None, "--width", "-w", help="Banner width"),
+    color: bool = typer.Option(False, "--color", "-c", help="Enable ANSI color"),
+    output: str = typer.Option(None, "--output", "-o", help="Save to file"),
+    list_fonts: bool = typer.Option(False, "--list-fonts", help="Show fonts"),
+    list_styles: bool = typer.Option(False, "--list-styles", help="Show styles"),
+    preview: bool = typer.Option(False, "--preview", help="Preview style"),
+    debug: bool = typer.Option(False, "--debug", help="Debug output"),
+    version: bool = typer.Option(False, "--version", help="Show version"),
+) -> None:
+    """Typer wrapper for the bannerize command."""
+    args = argparse.Namespace(
+        text=text,
+        font=font,
+        style=style,
+        width=width,
+        color=color,
+        output=output,
+        list_fonts=list_fonts,
+        list_styles=list_styles,
+        preview=preview,
+        debug=debug,
+        version=version,
+    )
+    # Reuse the main execution logic
+    signal.signal(signal.SIGINT, signal_handler)
+    setup_logging(args.debug)
+    if args.version:
+        show_version()
+        raise typer.Exit()
+    print_header()
+    api = get_api()
+    if args.list_fonts:
+        fonts = api.get_available_fonts()
+        list_items(fonts, "Available Glyph Fonts", columns=3)
+        raise typer.Exit()
+    if args.list_styles:
+        styles = api.get_available_styles()
+        list_items(list(styles.keys()), "Available Glyph Styles", columns=3)
+        raise typer.Exit()
+    if args.preview and args.text and args.style:
+        preview_style(api, args.text, args.style)
+        raise typer.Exit()
+    generate_banner(api, args)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        sys.exit(app())
     sys.exit(main())

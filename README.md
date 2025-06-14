@@ -62,7 +62,7 @@ print(glyph_art)  # Behold the transformation ✨
 ## 🖥️ Command Line Usage
 
 ```bash
-# Convert an image to glyph art
+# Convert an image to glyph art (with progress)
 glyph-forge imagize cat.jpg --width 80
 
 # Create a banner
@@ -77,6 +77,7 @@ glyph-forge bannerize "HELLO WORLD" --font slant
 - **⚙️ Fine-grained control** - Customize every aspect of transformation
 - **🧩 Extensible design** - Create custom transformers and renderers
 - **⚡ Optimized processing** - Convert images in ~0.1s at standard settings
+- **⏱️ Real-time progress** - CLI displays conversion progress
 
 ## 🔬 Usage
 
