@@ -5,7 +5,7 @@
 Hyper-efficient terminal user interface for Glyph art transformation.
 """
 from textual.app import App
-from textual.widgets import Header, Footer, Static, Button, Input, FileInput
+from textual.widgets import Header, Footer, Static, Button, Input
 from textual.containers import Container, Horizontal, Vertical, Grid
 from textual.screen import Screen
 from textual.reactive import reactive
@@ -92,7 +92,7 @@ class ImageConverterScreen(Screen):
         yield Container(
             Vertical(
                 Static("Image to Glyph Converter", classes="screen_title"),
-                FileInput(id="image_file"),
+                Input(placeholder="Path to image", id="image_file"),
                 Horizontal(
                     Button("Convert", id="btn_convert"),
                     Button("Back", id="btn_back"),
