@@ -273,7 +273,7 @@ jobs:
         run: |
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "::error::Pipeline failed!"
-            exit 1
+          exit 1
           else
             echo "::notice::All checks passed! ʕ •ᴥ•ʔ"
           fi
