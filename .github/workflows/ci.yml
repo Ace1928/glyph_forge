@@ -275,5 +275,5 @@ jobs:
             echo "::error::Pipeline failed!"
             exit 1
           else
-            echo "::notice::All checks passed! ʕ •ᴥ•ʔ
-            fi
+            echo "::notice::All checks passed! ʕ •ᴥ•ʔ"
+          fi
