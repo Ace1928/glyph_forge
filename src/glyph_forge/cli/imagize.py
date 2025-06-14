@@ -28,6 +28,7 @@ from pathlib import Path
 from functools import wraps
 from typing import List, Dict, Any, Optional, Tuple, Union, Callable
 import typer
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 # Ensure project path is in Python path for imports
 project_root = Path(__file__).parent.parent.parent
@@ -780,23 +781,29 @@ def convert(
 ):
     """Convert an image into spectacular Glyph art."""
     try:
-        result = convert_image(
-            image_path=image,
-            output_path=output,
-            width=width,
-            height=height,
-            charset=charset,
-            invert=invert,
-            color_mode=color,
-            dithering=dither,
-            optimize_contrast=optimize,
-        )
-        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("Converting image..."),
+            transient=True,
+        ) as progress:
+            progress.add_task("convert", total=None)
+            result = convert_image(
+                image_path=image,
+                output_path=output,
+                width=width,
+                height=height,
+                charset=charset,
+                invert=invert,
+                color_mode=color,
+                dithering=dither,
+                optimize_contrast=optimize,
+            )
+
         if not output:
             print(result)
         else:
             print(f"Glyph art saved to {output}")
-            
+
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)
