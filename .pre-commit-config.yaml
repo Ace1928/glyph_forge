@@ -15,4 +15,5 @@ repos:
         name: pytest
         entry: pytest
         language: system
+        args: ["-q", "tests"]
         types: [python]

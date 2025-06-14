@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from ..config.settings import get_config
 from ..core.banner_generator import BannerGenerator
@@ -87,14 +87,19 @@ class GlyphForgeAPI:
             temp_font = font if font is not None else self._banner_generator.font
             temp_width = width if width is not None else self._banner_generator.width
             generator = BannerGenerator(font=temp_font, width=temp_width)
-            return generator.generate(text, style=style, effects=effects, color=color)
+            return cast(
+                str, generator.generate(text, style=style, effects=effects, color=color)
+            )
 
         # Use existing generator
-        return self._banner_generator.generate(
-            text,
-            style=style,
-            effects=effects,
-            color=color,
+        return cast(
+            str,
+            self._banner_generator.generate(
+                text,
+                style=style,
+                effects=effects,
+                color=color,
+            ),
         )
 
     def image_to_Glyph(
@@ -168,7 +173,7 @@ class GlyphForgeAPI:
         Returns:
             List of available font names
         """
-        return self._banner_generator.available_fonts()
+        return cast(List[str], self._banner_generator.available_fonts())
 
     def get_available_styles(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -177,7 +182,7 @@ class GlyphForgeAPI:
         Returns:
             Dictionary mapping style names to their configurations
         """
-        return get_available_styles()
+        return cast(Dict[str, Dict[str, Any]], get_available_styles())
 
     def get_available_alphabets(self) -> List[str]:
         """
@@ -186,7 +191,7 @@ class GlyphForgeAPI:
         Returns:
             List of available alphabet names
         """
-        return AlphabetManager.list_available_alphabets()
+        return cast(List[str], AlphabetManager.list_available_alphabets())
 
     def save_to_file(self, Glyph_art: str, file_path: str) -> bool:
         """
@@ -225,7 +230,7 @@ class GlyphForgeAPI:
             Glyph art using specified font
         """
         generator = BannerGenerator(font=font, width=self._banner_generator.width)
-        return generator.generate(text)
+        return cast(str, generator.generate(text))
 
     def preview_style(self, style: str, text: str = "Glyph Forge") -> str:
         """
@@ -238,7 +243,7 @@ class GlyphForgeAPI:
         Returns:
             Glyph art using specified style
         """
-        return self._banner_generator.generate(text, style=style)
+        return cast(str, self._banner_generator.generate(text, style=style))
 
     def convert_text_to_art(self, text: str, font: str = "standard") -> str:
         """
@@ -252,7 +257,7 @@ class GlyphForgeAPI:
             Glyph art representation
         """
         generator = BannerGenerator(font=font, width=self._banner_generator.width)
-        return generator.figlet.renderText(text)
+        return cast(str, generator.figlet.renderText(text))
 
 
 # Singleton API instance

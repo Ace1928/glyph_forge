@@ -21,7 +21,7 @@ name = "glyph-forge"
 version = "0.1.0" # Genesis point - expansion begins here
 description = "Hyper-optimized text, image and video-to-glyph art converter with Eidosian principles"
 readme = "README.md"
-requires-python = ">=3.12" # Forward-facing compatibility
+requires-python = ">=3.10" # Python 3.10+ supported
 license = { file = "LICENSE" }
 authors = [{ name = "Lloyd Handyside", email = "ace1928@gmail.com" }]
 maintainers = [
@@ -93,6 +93,7 @@ docs = [
 glyphfy = "glyph_forge.cli.glyphfy:main"     # Image/video transformer
 imagize = "glyph_forge.cli.imagize:main"    # Image optimization tool
 bannerize = "glyph_forge.cli.bannerize:main" # Text banner generator
+glyph-forge = "glyph_forge.cli:main"        # Unified command interface
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔗 Project Links - External connections

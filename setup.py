@@ -6,30 +6,36 @@
 
 Quantum-aligned compatibility layer for Glyph Forge.
 
-This file bridges compatibility with legacy build tools that don't 
+This file bridges compatibility with legacy build tools that don't
 support pyproject.toml. It delegates all configuration through setuptools
 while maintaining Eidosian structural integrity.
 """
 import re
 from pathlib import Path
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔮 Version detection with Eidosian precision
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def get_version():
     """Extract version from package with quantum certainty."""
     version_file = Path("src") / "glyph_forge" / "__init__.py"
     with open(version_file, encoding="utf-8") as f:
-        version_match = re.search(r"VERSION\s*=\s*\((\d+),\s*(\d+),\s*(\d+)\)", f.read())
+        version_match = re.search(
+            r"VERSION\s*=\s*\((\d+),\s*(\d+),\s*(\d+)\)", f.read()
+        )
         if version_match:
             return ".".join(version_match.groups())
     return "0.1.0"  # Fallback with grace
 
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 📦 Package metadata extraction - Cross-dimensional consistency
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def get_long_description():
     """Extract long description from README with Eidosian thoroughness."""
@@ -38,6 +44,7 @@ def get_long_description():
         with open(readme_path, encoding="utf-8") as f:
             return f.read()
     return "Glyph Forge - Hyper-optimized glyph art converter with Eidosian principles"
+
 
 def get_package_metadata():
     """Extract core package metadata with perfect alignment."""
@@ -52,7 +59,7 @@ def get_package_metadata():
         "maintainer": "Neuroforge",
         "maintainer_email": "lloyd.handyside@neuroforge.io",
     }
-    
+
     if init_file.exists():
         with open(init_file, encoding="utf-8") as f:
             content = f.read()
@@ -62,8 +69,9 @@ def get_package_metadata():
                 match = re.search(pattern, content)
                 if match and match.group(1):
                     metadata[field] = match.group(1)
-    
+
     return metadata
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🧩 Dependencies - Quantum entanglement matrix
@@ -74,7 +82,7 @@ INSTALL_REQUIRES = [
     "numpy>=1.26.0",
     "pyfiglet>=0.8.0",
     "colorama>=0.4.6",
-    "rich>=13.7.0", 
+    "rich>=13.7.0",
     "typer>=0.9.0",
 ]
 
@@ -100,7 +108,7 @@ DOCS_REQUIRES = [
 if __name__ == "__main__":
     # 📡 Extract metadata with quantum precision
     metadata = get_package_metadata()
-    
+
     print("⚡ Activating Glyph Forge setup bridge...")
     setup(
         # Core identity
@@ -109,31 +117,27 @@ if __name__ == "__main__":
         description=metadata["description"],
         long_description=get_long_description(),
         long_description_content_type="text/markdown",
-        
         # Authorship - Eidosian collective
         author=metadata["author"],
         author_email=metadata["author_email"],
         maintainer="Neuroforge",
         maintainer_email="lloyd.handyside@neuroforge.io",
-        
         # License and platform
         license=metadata["license"],
-        python_requires=">=3.12",
-        
+        python_requires=">=3.10",
         # Package structure
         package_dir={"": "src"},
         packages=find_packages(where="src"),
         include_package_data=True,
-        
         # Entry points for CLI tools
         entry_points={
             "console_scripts": [
                 "glyphfy=glyph_forge.cli.glyphfy:main",
                 "imagize=glyph_forge.cli.imagize:main",
                 "bannerize=glyph_forge.cli.bannerize:main",
+                "glyph-forge=glyph_forge.cli:main",
             ],
         },
-        
         # Dependencies with quantum entanglement
         install_requires=INSTALL_REQUIRES,
         extras_require={
@@ -141,7 +145,6 @@ if __name__ == "__main__":
             "docs": DOCS_REQUIRES,
             "all": DEV_REQUIRES + DOCS_REQUIRES,
         },
-        
         # Classification for quantum indexing
         classifiers=[
             "Development Status :: 4 - Beta",
@@ -152,7 +155,6 @@ if __name__ == "__main__":
             "Topic :: Multimedia :: Graphics :: Graphics Conversion",
             "Topic :: Utilities",
         ],
-        
         # Project URLs for multidimensional navigation
         project_urls={
             "Homepage": "https://github.com/Ace1928/glyph_forge",

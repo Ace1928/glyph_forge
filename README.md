@@ -5,7 +5,7 @@
 glyph art transformation toolkit built on Eidosian principles. Transform images, text, and video into glyph with precision-engineered algorithms.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.12%2B-brightgreen.svg)
+![Python](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Status](https://img.shields.io/badge/status-beta-purple.svg)
 
@@ -57,6 +57,16 @@ glyph_art = api.image_to_Glyph(
     color_mode="ansi",
 )
 print(glyph_art)  # Behold the transformation ✨
+```
+
+## 🖥️ Command Line Usage
+
+```bash
+# Convert an image to glyph art
+glyph-forge imagize cat.jpg --width 80
+
+# Create a banner
+glyph-forge bannerize "HELLO WORLD" --font slant
 ```
 
 ## ✨ Features
@@ -160,7 +170,7 @@ Original        glyph Representation
 | 4K UHD     | 0.42s           | 200×112 chars | Level 2 |
 | 4K UHD     | 0.12s           | 200×112 chars | Level 4 |
 
-- *Measured on AMD Ryzen 7, 32GB RAM, Python 3.12*
+- *Measured on AMD Ryzen 7, 32GB RAM, Python 3.10*
 
 ## 🤝 Contributing
 

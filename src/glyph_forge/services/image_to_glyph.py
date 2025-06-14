@@ -3,7 +3,7 @@ import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
-from typing import Any, Iterable, List, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Iterable, List, Optional, Tuple, TypeAlias, TypeVar, Union, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -12,7 +12,7 @@ from PIL import Image
 from ..utils.alphabet_manager import AlphabetManager
 
 # Type definitions for clarity and precision
-PixelArray = NDArray[np.uint8]  # Type for grayscale/RGB pixel arrays
+PixelArray: TypeAlias = NDArray[np.uint8]  # Type for grayscale/RGB pixel arrays
 Shape = Tuple[int, ...]  # Array dimensions
 T = TypeVar('T')  # Generic type for flexible functions
 GlyphRow = List[str]  # Type for rows of Glyph characters
@@ -74,7 +74,7 @@ class ImageGlyphConverter:
             threads: Number of threads for parallel processing (0=auto)
         """
         # Get the appropriate charset
-        self._available_charsets = AlphabetManager.list_available_alphabets()
+        self._available_charsets: List[str] = AlphabetManager.list_available_alphabets()
         self.charset = (
             AlphabetManager.get_alphabet(charset)
             if charset in self._available_charsets
