@@ -6,11 +6,11 @@
 
 ### High Priority
 
-- [ ] **Implement actual transformer classes** - Replace placeholder implementations in `transformers/__init__.py`
-  - [ ] `ImageTransformer` - Full image-to-matrix transformation
-  - [ ] `ColorMapper` - Color space conversions and mapping
-  - [ ] `DepthAnalyzer` - Depth-based character selection
-  - [ ] `EdgeDetector` - Edge detection for enhanced detail
+- [x] **Implement actual transformer classes** - Replace placeholder implementations in `transformers/__init__.py`
+  - [x] `ImageTransformer` - Full image-to-matrix transformation
+  - [x] `ColorMapper` - Color space conversions and mapping
+  - [x] `DepthAnalyzer` - Depth-based character selection
+  - [x] `EdgeDetector` - Edge detection for enhanced detail
 
 - [ ] **Add video processing with OpenCV** - Full video support beyond GIFs
   - [ ] Video file decoding (MP4, AVI, MKV)
