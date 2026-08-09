@@ -285,7 +285,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite contains 268 tests and measures 72% branch-aware coverage.
+The current suite contains 269 tests and measures 72% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource
 checks.

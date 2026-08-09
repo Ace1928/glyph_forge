@@ -52,6 +52,8 @@ the project uses semantic versioning.
 
 - Public `glyph_forge.image_to_glyph` now resolves to the callable helper rather
   than the service module
+- Legacy `image_to_Glyph` imports now use an in-memory alias instead of a
+  case-colliding compatibility file on Windows and macOS
 - `doctor` launches FFmpeg tools instead of trusting executable names alone
 - Configuration discovery no longer creates user directories during import
 - ASCII borders use the correct corner, vertical, and horizontal characters

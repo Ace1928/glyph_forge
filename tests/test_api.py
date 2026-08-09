@@ -6,6 +6,7 @@ Glyph Forge API with maximum coverage and surgical precision.
 Every feature is validated with atomic tests and crystal-clear assertions.
 """
 
+import importlib
 import os
 import tempfile
 from unittest import mock
@@ -21,6 +22,18 @@ def test_top_level_image_helper_resolves_to_callable() -> None:
     from glyph_forge import image_to_glyph
 
     assert callable(image_to_glyph)
+
+
+def test_legacy_image_service_alias_uses_canonical_module() -> None:
+    """Legacy mixed-case imports must work without a case-colliding file."""
+
+    services = importlib.import_module("glyph_forge.services")
+    canonical = importlib.import_module("glyph_forge.services.image_to_glyph")
+    legacy = importlib.import_module("glyph_forge.services.image_to_Glyph")
+
+    assert services.image_to_glyph is canonical
+    assert services.image_to_Glyph is canonical
+    assert legacy is canonical
 
 
 @pytest.fixture

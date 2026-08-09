@@ -129,7 +129,6 @@ select = ["B", "E4", "E7", "E9", "F", "I", "W"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/glyph_forge/cli/*.py" = ["B008"]
-"src/glyph_forge/services/image_to_Glyph.py" = ["F403"]
 "tests/test_tui.py" = ["E402"]
 
 [tool.mypy]

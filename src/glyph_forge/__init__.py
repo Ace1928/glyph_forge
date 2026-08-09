@@ -253,7 +253,10 @@ _LAZY_EXPORTS: Final[Dict[str, Tuple[str, str]]] = {
     "configure": ("glyph_forge.utils", "configure"),
     "measure_performance": ("glyph_forge.utils", "measure_performance"),
     "detect_capabilities": ("glyph_forge.utils", "detect_capabilities"),
-    "image_to_glyph": ("glyph_forge.services", "image_to_glyph"),
+    "image_to_glyph": (
+        "glyph_forge.services.image_to_glyph",
+        "image_to_glyph",
+    ),
     "text_to_banner": ("glyph_forge.services", "text_to_banner"),
     "video_to_glyph_frames": ("glyph_forge.services", "video_to_glyph_frames"),
     "iter_video_glyph_frames": (
