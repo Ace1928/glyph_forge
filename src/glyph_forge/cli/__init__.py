@@ -18,7 +18,11 @@ from rich.table import Table
 from rich.text import Text
 
 from ..config.settings import ConfigManager, get_config
-from ..runtime import detect_runtime_profile, runtime_report
+from ..runtime import (
+    detect_runtime_profile,
+    reexec_clean_android_environment,
+    runtime_report,
+)
 from .live import app as live_app
 from .live import camera_command, screen_command
 
@@ -894,6 +898,7 @@ def get_settings() -> Union[Dict[str, Any], ConfigManager]:
 def main() -> None:
     """Console-script entry point."""
 
+    reexec_clean_android_environment()
     app()
 
 

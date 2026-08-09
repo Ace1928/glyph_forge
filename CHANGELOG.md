@@ -80,9 +80,10 @@ the project uses semantic versioning.
 
 ### Fixed
 
-- Android media subprocesses now ignore foreign `LD_LIBRARY_PATH` overrides
-  which could shadow Termux libraries, and video exports stop at the shorter
-  mapped stream instead of retaining a trailing audio-only tail
+- Android CLI sessions relaunch once without foreign `LD_LIBRARY_PATH`
+  overrides before loading native media modules, child media tools receive the
+  same clean environment, and video exports stop at the shorter mapped stream
+  instead of retaining a trailing audio-only tail
 
 - Public `glyph_forge.image_to_glyph` now resolves to the callable helper rather
   than the service module

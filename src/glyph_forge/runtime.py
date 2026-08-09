@@ -65,6 +65,33 @@ def subprocess_environment() -> dict[str, str] | None:
     return environment
 
 
+def reexec_clean_android_environment(
+    arguments: Iterable[str] | None = None,
+) -> bool:
+    """Relaunch the CLI once before Android loads optional native libraries.
+
+    Changing ``LD_LIBRARY_PATH`` after process startup is too late for native
+    modules loaded with ``dlopen`` (for example OpenCV).  Console entry points
+    therefore relaunch themselves with the same arguments and a clean linker
+    environment.  The second process naturally skips this path because the
+    override is no longer present.
+    """
+
+    if sys.platform != "android" or not os.environ.get("LD_LIBRARY_PATH"):
+        return False
+
+    environment = os.environ.copy()
+    environment.pop("LD_LIBRARY_PATH", None)
+    values = list(sys.argv[1:] if arguments is None else arguments)
+    launcher = sys.argv[0]
+    if os.path.isfile(launcher) and os.path.basename(launcher) != "__main__.py":
+        command = [sys.executable, os.path.abspath(launcher), *values]
+    else:
+        command = [sys.executable, "-m", "glyph_forge", *values]
+    os.execve(sys.executable, command, environment)
+    return True  # pragma: no cover - os.execve never returns on success
+
+
 @dataclass(frozen=True, slots=True)
 class Capability:
     """Availability and installation guidance for one feature dependency."""
@@ -319,6 +346,7 @@ __all__ = [
     "detect_runtime_profile",
     "iter_capabilities",
     "package_version",
+    "reexec_clean_android_environment",
     "runtime_report",
     "subprocess_environment",
 ]

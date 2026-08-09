@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from PIL import Image
 from typer.testing import CliRunner
 
@@ -82,6 +83,53 @@ def test_non_android_subprocess_environment_inherits_unchanged(monkeypatch) -> N
     monkeypatch.setattr(runtime.sys, "platform", "linux")
 
     assert runtime.subprocess_environment() is None
+
+
+@pytest.mark.parametrize("module_entry", [False, True])
+def test_android_cli_reexecs_before_loading_native_modules(
+    tmp_path: Path,
+    monkeypatch,
+    module_entry: bool,
+) -> None:
+    class Relaunched(RuntimeError):
+        pass
+
+    launcher = tmp_path / ("__main__.py" if module_entry else "glyph-forge")
+    launcher.write_text("# launcher\n", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def fake_execve(
+        executable: str,
+        arguments: list[str],
+        environment: dict[str, str],
+    ) -> None:
+        captured.update(
+            executable=executable,
+            arguments=arguments,
+            environment=environment,
+        )
+        raise Relaunched
+
+    monkeypatch.setattr(runtime.sys, "platform", "android")
+    monkeypatch.setattr(runtime.sys, "argv", [str(launcher), "video", "clip.mp4"])
+    monkeypatch.setattr(runtime.os, "execve", fake_execve)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/foreign/toolchain")
+    monkeypatch.setenv("GLYPH_FORGE_TEST", "preserved")
+
+    with pytest.raises(Relaunched):
+        runtime.reexec_clean_android_environment()
+
+    expected_prefix = (
+        [runtime.sys.executable, "-m", "glyph_forge"]
+        if module_entry
+        else [runtime.sys.executable, str(launcher)]
+    )
+    assert captured["executable"] == runtime.sys.executable
+    assert captured["arguments"] == [*expected_prefix, "video", "clip.mp4"]
+    environment = captured["environment"]
+    assert isinstance(environment, dict)
+    assert "LD_LIBRARY_PATH" not in environment
+    assert environment["GLYPH_FORGE_TEST"] == "preserved"
 
 
 def test_package_import_is_lazy_and_has_no_home_side_effects(tmp_path: Path) -> None:
