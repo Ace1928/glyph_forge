@@ -102,6 +102,7 @@ def test_ffmpeg_command_retains_script_audio_and_quality_options() -> None:
     assert command[command.index("-preset") + 1] == "slow"
     assert command[command.index("-crf") + 1] == "12"
     assert "1:a:0?" in command
+    assert "-shortest" in command
     assert "+faststart" in command
     assert command[-1] == "output.mp4"
 
@@ -168,9 +169,15 @@ class _FakePipe:
 class _FakeProcess:
     instances: list["_FakeProcess"] = []
 
-    def __init__(self, command: list[str], stdin: Any = None) -> None:
+    def __init__(
+        self,
+        command: list[str],
+        stdin: Any = None,
+        env: dict[str, str] | None = None,
+    ) -> None:
         del stdin
         self.command = command
+        self.environment = env
         self.stdin = _FakePipe()
         self.returncode: int | None = None
         Path(command[-1]).write_bytes(b"encoded-video")
@@ -206,6 +213,7 @@ def test_export_streams_frames_atomically_without_an_image_sequence(
     monkeypatch.setattr(video, "_load_opencv", lambda: _FakeCv2(capture))
     monkeypatch.setattr(video, "_executable_available", lambda _name: True)
     monkeypatch.setattr(video.subprocess, "Popen", _FakeProcess)
+    monkeypatch.setattr(video, "subprocess_environment", lambda: {"SAFE": "1"})
     progress = []
 
     result = export_glyph_video(
@@ -227,6 +235,7 @@ def test_export_streams_frames_atomically_without_an_image_sequence(
     assert destination.read_bytes() == b"encoded-video"
     assert process.stdin.bytes_written == 2 * 16 * 16 * 3
     assert process.stdin.closed
+    assert process.environment == {"SAFE": "1"}
     assert capture.released
     assert [item.rendered_frames for item in progress] == [1, 2]
     assert not list(tmp_path.glob(".*.glyph-forge-*.partial*"))

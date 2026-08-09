@@ -12,6 +12,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from enum import Enum
 from importlib import metadata
@@ -45,6 +46,23 @@ class RuntimeProfile:
         result = asdict(self)
         result["tier"] = self.tier.value
         return result
+
+
+def subprocess_environment() -> dict[str, str] | None:
+    """Return a safe child-process environment when the host requires one.
+
+    Termux binaries carry their own runtime search paths.  An inherited
+    ``LD_LIBRARY_PATH`` from another toolchain can take precedence and make a
+    healthy FFmpeg installation fail at load time.  Android is the only host
+    where Glyph Forge removes that override; every other platform inherits the
+    caller's environment unchanged.
+    """
+
+    if sys.platform != "android":
+        return None
+    environment = os.environ.copy()
+    environment.pop("LD_LIBRARY_PATH", None)
+    return environment
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,6 +276,7 @@ def _probe_tool(command: str) -> tuple[bool, str | None]:
             check=False,
             timeout=3,
             text=True,
+            env=subprocess_environment(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, f"found at {executable}, but self-check failed: {exc}"
@@ -301,4 +320,5 @@ __all__ = [
     "iter_capabilities",
     "package_version",
     "runtime_report",
+    "subprocess_environment",
 ]

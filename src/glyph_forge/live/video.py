@@ -21,7 +21,11 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image, ImageDraw, ImageFont
 
-from ..runtime import PerformanceTier, detect_runtime_profile
+from ..runtime import (
+    PerformanceTier,
+    detect_runtime_profile,
+    subprocess_environment,
+)
 from ..utils.alphabet_manager import AlphabetCategory, AlphabetManager
 
 RGBFrame = NDArray[np.uint8]
@@ -357,6 +361,7 @@ def build_ffmpeg_command(
         "aac",
         "-b:a",
         "192k",
+        "-shortest",
         "-movflags",
         "+faststart",
     ]
@@ -439,7 +444,11 @@ def export_glyph_video(
         renderer = GlyphVideoRenderer(selected)
         command = build_ffmpeg_command(source, partial, selected, fps)
         try:
-            encoder = subprocess.Popen(command, stdin=subprocess.PIPE)
+            encoder = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                env=subprocess_environment(),
+            )
         except OSError as exc:
             raise VideoExportError(f"Could not start FFmpeg: {exc}") from exc
         if encoder.stdin is None:  # pragma: no cover - defensive subprocess guard

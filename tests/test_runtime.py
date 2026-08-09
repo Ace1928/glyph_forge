@@ -64,6 +64,26 @@ def test_tool_probe_rejects_a_binary_that_exists_but_cannot_start(
     assert detail is not None and "cannot run" in detail
 
 
+def test_android_subprocess_environment_removes_foreign_library_path(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "android")
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/foreign/toolchain")
+    monkeypatch.setenv("GLYPH_FORGE_TEST", "preserved")
+
+    environment = runtime.subprocess_environment()
+
+    assert environment is not None
+    assert "LD_LIBRARY_PATH" not in environment
+    assert environment["GLYPH_FORGE_TEST"] == "preserved"
+
+
+def test_non_android_subprocess_environment_inherits_unchanged(monkeypatch) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+
+    assert runtime.subprocess_environment() is None
+
+
 def test_package_import_is_lazy_and_has_no_home_side_effects(tmp_path: Path) -> None:
     source_root = Path(__file__).parents[1] / "src"
     environment = os.environ.copy()
