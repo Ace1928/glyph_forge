@@ -20,7 +20,6 @@ def make_bundle(root: Path) -> Path:
     bundle.mkdir()
     executable = bundle / "glyph-forge"
     executable.write_bytes(b"portable executable\n")
-    executable.chmod(0o755)
     resources = bundle / "_internal" / "glyph_forge" / "ui" / "web"
     resources.mkdir(parents=True)
     (resources / "index.html").write_text("<h1>Glyph Forge</h1>\n", encoding="utf-8")

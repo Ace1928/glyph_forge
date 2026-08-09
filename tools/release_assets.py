@@ -87,7 +87,8 @@ def normalize_platform(value: str) -> str:
 def _normalized_mode(path: Path) -> int:
     if path.is_dir():
         return 0o755
-    return 0o755 if path.stat().st_mode & 0o111 else 0o644
+    launcher = path.name.casefold() in {"glyph-forge", "glyph-forge.exe"}
+    return 0o755 if launcher or path.stat().st_mode & 0o111 else 0o644
 
 
 def _safe_link_target(path: Path, source: Path) -> str:
