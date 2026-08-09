@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,8 @@ def test_adaptive_video_profiles_scale_cleanly() -> None:
 
     assert eco.width < workstation.width
     assert eco.columns < workstation.columns
+    assert eco.workers == 1
+    assert workstation.workers > eco.workers
     assert eco.width % eco.columns == 0
     assert workstation.height % workstation.rows == 0
 
@@ -43,6 +47,8 @@ def test_named_language_charsets_are_resolved() -> None:
         ({"start": -1}, "Start"),
         ({"crf": 52}, "CRF"),
         ({"preset": ""}, "preset"),
+        ({"workers": 0}, "Worker"),
+        ({"workers": 65}, "Worker"),
     ],
 )
 def test_video_config_validation(changes: dict[str, Any], message: str) -> None:
@@ -153,6 +159,45 @@ class _FakeCv2:
         return np.resize(frame, (size[1], size[0], 3)).astype(np.uint8)
 
 
+def test_parallel_frame_rendering_is_bounded_and_ordered() -> None:
+    frames = [np.full((1, 1, 3), marker, dtype=np.uint8) for marker in (1, 2, 3, 4)]
+    capture = _FakeCapture(frames)
+    barrier = threading.Barrier(2)
+
+    class Renderer:
+        def __init__(self) -> None:
+            self.active = 0
+            self.maximum_active = 0
+            self.lock = threading.Lock()
+
+        def render_bgr(self, frame: np.ndarray, _backend: Any) -> np.ndarray:
+            marker = int(frame[0, 0, 0])
+            with self.lock:
+                self.active += 1
+                self.maximum_active = max(self.maximum_active, self.active)
+            try:
+                if marker <= 2:
+                    barrier.wait(timeout=2)
+                return np.full((1, 1, 3), marker, dtype=np.uint8)
+            finally:
+                with self.lock:
+                    self.active -= 1
+
+    renderer = Renderer()
+    rendered = list(
+        video._iter_rendered_frames(
+            capture,
+            renderer,  # type: ignore[arg-type]
+            _FakeCv2(capture),
+            total_frames=None,
+            workers=2,
+        )
+    )
+
+    assert [int(frame[0, 0, 0]) for frame in rendered] == [1, 2, 3, 4]
+    assert renderer.maximum_active == 2
+
+
 class _FakePipe:
     def __init__(self) -> None:
         self.bytes_written = 0
@@ -232,6 +277,13 @@ def test_export_streams_frames_atomically_without_an_image_sequence(
     process = _FakeProcess.instances[-1]
     assert result.rendered_frames == 2
     assert result.fps == 10.0
+    assert result.rendered_seconds == 0.2
+    assert result.workers == 1
+    assert result.source == source
+    assert result.source_bytes == len(b"source")
+    assert result.output_bytes == len(b"encoded-video")
+    assert result.raw_rgb_bytes == 2 * 16 * 16 * 3
+    assert result.to_dict()["render_fps"] > 0
     assert destination.read_bytes() == b"encoded-video"
     assert process.stdin.bytes_written == 2 * 16 * 16 * 3
     assert process.stdin.closed
@@ -317,6 +369,8 @@ def test_cli_video_preserves_every_standalone_script_option(
             "fast",
             "--ffmpeg",
             "custom-ffmpeg",
+            "--workers",
+            "3",
             "--quiet",
         ],
     )
@@ -337,6 +391,7 @@ def test_cli_video_preserves_every_standalone_script_option(
     assert config.crf == 20
     assert config.preset == "fast"
     assert config.ffmpeg == "custom-ffmpeg"
+    assert config.workers == 3
 
 
 def test_cli_video_chooses_a_shareable_default_filename(
@@ -370,3 +425,46 @@ def test_cli_video_chooses_a_shareable_default_filename(
 
     assert result.exit_code == 0, result.output
     assert outputs == [tmp_path / "party.glyph.mp4"]
+
+
+def test_cli_video_emits_machine_readable_performance_metrics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.mov"
+    source.write_bytes(b"source")
+
+    def fake_export(
+        input_path: Path,
+        output_path: Path,
+        config: VideoExportConfig,
+        **_kwargs: Any,
+    ) -> VideoExportResult:
+        return VideoExportResult(
+            output=Path(output_path),
+            rendered_frames=60,
+            fps=30.0,
+            elapsed=1.0,
+            width=config.width,
+            height=config.height,
+            columns=config.columns,
+            rows=config.rows,
+            workers=config.workers,
+            source=Path(input_path),
+            source_bytes=100,
+            output_bytes=250,
+        )
+
+    monkeypatch.setattr(video, "export_glyph_video", fake_export)
+    result = CliRunner().invoke(
+        app,
+        ["video", str(source), "--performance", "eco", "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    metrics = json.loads(result.stdout)
+    assert metrics["render_fps"] == 60.0
+    assert metrics["rendered_seconds"] == 2.0
+    assert metrics["realtime_factor"] == 0.5
+    assert metrics["output_source_ratio"] == 2.5
+    assert metrics["workers"] == 1

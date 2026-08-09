@@ -9,6 +9,7 @@ Every feature is validated with atomic tests and crystal-clear assertions.
 import importlib
 import os
 import tempfile
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -22,6 +23,23 @@ def test_top_level_image_helper_resolves_to_callable() -> None:
     from glyph_forge import image_to_glyph
 
     assert callable(image_to_glyph)
+
+
+def test_video_metrics_result_is_available_from_the_public_package() -> None:
+    from glyph_forge import VideoExportResult
+
+    result = VideoExportResult(
+        output=Path("output.mp4"),
+        rendered_frames=30,
+        fps=30.0,
+        elapsed=1.0,
+        width=640,
+        height=360,
+        columns=80,
+        rows=45,
+    )
+
+    assert result.to_dict()["render_fps"] == 30.0
 
 
 def test_legacy_image_service_alias_uses_canonical_module() -> None:

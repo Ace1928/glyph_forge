@@ -424,6 +424,13 @@ def video_command(
     crf: int = typer.Option(18, "--crf", min=0, max=51),
     preset: str = typer.Option("veryfast", "--preset", help="FFmpeg x264 preset."),
     ffmpeg: str = typer.Option("ffmpeg", "--ffmpeg", help="FFmpeg executable."),
+    workers: Optional[int] = typer.Option(
+        None,
+        "--workers",
+        min=1,
+        max=64,
+        help="Ordered render workers; adaptive by default.",
+    ),
     performance: str = typer.Option(
         "auto",
         "--performance",
@@ -433,6 +440,11 @@ def video_command(
         True,
         "--progress/--quiet",
         help="Show periodic streaming progress.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit complete output and performance metrics as JSON.",
     ),
 ) -> None:
     """Stream a full-colour glyph MP4 with the source audio preserved."""
@@ -460,14 +472,18 @@ def video_command(
             crf=crf,
             preset=preset,
             ffmpeg=ffmpeg,
+            workers=workers,
         ).validated()
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    error_console.print(
-        f"Rendering [cyan]{config.columns}×{config.rows}[/cyan] glyphs to "
-        f"[cyan]{config.width}×{config.height}[/cyan]"
-    )
+    if not json_output:
+        error_console.print(
+            f"Rendering [cyan]{config.columns}×{config.rows}[/cyan] glyphs to "
+            f"[cyan]{config.width}×{config.height}[/cyan] with "
+            f"[cyan]{config.workers}[/cyan] ordered worker"
+            f"{'s' if config.workers != 1 else ''}"
+        )
     last_report = -10.0
 
     def report_progress(progress: VideoExportProgress) -> None:
@@ -490,14 +506,19 @@ def video_command(
             source,
             destination,
             config,
-            progress=report_progress if progress_output else None,
+            progress=report_progress if progress_output and not json_output else None,
         )
     except VideoExportError as exc:
         error_console.print(f"[bold red]Video export failed:[/bold red] {exc}")
         raise typer.Exit(1) from exc
+    if json_output:
+        typer.echo(json.dumps(result.to_dict(), sort_keys=True))
+        return
     error_console.print(
-        f"[green]Saved[/green] {result.output} "
-        f"({result.rendered_frames} frames in {result.elapsed:.1f}s)"
+        f"[green]Saved[/green] {result.output} · {result.rendered_frames} frames "
+        f"in {result.elapsed:.1f}s · {result.render_fps:.2f} render FPS · "
+        f"{result.realtime_factor:.2f}× real-time · "
+        f"{result.output_bytes / (1024**2):.1f} MiB"
     )
 
 

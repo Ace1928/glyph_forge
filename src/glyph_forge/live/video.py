@@ -12,10 +12,12 @@ import os
 import shutil
 import subprocess
 import time
+from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, Callable, Generator, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -55,6 +57,7 @@ class VideoExportConfig:
     crf: int = 18
     preset: str = "veryfast"
     ffmpeg: str = "ffmpeg"
+    workers: int = 1
 
     @classmethod
     def adaptive(
@@ -76,6 +79,7 @@ class VideoExportConfig:
             "height": height,
             "columns": columns,
             "rows": rows,
+            "workers": profile.workers,
         }
         values.update(overrides)
         return cls(**values)
@@ -111,6 +115,8 @@ class VideoExportConfig:
             raise ValueError("FFmpeg preset cannot be empty")
         if not self.ffmpeg.strip():
             raise ValueError("FFmpeg executable cannot be empty")
+        if not 1 <= self.workers <= 64:
+            raise ValueError("Worker count must be between 1 and 64")
         if not _resolve_charset(self.charset):
             raise ValueError("Charset cannot be empty")
         return self
@@ -144,6 +150,78 @@ class VideoExportResult:
     height: int
     columns: int
     rows: int
+    workers: int = 1
+    source: Path | None = None
+    source_bytes: int = 0
+    output_bytes: int = 0
+
+    @property
+    def rendered_seconds(self) -> float:
+        """Duration represented by the encoded frames."""
+
+        return self.rendered_frames / self.fps if self.fps > 0 else 0.0
+
+    @property
+    def render_fps(self) -> float:
+        """Frames rendered per wall-clock second."""
+
+        return self.rendered_frames / self.elapsed if self.elapsed > 0 else 0.0
+
+    @property
+    def realtime_factor(self) -> float:
+        """Wall time divided by encoded duration (below one is real-time)."""
+
+        duration = self.rendered_seconds
+        return self.elapsed / duration if duration > 0 else 0.0
+
+    @property
+    def glyph_cells_per_second(self) -> float:
+        """Glyph samples processed per wall-clock second."""
+
+        return self.render_fps * self.columns * self.rows
+
+    @property
+    def output_megapixels_per_second(self) -> float:
+        """Rendered raster megapixels produced per wall-clock second."""
+
+        return self.render_fps * self.width * self.height / 1_000_000
+
+    @property
+    def raw_rgb_bytes(self) -> int:
+        """Bytes streamed to FFmpeg before compression."""
+
+        return self.rendered_frames * self.width * self.height * 3
+
+    @property
+    def output_source_ratio(self) -> float | None:
+        """Encoded output size relative to the source file."""
+
+        return self.output_bytes / self.source_bytes if self.source_bytes else None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return complete JSON-ready performance and output metrics."""
+
+        return {
+            "source": str(self.source) if self.source is not None else None,
+            "output": str(self.output),
+            "rendered_frames": self.rendered_frames,
+            "source_fps": self.fps,
+            "render_fps": self.render_fps,
+            "rendered_seconds": self.rendered_seconds,
+            "elapsed_seconds": self.elapsed,
+            "realtime_factor": self.realtime_factor,
+            "width": self.width,
+            "height": self.height,
+            "columns": self.columns,
+            "rows": self.rows,
+            "workers": self.workers,
+            "glyph_cells_per_second": self.glyph_cells_per_second,
+            "output_megapixels_per_second": self.output_megapixels_per_second,
+            "source_bytes": self.source_bytes,
+            "output_bytes": self.output_bytes,
+            "output_source_ratio": self.output_source_ratio,
+            "raw_rgb_bytes": self.raw_rgb_bytes,
+        }
 
 
 def _resolve_charset(name_or_characters: str) -> str:
@@ -393,6 +471,50 @@ def _partial_output_path(output: Path) -> Path:
     return output.with_name(f".{output.stem}.glyph-forge-{nonce}.partial{suffix}")
 
 
+def _iter_rendered_frames(
+    capture: Any,
+    renderer: GlyphVideoRenderer,
+    backend: Any,
+    *,
+    total_frames: int | None,
+    workers: int,
+) -> Generator[RGBFrame, None, None]:
+    """Render captured frames in order with at most one frame per worker queued."""
+
+    if workers == 1:
+        submitted = 0
+        while total_frames is None or submitted < total_frames:
+            ok, frame = capture.read()
+            if not ok:
+                break
+            submitted += 1
+            yield renderer.render_bgr(frame, backend)
+        return
+
+    submitted = 0
+    source_ended = False
+    pending: deque[Future[RGBFrame]] = deque()
+    with ThreadPoolExecutor(
+        max_workers=workers,
+        thread_name_prefix="glyph-forge-video",
+    ) as executor:
+        while pending or not source_ended:
+            while not source_ended and len(pending) < workers:
+                if total_frames is not None and submitted >= total_frames:
+                    source_ended = True
+                    break
+                ok, frame = capture.read()
+                if not ok:
+                    source_ended = True
+                    break
+                pending.append(executor.submit(renderer.render_bgr, frame, backend))
+                submitted += 1
+            if pending:
+                # Futures stay in capture order even when later frames finish
+                # first, so audio timing and frame order remain exact.
+                yield pending.popleft().result()
+
+
 def export_glyph_video(
     input_path: str | os.PathLike[str],
     output_path: str | os.PathLike[str],
@@ -407,6 +529,7 @@ def export_glyph_video(
     output = Path(output_path).expanduser()
     if not source.is_file():
         raise VideoExportError(f"Input does not exist: {source}")
+    source_bytes = source.stat().st_size
     if source.resolve() == output.resolve():
         raise VideoExportError("Input and output paths must be different")
     if not _executable_available(selected.ffmpeg):
@@ -455,12 +578,15 @@ def export_glyph_video(
             raise VideoExportError("FFmpeg did not provide an input pipe")
 
         pipe_broken = False
+        rendered_frames = _iter_rendered_frames(
+            capture,
+            renderer,
+            cv2,
+            total_frames=total_frames,
+            workers=selected.workers,
+        )
         try:
-            while total_frames is None or rendered < total_frames:
-                ok, frame = capture.read()
-                if not ok:
-                    break
-                output_frame = renderer.render_bgr(frame, cv2)
+            for output_frame in rendered_frames:
                 encoder.stdin.write(output_frame.tobytes())
                 rendered += 1
                 if progress is not None:
@@ -474,6 +600,8 @@ def export_glyph_video(
                     )
         except BrokenPipeError:
             pipe_broken = True
+        finally:
+            rendered_frames.close()
 
         if rendered == 0:
             raise VideoExportError("The input did not yield any video frames")
@@ -514,6 +642,10 @@ def export_glyph_video(
         height=selected.height,
         columns=selected.columns,
         rows=selected.rows,
+        workers=selected.workers,
+        source=source,
+        source_bytes=source_bytes,
+        output_bytes=output.stat().st_size,
     )
 
 

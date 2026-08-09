@@ -34,6 +34,8 @@ the project uses semantic versioning.
   isolation, in-process registration, and CLI diagnostics
 - `live source` and top-level `stream` commands that route paths, URLs, devices,
   and plugin sources through one bounded-latency pipeline
+- Complete machine-readable video export metrics covering duration, throughput,
+  worker count, source/output/raw sizes, glyph rate, and real-time factor
 
 ### Performance
 
@@ -46,6 +48,8 @@ the project uses semantic versioning.
   when cursor-addressed output would be larger
 - Per-frame viewport constraints are applied before image resampling, avoiding
   wasted rendering work for pixels that cannot fit on the terminal surface
+- Offline video frames render through a bounded hardware-adaptive worker pool
+  while retaining exact source order, deterministic output, and audio sync
 
 ### Fixed
 

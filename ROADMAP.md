@@ -13,7 +13,7 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 | Desktop viewing | Render a desktop or isolated X11 app through glyph modes | Viewer complete in 0.2 |
 | Desktop control | Opt-in focused keyboard and pointer forwarding | Isolated X11 complete; native host adapters active |
 | Sharing | Exports, style links, and ephemeral seekable LAN links | Local/LAN complete; hosted relay optional later |
-| Native acceleration | Browser GPU atlas now; compiled/native hot paths later | Active |
+| Native acceleration | Browser GPU atlas and bounded parallel NumPy video path now; compiled kernels later | Active |
 | Extension SDK | Third-party source, renderer, transform, and exporter plugins | API v1 complete in Unreleased |
 
 ## Fidelity and performance
@@ -58,9 +58,9 @@ rejected because injected input can feed back into the focused terminal.
 4. Add native Windows, macOS, and Wayland capture adapters behind the existing
    source protocol.
 5. Profile hot paths and introduce optional compiled kernels only where measured
-   gains justify their maintenance and packaging cost. The first pass removed
-   per-cell half-block colour conversion and made the portable NumPy path fast
-   enough to defer a compiled dependency.
+   gains justify their maintenance and packaging cost. Portable passes removed
+   per-cell half-block colour conversion and added bounded, ordered parallel
+   video rendering, keeping NumPy fast enough to defer a compiled dependency.
 6. ~~Define versioned plugin contracts and isolated discovery for external
    sources, renderers, transforms, and exporters.~~ Completed with lazy entry
    points, live-pipeline integration, diagnostics, and failure isolation.

@@ -148,11 +148,18 @@ glyph-forge live url "https://example.com/video-page" --mode edge
 # Encode a full-colour glyph video and preserve source audio
 glyph-forge video clip.mp4
 glyph-forge video clip.mp4 output.mp4 --performance workstation --crf 16
+
+# Override bounded ordered workers or capture complete render metrics
+glyph-forge video clip.mp4 output.mp4 --workers 8
+glyph-forge video clip.mp4 output.mp4 --json > render-metrics.json
 ```
 
 The exporter streams OpenCV frames directly through a vectorized glyph atlas
 to FFmpeg. It does not create a temporary image sequence, and the destination
-is replaced only after encoding succeeds.
+is replaced only after encoding succeeds. Hardware-adaptive workers render a
+bounded number of frames concurrently, then write them in exact source order;
+this scales on workstations without allowing memory use or audio timing to
+drift. `--workers 1` provides the minimum-memory serial path.
 
 Live terminal views default to adaptive redraws. Glyph Forge compares the
 actual UTF-8 payload for a complete frame with cursor-addressed changed rows,
@@ -290,7 +297,8 @@ preview work runs outside the UI event loop.
 Most workflows accept `--performance auto|eco|balanced|workstation`. Automatic
 selection uses logical CPU count and available physical memory when those are
 discoverable. The profile chooses conservative defaults for worker count,
-output width, target FPS, and resampling; explicit command options always win.
+output width, target FPS, and resampling. Video export uses those workers as a
+bounded ordered pipeline; explicit command options always win.
 
 Measure the renderer on the current machine with deterministic synthetic input:
 
@@ -341,7 +349,7 @@ print(result.text)
 
 For low-level capture, video export, and live presentation, the public package
 also lazily exports `create_frame_source`, `LatestFramePump`,
-`VideoExportConfig`, `export_glyph_video`, `InputRouter`, and
+`VideoExportConfig`, `VideoExportResult`, `export_glyph_video`, `InputRouter`, and
 `run_terminal_session`.
 [`examples/api_examples.py`](examples/api_examples.py) is a complete runnable
 example that uses only generated in-memory media.
@@ -390,7 +398,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite has 387 passing tests (plus one platform-dependent skip) and
+The current suite has 394 passing tests (plus one platform-dependent skip) and
 measures at least 70% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource
