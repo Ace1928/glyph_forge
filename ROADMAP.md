@@ -10,7 +10,7 @@ tested conversion, capture, rendering, sharing, and capability APIs.
 |---|---|---|
 | Portable core | Install, import, diagnose, and run on modest or powerful hardware | Active in 0.2 |
 | Unified experiences | Friendly CLI, full-screen TUI, and local browser studio | Active in 0.2 |
-| Live media | Stream files, cameras, and screens without loading whole videos | Active in 0.2 |
+| Live media | Stream files, cameras, and screens without loading whole videos | Video engine complete; capture active |
 | Desktop mirror | View and optionally control a desktop through glyph rendering | Planned for 0.3 |
 | Sharing | Self-contained share codes, exports, and opt-in hosted links | Planned for 0.3 |
 | Extension SDK | Third-party capture, transform, renderer, and exporter plugins | Planned for 0.4 |
@@ -70,12 +70,13 @@ permission hint; they never prevent image/text workflows from starting.
 
 1. Side-effect-free imports, adaptive runtime profiles, unified commands, and
    dependable package metadata.
-2. Vectorized renderers plus streaming video and webcam capture.
-3. Screen capture and a terminal desktop mirror with bounded-latency scheduling.
-4. Browser studio with live preview, drag-and-drop files, downloads, and share
+2. Vectorized renderers plus streaming video export. **Complete in 0.2.**
+3. Webcam capture with the same bounded latest-frame pipeline.
+4. Screen capture and a terminal desktop mirror with bounded-latency scheduling.
+5. Browser studio with live preview, drag-and-drop files, downloads, and share
    codes.
-5. TUI parity, input routing, native capture adapters, and benchmarks.
-6. GPU atlas renderer, plugin SDK, signed releases, and standalone installers.
+6. TUI parity, input routing, native capture adapters, and benchmarks.
+7. GPU atlas renderer, plugin SDK, signed releases, and standalone installers.
 
 Each milestone must keep the core test suite green, add focused tests and
 benchmarks for new hot paths, preserve compatibility aliases, and avoid making

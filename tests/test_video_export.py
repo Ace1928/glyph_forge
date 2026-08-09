@@ -1,0 +1,363 @@
+"""Tests for the streamed full-colour glyph video pipeline."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pytest
+from typer.testing import CliRunner
+
+from glyph_forge.cli import app
+from glyph_forge.live import video
+from glyph_forge.live.video import (
+    GlyphVideoRenderer,
+    VideoExportConfig,
+    VideoExportResult,
+    build_ffmpeg_command,
+    export_glyph_video,
+)
+
+
+def test_adaptive_video_profiles_scale_cleanly() -> None:
+    eco = VideoExportConfig.adaptive("eco")
+    workstation = VideoExportConfig.adaptive("workstation")
+
+    assert eco.width < workstation.width
+    assert eco.columns < workstation.columns
+    assert eco.width % eco.columns == 0
+    assert workstation.height % workstation.rows == 0
+
+
+def test_named_language_charsets_are_resolved() -> None:
+    assert video._resolve_charset("greek").startswith("αβγ")
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"width": 7}, "even"),
+        ({"width": 10, "columns": 3}, "whole-pixel"),
+        ({"duration": 0}, "Duration"),
+        ({"start": -1}, "Start"),
+        ({"crf": 52}, "CRF"),
+        ({"preset": ""}, "preset"),
+    ],
+)
+def test_video_config_validation(changes: dict[str, Any], message: str) -> None:
+    base = {
+        "width": 16,
+        "height": 16,
+        "columns": 2,
+        "rows": 2,
+        "charset": " @",
+    }
+    with pytest.raises(ValueError, match=message):
+        VideoExportConfig(**(base | changes)).validated()
+
+
+def test_full_colour_renderer_maps_brightness_and_preserves_colour() -> None:
+    renderer = GlyphVideoRenderer(
+        VideoExportConfig(
+            width=16,
+            height=16,
+            columns=2,
+            rows=2,
+            charset="@",
+        )
+    )
+    sampled = np.zeros((2, 2, 3), dtype=np.uint8)
+    sampled[:, 1] = [255, 0, 0]
+
+    rendered = renderer.render_sampled_rgb(sampled)
+
+    assert rendered.shape == (16, 16, 3)
+    assert rendered.dtype == np.uint8
+    assert rendered[:, :8].sum() == 0
+    assert rendered[:, 8:, 0].sum() > 0
+    assert rendered[:, 8:, 1:].sum() == 0
+
+
+def test_ffmpeg_command_retains_script_audio_and_quality_options() -> None:
+    config = VideoExportConfig(
+        width=1920,
+        height=1080,
+        columns=160,
+        rows=90,
+        start=2.5,
+        duration=4.25,
+        crf=12,
+        preset="slow",
+    )
+
+    command = build_ffmpeg_command("source.mov", "output.mp4", config, 29.97)
+
+    assert command[:2] == ["ffmpeg", "-hide_banner"]
+    assert ["-video_size", "1920x1080"] == command[
+        command.index("-video_size") : command.index("-video_size") + 2
+    ]
+    assert command[command.index("-ss") + 1] == "2.500000"
+    assert command[command.index("-t") + 1] == "4.250000"
+    assert command[command.index("-preset") + 1] == "slow"
+    assert command[command.index("-crf") + 1] == "12"
+    assert "1:a:0?" in command
+    assert "+faststart" in command
+    assert command[-1] == "output.mp4"
+
+
+class _FakeCapture:
+    def __init__(self, frames: list[np.ndarray]) -> None:
+        self.frames = iter(frames)
+        self.released = False
+        self.seek = 0
+
+    def isOpened(self) -> bool:
+        return True
+
+    def get(self, property_id: int) -> float:
+        return {1: 10.0, 2: 2.0}.get(property_id, 0.0)
+
+    def set(self, property_id: int, value: int) -> bool:
+        self.seek = value
+        return True
+
+    def read(self) -> tuple[bool, np.ndarray | None]:
+        try:
+            return True, next(self.frames)
+        except StopIteration:
+            return False, None
+
+    def release(self) -> None:
+        self.released = True
+
+
+class _FakeCv2:
+    CAP_PROP_FPS = 1
+    CAP_PROP_FRAME_COUNT = 2
+    CAP_PROP_POS_FRAMES = 3
+    INTER_AREA = 4
+
+    def __init__(self, capture: _FakeCapture) -> None:
+        self.capture = capture
+
+    def VideoCapture(self, _path: str) -> _FakeCapture:
+        return self.capture
+
+    @staticmethod
+    def resize(
+        frame: np.ndarray, size: tuple[int, int], interpolation: int
+    ) -> np.ndarray:
+        del interpolation
+        return np.resize(frame, (size[1], size[0], 3)).astype(np.uint8)
+
+
+class _FakePipe:
+    def __init__(self) -> None:
+        self.bytes_written = 0
+        self.closed = False
+
+    def write(self, data: bytes) -> int:
+        self.bytes_written += len(data)
+        return len(data)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeProcess:
+    instances: list["_FakeProcess"] = []
+
+    def __init__(self, command: list[str], stdin: Any = None) -> None:
+        del stdin
+        self.command = command
+        self.stdin = _FakePipe()
+        self.returncode: int | None = None
+        Path(command[-1]).write_bytes(b"encoded-video")
+        self.instances.append(self)
+
+    def wait(self, timeout: int | None = None) -> int:
+        del timeout
+        self.returncode = 0
+        return 0
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.returncode = -15
+
+    def kill(self) -> None:
+        self.returncode = -9
+
+
+def test_export_streams_frames_atomically_without_an_image_sequence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.mov"
+    destination = tmp_path / "result.mp4"
+    source.write_bytes(b"source")
+    frames = [
+        np.full((2, 2, 3), [0, 0, 255], dtype=np.uint8),
+        np.full((2, 2, 3), [255, 0, 0], dtype=np.uint8),
+    ]
+    capture = _FakeCapture(frames)
+    monkeypatch.setattr(video, "_load_opencv", lambda: _FakeCv2(capture))
+    monkeypatch.setattr(video, "_executable_available", lambda _name: True)
+    monkeypatch.setattr(video.subprocess, "Popen", _FakeProcess)
+    progress = []
+
+    result = export_glyph_video(
+        source,
+        destination,
+        VideoExportConfig(
+            width=16,
+            height=16,
+            columns=2,
+            rows=2,
+            charset=" @",
+        ),
+        progress=progress.append,
+    )
+
+    process = _FakeProcess.instances[-1]
+    assert result.rendered_frames == 2
+    assert result.fps == 10.0
+    assert destination.read_bytes() == b"encoded-video"
+    assert process.stdin.bytes_written == 2 * 16 * 16 * 3
+    assert process.stdin.closed
+    assert capture.released
+    assert [item.rendered_frames for item in progress] == [1, 2]
+    assert not list(tmp_path.glob(".*.glyph-forge-*.partial*"))
+
+
+def test_export_refuses_to_overwrite_its_input(tmp_path: Path) -> None:
+    source = tmp_path / "only-copy.mp4"
+    source.write_bytes(b"video")
+
+    with pytest.raises(video.VideoExportError, match="must be different"):
+        export_glyph_video(
+            source,
+            source,
+            VideoExportConfig(
+                width=16,
+                height=16,
+                columns=2,
+                rows=2,
+                charset="@",
+            ),
+        )
+
+
+def test_cli_video_preserves_every_standalone_script_option(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.mov"
+    destination = tmp_path / "custom.mp4"
+    font = tmp_path / "font.ttf"
+    source.write_bytes(b"source")
+    font.write_bytes(b"font")
+    calls: list[tuple[Path, Path, VideoExportConfig]] = []
+
+    def fake_export(
+        input_path: Path,
+        output_path: Path,
+        config: VideoExportConfig,
+        **_kwargs: Any,
+    ) -> VideoExportResult:
+        calls.append((Path(input_path), Path(output_path), config))
+        return VideoExportResult(
+            output=Path(output_path),
+            rendered_frames=24,
+            fps=24.0,
+            elapsed=1.0,
+            width=config.width,
+            height=config.height,
+            columns=config.columns,
+            rows=config.rows,
+        )
+
+    monkeypatch.setattr(video, "export_glyph_video", fake_export)
+    result = CliRunner().invoke(
+        app,
+        [
+            "video",
+            str(source),
+            str(destination),
+            "--width",
+            "640",
+            "--height",
+            "360",
+            "--columns",
+            "80",
+            "--rows",
+            "45",
+            "--charset",
+            "blocks",
+            "--font",
+            str(font),
+            "--start",
+            "1.5",
+            "--duration",
+            "2",
+            "--crf",
+            "20",
+            "--preset",
+            "fast",
+            "--ffmpeg",
+            "custom-ffmpeg",
+            "--quiet",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    _, called_output, config = calls[0]
+    assert called_output == destination.resolve()
+    assert (config.width, config.height, config.columns, config.rows) == (
+        640,
+        360,
+        80,
+        45,
+    )
+    assert config.charset == "blocks"
+    assert config.font == str(font)
+    assert config.start == 1.5
+    assert config.duration == 2
+    assert config.crf == 20
+    assert config.preset == "fast"
+    assert config.ffmpeg == "custom-ffmpeg"
+
+
+def test_cli_video_chooses_a_shareable_default_filename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "party.mov"
+    source.write_bytes(b"source")
+    outputs: list[Path] = []
+
+    def fake_export(
+        _input: Path,
+        output: Path,
+        config: VideoExportConfig,
+        **_kwargs: Any,
+    ) -> VideoExportResult:
+        outputs.append(Path(output))
+        return VideoExportResult(
+            Path(output),
+            1,
+            30.0,
+            0.1,
+            config.width,
+            config.height,
+            config.columns,
+            config.rows,
+        )
+
+    monkeypatch.setattr(video, "export_glyph_video", fake_export)
+    result = CliRunner().invoke(app, ["video", str(source), "--quiet"])
+
+    assert result.exit_code == 0, result.output
+    assert outputs == [tmp_path / "party.glyph.mp4"]

@@ -62,12 +62,29 @@ This document maps the evolution pathway of Glyph Forge through its structural i
 
 > *"Functionality expands like glyph itself—simple elements creating complex structures."*
 
+### ✨ Added
+
+- Unified `glyph-forge video` command with adaptive eco, balanced, and
+  workstation profiles
+- Full-colour vectorized glyph-atlas video renderer with streamed FFmpeg output
+- Source-audio muxing, subclip controls, encoder quality controls, progress
+  callbacks, portable font discovery, and atomic output saves
+- Low-latency glyph, Braille 2×4, true-color half-block, and quadrant renderers
+- Scalable SVG text export for lossless zoomable stills
+
+### ⚡ Performance
+
+- Video frames now stream directly from decoder to renderer to encoder without
+  temporary images or unbounded frame lists
+- Existing video frame APIs now use lazy iterators internally while preserving
+  their list-returning compatibility functions
+
 ### 🔮 Development Vector
 
 - Format-specific rendering optimizations
 - Pattern recognition system with feature preservation
 - Extended format support with conversion integrity
-- Animation framework with frame coherence
+- Webcam and desktop capture with bounded latest-frame scheduling
 - Stable API contracts with backward compatibility
 - CLI enhancement with progress visualization
 

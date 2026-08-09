@@ -1,26 +1,37 @@
-"""Render a sequence of images to an animated GIF."""
+"""Encode an image iterable as an animated GIF."""
 
-from typing import List
+from __future__ import annotations
+
+from collections.abc import Iterable
+from pathlib import Path
+
 from PIL import Image
 
 
-def display_stream_to_video(frames: List[Image.Image], output_path: str, fps: int = 10) -> None:
-    """Save frames as an animated GIF.
+def display_stream_to_video(
+    frames: Iterable[Image.Image],
+    output_path: str | Path,
+    fps: float = 10,
+) -> None:
+    """Save an iterable of frames as an animated GIF."""
 
-    Args:
-        frames: Sequence of ``PIL.Image`` frames.
-        output_path: Destination GIF file path.
-        fps: Frames per second for playback speed.
-    """
-    if not frames:
-        raise ValueError("At least one frame is required")
+    if fps <= 0:
+        raise ValueError("fps must be greater than zero")
+    iterator = iter(frames)
+    try:
+        first = next(iterator)
+    except StopIteration as exc:
+        raise ValueError("At least one frame is required") from exc
 
-    duration = int(1000 / fps)
-    first, *rest = frames
+    destination = Path(output_path).expanduser()
+    destination.parent.mkdir(parents=True, exist_ok=True)
     first.save(
-        output_path,
+        destination,
         save_all=True,
-        append_images=rest,
-        duration=duration,
+        append_images=iterator,
+        duration=max(1, round(1000 / fps)),
         loop=0,
     )
+
+
+__all__ = ["display_stream_to_video"]

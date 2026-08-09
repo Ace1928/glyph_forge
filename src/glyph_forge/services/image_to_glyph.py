@@ -386,7 +386,7 @@ class ImageGlyphConverter:
             ):
                 img = image_path.convert('RGB')
             else:
-                return f"Error: image_path must be a string path or PIL Image object"
+                return "Error: image_path must be a string path or PIL Image object"
 
             # Calculate dimensions
             orig_width, orig_height = img.size

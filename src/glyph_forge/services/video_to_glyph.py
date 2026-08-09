@@ -1,37 +1,52 @@
-"""Video to glyph conversion service."""
+"""Memory-bounded video-to-glyph conversion service."""
 
-from typing import List, Optional
-from PIL import Image
+from __future__ import annotations
+
+from collections.abc import Iterator
+from pathlib import Path
 
 from .image_to_glyph import ImageGlyphConverter
-from .video_to_images import video_to_images
+from .video_to_images import iter_video_images
+
+
+def iter_video_glyph_frames(
+    video_path: str | Path,
+    width: int = 80,
+    max_frames: int | None = None,
+    color_mode: str = "none",
+) -> Iterator[str]:
+    """Yield converted glyph frames as they are decoded."""
+
+    mode = color_mode.casefold()
+    if mode not in {"none", "ansi", "html"}:
+        raise ValueError("color_mode must be none, ansi, or html")
+    converter = ImageGlyphConverter(width=width)
+    for image in iter_video_images(video_path, max_frames=max_frames):
+        if mode == "none":
+            yield converter.convert(image)
+        else:
+            yield converter.convert_color(image, color_mode=mode)
 
 
 def video_to_glyph_frames(
-    video_path: str,
+    video_path: str | Path,
     width: int = 80,
-    max_frames: Optional[int] = None,
+    max_frames: int | None = None,
     color_mode: str = "none",
-) -> List[str]:
-    """Convert a video or GIF into a list of glyph-art frames.
+) -> list[str]:
+    """Return glyph frames as a compatibility list.
 
-    Args:
-        video_path: Path to the input video or GIF file.
-        width: Target width of each glyph frame.
-        max_frames: Optional limit on number of frames to convert.
-        color_mode: ``"none"``, ``"ansi"`` or ``"html"`` for color output.
-
-    Returns:
-        List of glyph-art frames as strings.
+    Use :func:`iter_video_glyph_frames` for live playback and long videos.
     """
-    converter = ImageGlyphConverter(width=width)
-    images = video_to_images(video_path, max_frames=max_frames)
 
-    frames: List[str] = []
-    for img in images:
-        if color_mode.lower() in ("ansi", "html"):
-            frames.append(converter.convert_color(img, color_mode=color_mode))
-        else:
-            frames.append(converter.convert(img))
+    return list(
+        iter_video_glyph_frames(
+            video_path,
+            width=width,
+            max_frames=max_frames,
+            color_mode=color_mode,
+        )
+    )
 
-    return frames
+
+__all__ = ["iter_video_glyph_frames", "video_to_glyph_frames"]

@@ -175,6 +175,121 @@ def text_command(
         error_console.print(f"[green]Saved[/green] {output}")
 
 
+@app.command("video")
+def video_command(
+    source: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        help="Video to render as full-colour glyph art.",
+    ),
+    output: Optional[Path] = typer.Argument(
+        None,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+        help="Output video (defaults to <input>.glyph.mp4).",
+    ),
+    width: Optional[int] = typer.Option(None, "--width", min=2),
+    height: Optional[int] = typer.Option(None, "--height", min=2),
+    columns: Optional[int] = typer.Option(None, "--columns", min=1),
+    rows: Optional[int] = typer.Option(None, "--rows", min=1),
+    charset: str = typer.Option("detailed", "--charset", "-c"),
+    font: Optional[str] = typer.Option(
+        None,
+        "--font",
+        help="Monospace font path/name; auto-detected when omitted.",
+    ),
+    start: float = typer.Option(0.0, "--start", min=0.0, help="Start time in seconds."),
+    duration: Optional[float] = typer.Option(
+        None,
+        "--duration",
+        min=0.001,
+        help="Seconds to render; the rest of the video is used when omitted.",
+    ),
+    crf: int = typer.Option(18, "--crf", min=0, max=51),
+    preset: str = typer.Option("veryfast", "--preset", help="FFmpeg x264 preset."),
+    ffmpeg: str = typer.Option("ffmpeg", "--ffmpeg", help="FFmpeg executable."),
+    performance: str = typer.Option(
+        "auto",
+        "--performance",
+        help="auto, eco, balanced, or workstation",
+    ),
+    progress_output: bool = typer.Option(
+        True,
+        "--progress/--quiet",
+        help="Show periodic streaming progress.",
+    ),
+) -> None:
+    """Stream a full-colour glyph MP4 with the source audio preserved."""
+
+    from ..live.video import (
+        VideoExportConfig,
+        VideoExportError,
+        VideoExportProgress,
+        export_glyph_video,
+        with_video_overrides,
+    )
+
+    destination = output or source.with_name(f"{source.stem}.glyph.mp4")
+    try:
+        config = with_video_overrides(
+            VideoExportConfig.adaptive(performance),
+            width=width,
+            height=height,
+            columns=columns,
+            rows=rows,
+            charset=charset,
+            font=font,
+            start=start,
+            duration=duration,
+            crf=crf,
+            preset=preset,
+            ffmpeg=ffmpeg,
+        ).validated()
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    error_console.print(
+        f"Rendering [cyan]{config.columns}×{config.rows}[/cyan] glyphs to "
+        f"[cyan]{config.width}×{config.height}[/cyan]"
+    )
+    last_report = -10.0
+
+    def report_progress(progress: VideoExportProgress) -> None:
+        nonlocal last_report
+        complete = progress.total_frames == progress.rendered_frames
+        if (
+            progress.rendered_frames != 1
+            and progress.elapsed - last_report < 5
+            and not complete
+        ):
+            return
+        last_report = progress.elapsed
+        total = str(progress.total_frames) if progress.total_frames else "?"
+        error_console.print(
+            f"  {progress.rendered_frames}/{total} frames " f"({progress.elapsed:.1f}s)"
+        )
+
+    try:
+        result = export_glyph_video(
+            source,
+            destination,
+            config,
+            progress=report_progress if progress_output else None,
+        )
+    except VideoExportError as exc:
+        error_console.print(f"[bold red]Video export failed:[/bold red] {exc}")
+        raise typer.Exit(1) from exc
+    error_console.print(
+        f"[green]Saved[/green] {result.output} "
+        f"({result.rendered_frames} frames in {result.elapsed:.1f}s)"
+    )
+
+
 @app.command()
 def styles(
     preview: bool = typer.Option(False, "--preview", help="Render a short sample."),
@@ -304,6 +419,7 @@ def list_commands() -> None:
     for command, description in (
         ("image", "Convert and preview an image"),
         ("text", "Create a text banner"),
+        ("video", "Stream a full-colour glyph video to MP4"),
         ("styles", "Browse charsets and styles"),
         ("launch", "Choose CLI or TUI automatically"),
         ("doctor", "Inspect features and adaptive defaults"),
@@ -341,6 +457,7 @@ def _display_quick_start() -> None:
     console.print("[bold]Quick start[/bold]")
     console.print("  glyph-forge image photo.jpg")
     console.print("  glyph-forge text 'Hello friends'")
+    console.print("  glyph-forge video clip.mp4")
     console.print("  glyph-forge launch tui")
     console.print("  glyph-forge doctor")
     console.print("\nRun [cyan]glyph-forge --help[/cyan] for every option.")

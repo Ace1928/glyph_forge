@@ -4,14 +4,15 @@
 
 A fast, portable toolkit for turning images, text, video, cameras, and screens
 into expressive character art. Glyph Forge scales its defaults to the machine
-it is running on and offers focused CLI commands today, with live media and
-desktop-mirror experiences on the [product roadmap](ROADMAP.md).
+it is running on and offers focused CLI commands, memory-bounded video export,
+and subpixel live renderers today. Webcam, screen, and desktop-mirror
+experiences are tracked on the [product roadmap](ROADMAP.md).
 
 ![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Status](https://img.shields.io/badge/status-beta-purple.svg)
-![Tests](https://img.shields.io/badge/tests-179%20passed-green.svg)
+![Tests](https://img.shields.io/badge/tests-212%20passed-green.svg)
 
 ## 📋 Table of Contents
 
@@ -84,6 +85,7 @@ pip install -e ".[docs]"
 - **Dependencies**: PIL/Pillow, NumPy, PyFiglet, Colorama, Rich, Typer
 - **Optional interfaces**: Textual for the TUI
 - **Optional media**: OpenCV and MSS for video, webcam, and screen capture
+- **Video export**: FFmpeg on `PATH` (or pass `--ffmpeg /path/to/ffmpeg`)
 
 ## 🚀 Quick Start
 
@@ -120,6 +122,10 @@ glyph-forge image image.jpg --color ansi --output portrait.ansi
 # Create a styled text banner
 glyph-forge text "GLYPH FORGE" --font slant --style boxed
 
+# Stream a full-colour glyph MP4 and preserve source audio
+glyph-forge video clip.mp4
+glyph-forge video clip.mp4 party-glyphs.mp4 --performance workstation
+
 # Browse styles, choose an interface, or inspect optional features
 glyph-forge styles --preview
 glyph-forge launch tui
@@ -146,6 +152,9 @@ for compatibility.
 | **Parallel Processing** | Multi-threaded conversion for large images |
 | **Auto-scaling** | Automatic output sizing to fit terminal dimensions |
 | **Caching** | Performance-optimized banner caching system |
+| **Streaming Video** | One-pass OpenCV → vectorized glyph atlas → FFmpeg export with audio |
+| **Subpixel Modes** | Glyph, Braille 2×4, half-block true color, and quadrant renderers |
+| **Adaptive Profiles** | Eco, balanced, and workstation defaults with explicit overrides |
 
 ### Character Sets
 
@@ -172,6 +181,9 @@ glyph_forge/
 ├── core/                   # Core processing engines
 │   ├── banner_generator.py # Text-to-banner engine
 │   └── style_manager.py    # Styling and borders
+├── live/                   # Low-latency and high-fidelity media engine
+│   ├── renderers.py        # Glyph, Braille, block, quadrant, and SVG output
+│   └── video.py            # Vectorized atlas rendering and FFmpeg streaming
 ├── services/               # High-level service functions
 │   ├── image_to_glyph.py  # Image conversion service
 │   ├── text_to_banner.py  # Banner generation service
@@ -291,22 +303,20 @@ print(generator.preview_fonts("Sample", limit=5))
 #### Video Processing
 
 ```python
-from glyph_forge.services import video_to_glyph_frames
-import time
+from glyph_forge import VideoExportConfig, export_glyph_video
+from glyph_forge.services import iter_video_glyph_frames
 
-# Extract and convert video frames
-frames = video_to_glyph_frames(
-    "animation.gif",
-    width=80,
-    max_frames=100,
-    color_mode="ansi",
+# Stream directly to an MP4; no temporary image sequence is created.
+result = export_glyph_video(
+    "clip.mov",
+    "clip.glyph.mp4",
+    VideoExportConfig.adaptive("auto", charset="detailed"),
 )
+print(result.output)
 
-# Play back the frames
-for frame in frames:
-    print("\033[H\033[J")  # Clear screen
-    print(frame)
-    time.sleep(1/15)       # 15 FPS playback
+# Lazy terminal playback keeps memory bounded.
+for frame in iter_video_glyph_frames("animation.gif", width=80):
+    print("\033[H", frame, sep="")
 ```
 
 ### Command Line Interface
@@ -327,26 +337,26 @@ glyph-forge interactive
 glyph-forge list-commands
 ```
 
-#### Image Conversion (imagize)
+#### Image Conversion
 
 ```bash
 # Basic conversion
-glyph-forge imagize photo.jpg
+glyph-forge image photo.jpg
 
 # With custom width
-glyph-forge imagize photo.jpg -w 120
+glyph-forge image photo.jpg -w 120
 
 # With character set and color
-glyph-forge imagize photo.jpg -s blocks -c ansi
+glyph-forge image photo.jpg --charset blocks --color ansi
 
 # Inverted with dithering
-glyph-forge imagize photo.jpg -i -d
+glyph-forge image photo.jpg --invert --dither
 
 # Save to file
-glyph-forge imagize photo.jpg -o output.txt
+glyph-forge image photo.jpg -o output.txt
 
 # Full options
-glyph-forge imagize photo.jpg \
+glyph-forge image photo.jpg \
     --width 100 \
     --charset detailed \
     --color ansi \
@@ -357,30 +367,41 @@ glyph-forge imagize photo.jpg \
     --output art.txt
 ```
 
-#### Banner Generation (bannerize)
+#### Banner Generation
 
 ```bash
 # Basic banner
-glyph-forge bannerize "Hello World"
+glyph-forge text "Hello World"
 
 # With custom font and style
-glyph-forge bannerize "FORGE" --font slant --style boxed
+glyph-forge text "FORGE" --font slant --style boxed
 
 # With color
-glyph-forge bannerize "Eidosian" --style eidosian --color
+glyph-forge text "Eidosian" --style eidosian --color
 
-# List available fonts
-glyph-forge bannerize --list-fonts
-
-# List available styles
-glyph-forge bannerize --list-styles
-
-# Preview a style
-glyph-forge bannerize "Test" --preview --style boxed
+# Browse styles and charsets
+glyph-forge styles --preview
 
 # Save to file
-glyph-forge bannerize "Banner" -o banner.txt
+glyph-forge text "Banner" -o banner.txt
 ```
+
+#### Full-colour Video Export
+
+```bash
+# Adaptive resolution and automatic clip.glyph.mp4 destination
+glyph-forge video clip.mp4
+
+# Every setting is explicit and portable
+glyph-forge video clip.mov output.mp4 \
+    --width 1920 --height 1080 \
+    --columns 160 --rows 90 \
+    --charset detailed --font /path/to/mono.ttf \
+    --start 5 --duration 20 --crf 18 --preset veryfast
+```
+
+The older `imagize`, `bannerize`, and `glyphfy` commands are thin compatibility
+surfaces for existing automation; new projects should use `image` and `text`.
 
 ## ⚙️ Configuration
 
