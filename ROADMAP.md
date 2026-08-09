@@ -12,7 +12,7 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 | Live media | Stream files, cameras, screens, and URLs with bounded latency | Complete in 0.2 |
 | Desktop viewing | Render a desktop or isolated X11 app through glyph modes | Viewer complete in 0.2 |
 | Desktop control | Opt-in focused keyboard and pointer forwarding | Isolated X11 complete; native host adapters active |
-| Sharing | Local exports and style links; optional hosted links later | Active |
+| Sharing | Exports, style links, and ephemeral seekable LAN links | Local/LAN complete; hosted relay optional later |
 | Native acceleration | Browser GPU atlas now; compiled/native hot paths later | Active |
 | Extension SDK | Third-party source, renderer, transform, and exporter plugins | API v1 complete in Unreleased |
 
@@ -64,8 +64,9 @@ rejected because injected input can feed back into the focused terminal.
 6. ~~Define versioned plugin contracts and isolated discovery for external
    sources, renderers, transforms, and exporters.~~ Completed with lazy entry
    points, live-pipeline integration, diagnostics, and failure isolation.
-7. Produce reproducible signed wheels, standalone installers, and opt-in hosted
-   sharing without changing the local-first default.
+7. ~~Add bounded, opt-in, seekable local/LAN links without changing the
+   local-first default.~~ Completed. Next, produce reproducible signed wheels
+   and standalone installers; evaluate an opt-in hosted relay separately.
 
 Every milestone must keep imports side-effect-free, optional dependencies lazy,
 buffers bounded, compatibility adapters tested, and the cross-platform CI suite

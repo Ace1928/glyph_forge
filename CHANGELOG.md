@@ -12,6 +12,11 @@ the project uses semantic versioning.
 
 ### Added
 
+- Opt-in ephemeral capability links for Studio PNG snapshots and exact local
+  files, including the `glyph-forge share` command, trusted-LAN address
+  discovery, configurable expiry, and browser copy-to-clipboard workflow
+- HTTP range and HEAD support for seekable image, audio, and video links, with
+  IPv4/IPv6 URL generation and an explicit advertised-host override
 - Explicit isolated-desktop keyboard and pointer control through a typed input
   protocol, lazy pynput adapter, UTF-8/SGR terminal parser, viewport coordinate
   mapping, and Ctrl+] emergency release
@@ -27,6 +32,9 @@ the project uses semantic versioning.
 
 ### Performance
 
+- File-backed sharing streams large outputs in place through the platform
+  `sendfile` path when available, with a bounded portable fallback and no
+  media-sized memory copy
 - Vectorized half-block palette conversion and run-length terminal emission,
   removing per-cell NumPy allocations and redundant ANSI256 colour sequences
 - Changed-row terminal updates which automatically fall back to complete frames
@@ -36,6 +44,9 @@ the project uses semantic versioning.
 
 ### Security
 
+- Link sharing is disabled by default and bounded by random capability tokens,
+  TTL, item count, and memory; browser publication requires same-origin CSRF
+  validation and a real PNG signature, while file links reject changed files
 - Input forwarding is opt-in, independent from capture permission, and refuses
   unsafe same-display terminal injection that could create an event loop
 - Isolated capture, child processes, and input routing receive their target X11

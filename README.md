@@ -181,6 +181,12 @@ viewer exits.
 
 ```bash
 glyph-forge studio
+
+# Enable explicit one-click snapshot links on this device
+glyph-forge studio --share-links
+
+# Open Studio to trusted devices on the same LAN and enable snapshot links
+glyph-forge studio --lan
 ```
 
 Studio is included in the core install and opens a private loopback server. It
@@ -190,18 +196,38 @@ Canvas2D fallback.
 
 Exports include PNG, scalable real-text SVG, and TXT. When supported, the Web
 Share API can hand an export to another installed app. Copyable style links
-encode settings only; source media stays in the browser session and is not
-uploaded by Glyph Forge.
+encode settings only. Temporary output links are hidden unless explicitly
+enabled; pressing **Copy temporary link** publishes only the current PNG frame
+to the bounded in-memory local server, never the source media.
 
 The server refuses non-loopback addresses unless trusted-LAN access is
 explicitly enabled:
 
 ```bash
-glyph-forge studio --host 0.0.0.0 --allow-network
+glyph-forge studio --lan --share-ttl 1800
 ```
 
-There is no hosted link service in 0.2. Use the exported file or your preferred
-file-sharing service when a public URL is required.
+Share an already-rendered image, audio file, or multi-gigabyte video without
+copying it into memory or another directory:
+
+```bash
+# Private test link on this computer
+glyph-forge share Downloads/crab-rave.glyph.mp4
+
+# Seekable link for friends on the trusted local network
+glyph-forge share Downloads/crab-rave.glyph.mp4 --lan --ttl 3600
+
+# Override automatic LAN-address selection on a VPN or multi-NIC workstation
+glyph-forge share render.mp4 --lan --advertise-host 192.168.1.42
+```
+
+File links expose exactly the selected file and support HTTP byte ranges, so a
+browser can seek through large videos while Glyph Forge streams from disk. The
+file is never copied or uploaded, and the link disappears when its TTL expires
+or the command stops. Capability URLs are random but use unencrypted HTTP: use
+`--lan` only on a trusted local network and share the URL only with intended
+viewers. Glyph Forge does not provide a public Internet relay or hosted storage.
+See [the sharing guide](docs/sharing.md) for behavior and security boundaries.
 
 ## Third-party extensions
 
@@ -346,7 +372,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite has 322 passing tests (plus one platform-dependent skip) and
+The current suite has 361 passing tests (plus one platform-dependent skip) and
 measures at least 70% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource

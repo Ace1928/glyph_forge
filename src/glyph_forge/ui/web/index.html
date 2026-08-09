@@ -18,7 +18,7 @@
           <small>Local visual foundry</small>
         </span>
       </a>
-      <div class="privacy-pill" title="Media is processed in this browser">
+      <div class="privacy-pill" title="Media stays local unless you explicitly publish an output">
         <span class="privacy-dot" aria-hidden="true"></span>
         Private by design
       </div>
@@ -31,7 +31,7 @@
             <span class="step">01</span>
             <div>
               <h2>Choose a source</h2>
-              <p>Files never leave this browser.</p>
+              <p>Files stay here unless you explicitly publish.</p>
             </div>
           </div>
 
@@ -152,7 +152,8 @@
             <button id="pngButton" class="button primary" type="button" disabled>Save PNG</button>
             <button id="svgButton" class="button secondary" type="button" disabled>Save SVG</button>
             <button id="textButton" class="button secondary" type="button" disabled>Save text</button>
-            <button id="shareButton" class="button accent" type="button" disabled>Share</button>
+            <button id="shareButton" class="button accent" type="button" disabled>Share file</button>
+            <button id="publishButton" class="button accent wide hidden" type="button" disabled>Copy temporary link</button>
             <button id="linkButton" class="button ghost wide" type="button">Copy style link</button>
           </div>
         </section>
@@ -184,7 +185,7 @@
 
         <footer class="stage-footer">
           <span id="statusMessage" role="status">Ready. Nothing is uploaded.</span>
-          <span>WebGL2 atlas · Canvas fallback · local-only media</span>
+          <span>WebGL2 atlas · Canvas fallback · local-first media</span>
         </footer>
       </section>
     </main>

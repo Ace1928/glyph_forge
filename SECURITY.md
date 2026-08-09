@@ -25,9 +25,16 @@ promise a timeline it may be unable to meet.
 ## Security boundaries
 
 - Browser Studio binds to loopback by default. A non-loopback bind requires the
-  explicit `--allow-network` option and should only be used on a trusted LAN.
-- Studio does not upload source media. Browser Web Share hands an export to an
-  app selected by the user; style links contain settings, not media.
+  explicit `--allow-network` or `--lan` option and should only be used on a
+  trusted LAN.
+- Link sharing is disabled by default. `studio --share-links` can publish only
+  the current PNG output after an explicit button press; it does not publish
+  source media. `glyph-forge share` exposes exactly the selected file and
+  disables the Studio upload endpoint.
+- Temporary links are random bearer capabilities. Anyone who receives one and
+  can reach the server can read that output until the TTL expires or the
+  process stops. Links use unencrypted HTTP and are intended for trusted local
+  networks, not the public Internet. Glyph Forge has no hosted relay.
 - Webcam and screen access remain subject to browser and operating-system
   permission prompts.
 - `live url` contacts the supplied URL and services used by yt-dlp. Treat URLs
@@ -47,8 +54,12 @@ promise a timeline it may be unable to meet.
 ## Defensive design
 
 Glyph Forge keeps optional dependencies lazy, validates local server binds,
-sends restrictive browser security headers, avoids shell-based child-process
-launch, uses bounded live buffers, and writes video output through a temporary
-destination before atomic replacement. CI checks formatting, linting, typing,
-tests, package metadata, optional dependency installation, and installed wheel
-resources.
+sends restrictive browser security headers, and avoids shell-based child-process
+launch. Browser publishing uses same-origin and per-session CSRF checks, a PNG
+signature check, bounded memory and item counts, and expiring capability tokens.
+The HTTP server also bounds simultaneous request threads.
+File links are path-resolved, limited to regular files, and revoked if the file
+identity, size, or modification time changes. Live buffers are bounded, and
+video output uses a temporary destination before atomic replacement. CI checks
+formatting, linting, typing, tests, package metadata, optional dependency
+installation, and installed wheel resources.

@@ -632,7 +632,7 @@ def launch(
     selected = interface.casefold()
     if selected not in {"auto", "gui", "studio", "tui", "cli"}:
         raise typer.BadParameter(
-            "Choose auto, gui, tui, or cli", param_hint="interface"
+            "Choose auto, gui, studio, tui, or cli", param_hint="interface"
         )
     dependencies = check_for_external_dependencies()
     if selected == "auto":
@@ -646,6 +646,10 @@ def launch(
             port=0,
             open_browser=True,
             allow_network=False,
+            lan=False,
+            share_links=False,
+            advertise_host=None,
+            share_ttl=3600,
             duration=None,
         )
         return
@@ -674,6 +678,10 @@ def interactive() -> None:
             port=0,
             open_browser=True,
             allow_network=False,
+            lan=False,
+            share_links=False,
+            advertise_host=None,
+            share_ttl=3600,
             duration=None,
         )
 
@@ -694,6 +702,28 @@ def studio(
         "--allow-network",
         help="Explicitly allow a non-loopback bind for trusted LAN sharing.",
     ),
+    lan: bool = typer.Option(
+        False,
+        "--lan",
+        help="Listen on the trusted LAN and enable temporary share links.",
+    ),
+    share_links: bool = typer.Option(
+        False,
+        "--share-links",
+        help="Enable bounded temporary links from the Studio export panel.",
+    ),
+    advertise_host: Optional[str] = typer.Option(
+        None,
+        "--advertise-host",
+        help="Hostname or IP embedded in links (useful with VPNs or many NICs).",
+    ),
+    share_ttl: int = typer.Option(
+        3600,
+        "--share-ttl",
+        min=1,
+        max=86400,
+        help="Lifetime of temporary links in seconds (maximum one day).",
+    ),
     duration: Optional[float] = typer.Option(
         None,
         "--duration",
@@ -706,24 +736,149 @@ def studio(
 
     from ..studio import StudioError, StudioServer
 
+    if lan:
+        if host == "127.0.0.1":
+            host = "0.0.0.0"
+        allow_network = True
+        share_links = True
     try:
         server = StudioServer(
             host,
             port,
             allow_network=allow_network,
             quiet=True,
+            share_links=share_links,
+            advertise_host=advertise_host,
+            share_ttl=float(share_ttl),
         ).start(open_browser=open_browser)
     except (StudioError, ValueError) as exc:
         error_console.print(f"[bold red]Could not start studio:[/bold red] {exc}")
         raise typer.Exit(2) from exc
 
     console.print(Panel.fit(f"[bold cyan]{server.url}[/bold cyan]", title="Studio"))
-    error_console.print("Your media stays in this browser session. Ctrl+C stops it.")
+    if server.sharing_enabled:
+        error_console.print(
+            f"Temporary link sharing is enabled at {server.public_url} "
+            f"for up to {share_ttl} seconds."
+        )
+        error_console.print("Use it only on a trusted LAN; links are unencrypted HTTP.")
+    else:
+        error_console.print(
+            "Your media stays in this browser session. Ctrl+C stops it."
+        )
     try:
         if duration is not None:
             threading.Event().wait(duration)
         else:
             server.wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.close()
+
+
+@app.command()
+def share(
+    source: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        help="Rendered image, video, audio, text, or other file to share.",
+    ),
+    lan: bool = typer.Option(
+        False,
+        "--lan",
+        help="Listen beyond this device on a trusted local network.",
+    ),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Bind address; --lan changes the default to 0.0.0.0.",
+    ),
+    port: int = typer.Option(
+        0, "--port", min=0, max=65535, help="Port; zero chooses a free port."
+    ),
+    advertise_host: Optional[str] = typer.Option(
+        None,
+        "--advertise-host",
+        help="Hostname or IP friends should use when automatic detection is wrong.",
+    ),
+    ttl: int = typer.Option(
+        3600,
+        "--ttl",
+        min=1,
+        max=86400,
+        help="Link lifetime in seconds (maximum one day).",
+    ),
+    open_browser: bool = typer.Option(
+        False,
+        "--open/--no-open",
+        help="Open the temporary link in the default browser.",
+    ),
+    duration: Optional[float] = typer.Option(
+        None,
+        "--duration",
+        min=0.01,
+        hidden=True,
+        help="Stop earlier after N seconds (automation/testing).",
+    ),
+) -> None:
+    """Create a seekable, temporary link to exactly one local file."""
+
+    import webbrowser
+
+    from ..studio import StudioError, StudioServer
+
+    if lan and host == "127.0.0.1":
+        host = "0.0.0.0"
+    server: StudioServer | None = None
+    try:
+        server = StudioServer(
+            host,
+            port,
+            allow_network=lan,
+            quiet=True,
+            share_links=True,
+            advertise_host=advertise_host,
+            share_ttl=float(ttl),
+            browser_shares=False,
+        )
+        publication = server.publish_file(source, ttl=float(ttl))
+        server.start()
+    except (StudioError, ValueError) as exc:
+        if server is not None:
+            server.close()
+        error_console.print(f"[bold red]Could not share file:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+
+    details = Table(show_header=False, box=None)
+    details.add_column("Property", style="bold cyan")
+    details.add_column("Value")
+    details.add_row("Link", Text(publication.url, style="bright_yellow"))
+    details.add_row("File", Text(publication.filename))
+    details.add_row("Size", _format_bytes(publication.size))
+    details.add_row("Expires", f"in {ttl} seconds")
+    console.print(Panel.fit(details, title="Temporary share"))
+    error_console.print(
+        "The file is streamed in place with video seeking; it is not copied or uploaded."
+    )
+    if lan:
+        error_console.print(
+            "Anyone with this unencrypted link on the trusted LAN can access it until "
+            "the command stops."
+        )
+    else:
+        error_console.print(
+            "This loopback link works only on this device. Add --lan to share nearby."
+        )
+    if open_browser:
+        webbrowser.open(publication.url, new=2)
+    try:
+        lifetime = float(ttl) if duration is None else min(float(ttl), duration)
+        threading.Event().wait(lifetime)
     except KeyboardInterrupt:
         pass
     finally:
@@ -871,6 +1026,7 @@ def list_commands() -> None:
         ("video", "Stream a full-colour glyph video to MP4"),
         ("live", "View a camera, video, or desktop with bounded latency"),
         ("studio", "Open the local browser GUI and sharing surface"),
+        ("share", "Create a temporary seekable link to one local file"),
         ("demo", "Render a built-in showcase with no input file"),
         ("benchmark", "Measure adaptive renderer throughput"),
         ("plugins", "Discover and diagnose third-party extensions"),
@@ -918,6 +1074,7 @@ def _display_quick_start() -> None:
     console.print("  glyph-forge webcam")
     console.print("  glyph-forge desktop")
     console.print("  glyph-forge studio")
+    console.print("  glyph-forge share render.mp4 --lan")
     console.print("  glyph-forge launch tui")
     console.print("  glyph-forge doctor")
     console.print("\nRun [cyan]glyph-forge --help[/cyan] for every option.")

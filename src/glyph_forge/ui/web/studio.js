@@ -43,6 +43,7 @@ const elements = {
   svg: $("svgButton"),
   text: $("textButton"),
   share: $("shareButton"),
+  publish: $("publishButton"),
   link: $("linkButton"),
   sourceName: $("sourceName"),
   sourceMeta: $("sourceMeta"),
@@ -61,6 +62,12 @@ const state = {
   frameTimes: [],
   renderer: null,
   dimensions: { width: 1280, height: 720, rows: 72 },
+  shareConfig: {
+    enabled: false,
+    csrfToken: null,
+    maxUploadBytes: 0,
+    ttlSeconds: 0,
+  },
 };
 
 function hexToRgb(hex) {
@@ -369,6 +376,7 @@ function enableExports(enabled) {
   for (const button of [elements.png, elements.svg, elements.text, elements.share]) {
     button.disabled = !enabled;
   }
+  elements.publish.disabled = !enabled || !state.shareConfig.enabled;
   elements.stop.disabled = !enabled;
 }
 
@@ -652,6 +660,65 @@ async function shareOutput() {
   }
 }
 
+async function loadStudioConfig() {
+  try {
+    const response = await fetch("/api/config", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`server returned ${response.status}`);
+    const config = await response.json();
+    state.shareConfig = {
+      enabled: config.share_links === true,
+      csrfToken: config.csrf_token || null,
+      maxUploadBytes: Number(config.max_upload_bytes) || 0,
+      ttlSeconds: Number(config.default_ttl_seconds) || 0,
+    };
+    elements.publish.classList.toggle("hidden", !state.shareConfig.enabled);
+    elements.publish.disabled = !state.source || !state.shareConfig.enabled;
+    if (state.shareConfig.enabled) {
+      elements.publish.title = `Link expires after ${state.shareConfig.ttlSeconds} seconds or when Glyph Forge stops`;
+    }
+  } catch (error) {
+    console.warn("Studio sharing configuration is unavailable", error);
+    elements.publish.classList.add("hidden");
+    state.shareConfig.enabled = false;
+  }
+}
+
+async function publishLink() {
+  if (!state.shareConfig.enabled || !state.shareConfig.csrfToken) {
+    setStatus("Temporary link sharing is not enabled. Restart Studio with --lan or --share-links.", true);
+    return;
+  }
+  elements.publish.disabled = true;
+  try {
+    const blob = await canvasBlob();
+    if (blob.size > state.shareConfig.maxUploadBytes) {
+      const limit = (state.shareConfig.maxUploadBytes / (1024 * 1024)).toFixed(1);
+      throw new Error(`PNG is larger than the ${limit} MiB link limit`);
+    }
+    const filename = outputName("png");
+    const response = await fetch(`/api/share?name=${encodeURIComponent(filename)}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "image/png",
+        "X-Glyph-Forge-Token": state.shareConfig.csrfToken,
+      },
+      body: blob,
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `server returned ${response.status}`);
+    await copyText(result.url);
+    setStatus(`Temporary link copied. It expires in ${state.shareConfig.ttlSeconds} seconds or when Glyph Forge stops.`);
+  } catch (error) {
+    setStatus(`Could not publish link: ${error.message}`, true);
+  } finally {
+    elements.publish.disabled = !state.source || !state.shareConfig.enabled;
+  }
+}
+
 function restoreSettings() {
   if (!window.location.hash) return;
   const values = new URLSearchParams(window.location.hash.slice(1));
@@ -702,6 +769,7 @@ function bindEvents() {
   elements.svg.addEventListener("click", saveSvg);
   elements.text.addEventListener("click", saveText);
   elements.share.addEventListener("click", shareOutput);
+  elements.publish.addEventListener("click", publishLink);
   elements.link.addEventListener("click", copyStyleLink);
 
   for (const control of [
@@ -739,4 +807,5 @@ restoreSettings();
 syncControlLabels();
 initializeRenderer();
 bindEvents();
+loadStudioConfig();
 setStatus("Ready. Nothing is uploaded.");
