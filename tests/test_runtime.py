@@ -85,6 +85,36 @@ def test_non_android_subprocess_environment_inherits_unchanged(monkeypatch) -> N
     assert runtime.subprocess_environment() is None
 
 
+def test_windows_cli_streams_are_reconfigured_for_lossless_glyphs(
+    monkeypatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+
+    class Stream:
+        def reconfigure(self, **options: str) -> None:
+            calls.append(options)
+
+    monkeypatch.setattr(runtime.sys, "platform", "win32")
+    monkeypatch.setattr(runtime.sys, "stdout", Stream())
+    monkeypatch.setattr(runtime.sys, "stderr", Stream())
+
+    runtime.configure_utf8_stdio()
+
+    assert calls == [{"encoding": "utf-8"}, {"encoding": "utf-8"}]
+
+
+def test_non_windows_cli_streams_keep_host_configuration(monkeypatch) -> None:
+    class Stream:
+        def reconfigure(self, **_options: str) -> None:
+            pytest.fail("non-Windows streams must remain untouched")
+
+    monkeypatch.setattr(runtime.sys, "platform", "linux")
+    monkeypatch.setattr(runtime.sys, "stdout", Stream())
+    monkeypatch.setattr(runtime.sys, "stderr", Stream())
+
+    runtime.configure_utf8_stdio()
+
+
 def test_frozen_android_app_keeps_its_bootloader_library_path(monkeypatch) -> None:
     monkeypatch.setattr(runtime.sys, "platform", "android")
     monkeypatch.setattr(runtime.sys, "frozen", True, raising=False)

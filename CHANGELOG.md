@@ -47,6 +47,11 @@ the project uses semantic versioning.
 - Per-frame viewport constraints are applied before image resampling, avoiding
   wasted rendering work for pixels that cannot fit on the terminal surface
 
+### Fixed
+
+- Redirected and frozen Windows commands switch their existing text streams to
+  UTF-8 before emitting Braille, block, or international glyphs
+
 ### Security
 
 - Link sharing is disabled by default and bounded by random capability tokens,

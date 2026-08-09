@@ -67,6 +67,30 @@ def subprocess_environment() -> dict[str, str] | None:
     return environment
 
 
+def configure_utf8_stdio() -> None:
+    """Keep redirected Windows glyph output lossless.
+
+    Windows can expose a legacy code-page encoding when a console program's
+    output is captured or redirected.  Braille, block, and international glyph
+    modes cannot be represented by those encodings, so CLI entry points switch
+    their existing text streams to UTF-8 before producing output.  Other
+    platforms already use UTF-8 in supported environments and remain untouched.
+    """
+
+    if sys.platform != "win32":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if not callable(reconfigure):
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (OSError, ValueError):
+            # Embedded hosts may expose a stream that cannot be reconfigured;
+            # individual commands can still use their host-provided encoding.
+            continue
+
+
 def reexec_clean_android_environment(
     arguments: Iterable[str] | None = None,
 ) -> bool:
@@ -352,6 +376,7 @@ __all__ = [
     "Capability",
     "PerformanceTier",
     "RuntimeProfile",
+    "configure_utf8_stdio",
     "detect_runtime_profile",
     "iter_capabilities",
     "package_version",

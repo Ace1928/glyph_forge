@@ -19,6 +19,7 @@ from rich.text import Text
 
 from ..config.settings import ConfigManager, get_config
 from ..runtime import (
+    configure_utf8_stdio,
     detect_runtime_profile,
     reexec_clean_android_environment,
     runtime_report,
@@ -1115,6 +1116,7 @@ def main() -> None:
     """Console-script entry point."""
 
     reexec_clean_android_environment()
+    configure_utf8_stdio()
     app()
 
 
