@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 import pytest
 import typer
+from rich.text import Text
 from typer.testing import CliRunner
 
 from glyph_forge.cli import app
@@ -362,10 +363,11 @@ def test_webcam_and_desktop_are_direct_unified_cli_aliases(
 
 def test_live_commands_expose_adaptive_redraw_control() -> None:
     result = CliRunner().invoke(app, ["live", "screen", "--help"])
+    plain_output = Text.from_ansi(result.output).plain
 
     assert result.exit_code == 0, result.output
-    assert "--redraw" in result.output
-    assert "Terminal updates" in result.output
+    assert "--redraw" in plain_output
+    assert "Terminal updates" in plain_output
 
 
 def test_host_desktop_control_refuses_same_terminal_feedback() -> None:
