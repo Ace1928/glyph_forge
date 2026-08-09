@@ -31,6 +31,8 @@ permanent repository branch.
 - Keep optional features behind lazy imports and an existing or new extra.
 - Reuse the capture, render, runtime, and presentation protocols instead of
   adding a parallel command-specific engine.
+- Use the [extension API](docs/extensions.md) for optional third-party behavior;
+  do not add package scanning or eager plugin imports.
 - Preserve documented compatibility unless a breaking change is discussed and
   scheduled.
 - Measure performance claims with `glyph-forge benchmark` or a focused,

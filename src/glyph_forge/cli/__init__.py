@@ -24,7 +24,8 @@ from ..runtime import (
     runtime_report,
 )
 from .live import app as live_app
-from .live import camera_command, screen_command
+from .live import camera_command, screen_command, source_command
+from .plugins import app as plugins_app
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -38,8 +39,10 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 app.add_typer(live_app, name="live")
+app.add_typer(plugins_app, name="plugins")
 app.command("webcam")(camera_command)
 app.command("desktop")(screen_command)
+app.command("stream")(source_command)
 
 
 @app.callback(invoke_without_command=True)
@@ -166,7 +169,8 @@ def image_command(
 ) -> None:
     """Convert an image with sensible adaptive defaults and an instant preview."""
 
-    from ..live.renderers import RenderMode
+    from ..live.renderers import RenderMode, normalize_render_mode
+    from ..plugins import PluginError
     from ..services.image_to_glyph import ImageGlyphConverter
     from ..utils.alphabet_manager import AlphabetManager
 
@@ -211,10 +215,13 @@ def image_command(
     if color_mode not in {"none", "ansi", "html"}:
         raise typer.BadParameter("Choose none, ansi, or html", param_hint="--color")
     try:
-        selected_render_mode = RenderMode(render_mode.casefold())
-    except ValueError as exc:
+        selected_render_mode = normalize_render_mode(render_mode)
+    except (PluginError, ValueError) as exc:
         choices = ", ".join(item.value for item in RenderMode)
-        raise typer.BadParameter(f"Choose {choices}", param_hint="--mode") from exc
+        raise typer.BadParameter(
+            f"Choose {choices}, or plugin:plugin-id/renderer ({exc})",
+            param_hint="--mode",
+        ) from exc
     if selected_render_mode is not RenderMode.GLYPH and color_mode == "html":
         raise typer.BadParameter(
             "HTML colour is available in glyph mode; use --color none or ansi",
@@ -280,24 +287,28 @@ def image_command(
         if contrast != 1:
             prepared = ImageEnhance.Contrast(prepared).enhance(contrast)
         pixels = np.asarray(prepared, dtype=np.uint8)
-        result = (
-            FrameRenderer(
-                RenderConfig(
-                    width=selected_width,
-                    height=selected_height,
-                    mode=selected_render_mode,
-                    color="truecolor" if color_mode == "ansi" else "none",
-                    charset=charset,
-                    invert=invert,
-                    dither=dithering,
-                    edge_algorithm=edge_algorithm,
-                    edge_threshold=edge_threshold,
-                    resample=profile.resample,
+        try:
+            result = (
+                FrameRenderer(
+                    RenderConfig(
+                        width=selected_width,
+                        height=selected_height,
+                        mode=selected_render_mode,
+                        color="truecolor" if color_mode == "ansi" else "none",
+                        charset=charset,
+                        invert=invert,
+                        dither=dithering,
+                        edge_algorithm=edge_algorithm,
+                        edge_threshold=edge_threshold,
+                        resample=profile.resample,
+                    )
                 )
+                .render(pixels)
+                .text
             )
-            .render(pixels)
-            .text
-        )
+        except PluginError as exc:
+            error_console.print(f"[bold red]Plugin render failed:[/bold red] {exc}")
+            raise typer.Exit(2) from exc
         if style:
             result = apply_style(result, style_name=style)
         if output is not None:
@@ -531,6 +542,19 @@ def doctor(
     from .. import __version__
 
     report["glyph_forge"] = __version__
+    from ..plugins import (
+        PLUGIN_API_VERSION,
+        get_plugin_registry,
+        plugins_enabled,
+    )
+
+    report["plugins"] = {
+        "api_version": PLUGIN_API_VERSION,
+        "enabled": plugins_enabled(),
+        "installed": [
+            item.to_dict() for item in get_plugin_registry().inventory(load=False)
+        ],
+    }
     if json_output:
         typer.echo(json.dumps(report, indent=2, sort_keys=True))
         return
@@ -573,6 +597,28 @@ def doctor(
             "" if item["available"] else (item["install_hint"] or ""),
         )
     console.print(features)
+
+    plugin_report = report["plugins"]
+    installed_plugins = plugin_report["installed"]
+    plugins = Table(title=f"Plugins · API {plugin_report['api_version']}")
+    plugins.add_column("State")
+    plugins.add_column("Identifier", style="bold cyan")
+    plugins.add_column("Distribution")
+    plugins.add_column("Entry point")
+    for item in installed_plugins:
+        plugins.add_row(
+            str(item["state"]),
+            str(item["identifier"]),
+            str(item["distribution"] or "—"),
+            str(item["entry_point"] or item["error"] or "—"),
+        )
+    if installed_plugins:
+        console.print(plugins)
+    else:
+        status = "enabled; none installed" if plugin_report["enabled"] else "disabled"
+        console.print(
+            f"[dim]Plugins · API {plugin_report['api_version']} · {status}[/dim]"
+        )
 
 
 @app.command()
@@ -690,7 +736,7 @@ def demo(
         "edge",
         "--mode",
         "-m",
-        help="glyph, edge, braille, half-block, or quadrant",
+        help="Built-in mode or plugin:plugin-id/renderer",
     ),
     width: Optional[int] = typer.Option(None, "--width", "-w", min=10),
     color: bool = typer.Option(True, "--color/--no-color"),
@@ -700,13 +746,19 @@ def demo(
     """Render a built-in showcase immediately—no input file needed."""
 
     from ..benchmark import synthetic_frame
-    from ..live.renderers import FrameRenderer, RenderConfig, RenderMode
+    from ..live.renderers import (
+        FrameRenderer,
+        RenderConfig,
+        RenderMode,
+        normalize_render_mode,
+    )
+    from ..plugins import PluginError
     from ..services.text_to_banner import text_to_banner
 
     try:
-        selected_mode = RenderMode(mode.casefold())
+        selected_mode = normalize_render_mode(mode)
         profile = detect_runtime_profile(performance)
-    except ValueError as exc:
+    except (PluginError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     selected_width = width or min(
         profile.stream_width,
@@ -716,20 +768,24 @@ def demo(
     selected_color = "ansi256" if color and sys.stdout.isatty() else "none"
     if selected_mode is RenderMode.HALF_BLOCK and color:
         selected_color = "truecolor" if sys.stdout.isatty() else "ansi256"
-    art = (
-        FrameRenderer(
-            RenderConfig(
-                width=selected_width,
-                mode=selected_mode,
-                color=selected_color,
-                charset="detailed",
-                edge_algorithm="scharr",
-                resample=profile.resample,
+    try:
+        art = (
+            FrameRenderer(
+                RenderConfig(
+                    width=selected_width,
+                    mode=selected_mode,
+                    color=selected_color,
+                    charset="detailed",
+                    edge_algorithm="scharr",
+                    resample=profile.resample,
+                )
             )
+            .render(frame)
+            .text
         )
-        .render(frame)
-        .text
-    )
+    except PluginError as exc:
+        error_console.print(f"[bold red]Plugin render failed:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
     banner = text_to_banner(
         "GLYPH FORGE",
         font="small",
@@ -750,7 +806,7 @@ def benchmark(
         "all",
         "--mode",
         "-m",
-        help="all, glyph, edge, braille, half-block, or quadrant",
+        help="all, a built-in mode, or plugin:plugin-id/renderer",
     ),
     iterations: int = typer.Option(3, "--iterations", "-n", min=1, max=100),
     warmup: int = typer.Option(1, "--warmup", min=0, max=20),
@@ -760,16 +816,17 @@ def benchmark(
     """Measure renderer throughput with a deterministic local frame."""
 
     from ..benchmark import benchmark_renderers
-    from ..live.renderers import RenderMode
+    from ..live.renderers import PluginRenderMode, RenderMode, normalize_render_mode
+    from ..plugins import PluginError
 
     if mode.casefold() == "all":
-        modes = list(RenderMode)
+        modes: list[RenderMode | PluginRenderMode | str] = list(RenderMode)
     else:
         try:
-            modes = [RenderMode(mode.casefold())]
-        except ValueError as exc:
+            modes = [normalize_render_mode(mode)]
+        except (PluginError, ValueError) as exc:
             raise typer.BadParameter(
-                "Choose all, glyph, edge, braille, half-block, or quadrant",
+                "Choose all, a built-in mode, or plugin:plugin-id/renderer",
                 param_hint="--mode",
             ) from exc
     try:
@@ -779,7 +836,7 @@ def benchmark(
             iterations=iterations,
             warmup=warmup,
         )
-    except ValueError as exc:
+    except (PluginError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     if as_json:
         typer.echo(json.dumps([item.to_dict() for item in results], indent=2))
@@ -816,8 +873,10 @@ def list_commands() -> None:
         ("studio", "Open the local browser GUI and sharing surface"),
         ("demo", "Render a built-in showcase with no input file"),
         ("benchmark", "Measure adaptive renderer throughput"),
+        ("plugins", "Discover and diagnose third-party extensions"),
         ("webcam", "Direct alias for live camera"),
         ("desktop", "Direct alias for live screen"),
+        ("stream", "Open any built-in or plugin live source"),
         ("styles", "Browse charsets and styles"),
         ("launch", "Choose CLI or TUI automatically"),
         ("doctor", "Inspect features and adaptive defaults"),

@@ -38,9 +38,11 @@ from .network import (
 from .renderers import (
     ColorOutput,
     FrameRenderer,
+    PluginRenderMode,
     RenderConfig,
     RenderMode,
     RenderResult,
+    normalize_render_mode,
     render_svg,
 )
 from .session import (
@@ -91,6 +93,7 @@ __all__ = [
     "OpenCVFrameSource",
     "PillowScreenSource",
     "PointerInput",
+    "PluginRenderMode",
     "PynputInputSink",
     "RenderConfig",
     "RenderMode",
@@ -117,6 +120,7 @@ __all__ = [
     "glyph_atlas",
     "is_network_url",
     "map_pointer_to_capture",
+    "normalize_render_mode",
     "render_svg",
     "resolve_network_source",
     "run_terminal_session",

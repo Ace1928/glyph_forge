@@ -121,6 +121,9 @@ glyph-forge webcam 0 --mode braille --fps 30
 glyph-forge desktop 1 --mode half-block --color truecolor
 glyph-forge desktop 1 --redraw auto
 
+# One resolver for built-in paths/URLs/devices and plugin sources
+glyph-forge stream "plugin:visualizers/synth:440hz" --mode braille
+
 # Supported sites are resolved without saving the media to disk
 glyph-forge live url "https://example.com/video-page" --mode edge
 
@@ -199,6 +202,33 @@ glyph-forge studio --host 0.0.0.0 --allow-network
 
 There is no hosted link service in 0.2. Use the exported file or your preferred
 file-sharing service when a public URL is required.
+
+## Third-party extensions
+
+Glyph Forge has a versioned plugin API for external sources, renderers,
+transforms, and exporters. Installed plugin metadata is discovered without
+importing plugin code; a plugin loads only when selected, inspected, or
+explicitly probed. Failures are isolated per plugin.
+
+```bash
+glyph-forge plugins                 # metadata only
+glyph-forge plugins --probe         # validate every installed plugin
+glyph-forge plugins inspect effects # inspect one manifest
+
+# Plugin sources and renderers use the maintained live pipeline
+glyph-forge live source "plugin:synth/waves:440" --mode plugin:effects/neon
+```
+
+Plugins are ordinary Python packages registered in the
+`glyph_forge.plugins` entry-point group. pipx users can install one into the
+same isolated environment with `pipx inject glyph-forge PACKAGE`. Plugins run
+in-process with your account's permissions and are not sandboxed, so install
+only packages you trust; `GLYPH_FORGE_DISABLE_PLUGINS=1` disables automatic
+discovery.
+
+The [extension API v1 guide](docs/extensions.md) documents packaging, all four
+contracts, failure isolation, viewport rules, and testing. A complete runnable
+implementation is in [`examples/plugin_example.py`](examples/plugin_example.py).
 
 ## Full-screen terminal UI
 
@@ -316,8 +346,8 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite contains 303 tests and measures at least 70% branch-aware
-coverage.
+The current suite has 322 passing tests (plus one platform-dependent skip) and
+measures at least 70% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource
 checks.

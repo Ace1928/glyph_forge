@@ -34,8 +34,13 @@ promise a timeline it may be unable to meet.
   as network operations and use a current yt-dlp release.
 - `live launch` executes the exact command supplied by the local user. It does
   not sandbox that application; Xvfb only gives it an isolated display.
-- Desktop capture is read-only in 0.2. Keyboard and pointer injection are not
-  implemented.
+- Host-desktop capture remains view-only. Keyboard and pointer forwarding is
+  separately opt-in for isolated X11 targets, refuses same-display terminal
+  injection, and provides Ctrl+] as an emergency release chord.
+- Third-party plugins execute in-process with the user's permissions and are
+  not sandboxed. Metadata listing does not import them, but selecting a plugin,
+  `plugins inspect`, and `plugins --probe` do. Install only trusted packages;
+  set `GLYPH_FORGE_DISABLE_PLUGINS=1` to disable entry-point discovery.
 - FFmpeg, OpenCV, yt-dlp, PyVirtualDisplay, and capture backends are optional
   third-party components with their own security policies and update cycles.
 

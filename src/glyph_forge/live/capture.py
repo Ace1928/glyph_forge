@@ -12,7 +12,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -383,10 +383,35 @@ def create_frame_source(
     screen_backend: str = "auto",
     screen_display: str | None = None,
 ) -> FrameSource:
-    """Resolve a camera, screen, local video, or optional network source."""
+    """Resolve a built-in or explicitly addressed plugin frame source."""
 
     kind, separator, value = specification.partition(":")
     normalized = kind.casefold()
+    if separator and normalized == "plugin":
+        from ..plugins import (
+            PluginError,
+            SourceRequest,
+            get_plugin_registry,
+            parse_component_reference,
+        )
+
+        try:
+            parsed = parse_component_reference(specification, allow_resource=True)
+            return cast(
+                FrameSource,
+                get_plugin_registry().source(
+                    parsed.qualified,
+                    SourceRequest(
+                        resource=parsed.resource,
+                        width=width,
+                        height=height,
+                        fps=fps,
+                        loop=loop,
+                    ),
+                ),
+            )
+        except PluginError as exc:
+            raise CaptureError(str(exc)) from exc
     if separator and normalized in {"camera", "cam", "webcam"}:
         try:
             index = int(value)
@@ -430,7 +455,7 @@ def create_frame_source(
     if not source.is_file():
         raise CaptureError(
             f"Unknown live source {specification!r}; use camera:0, screen:1, "
-            "url:https://…, or a video path"
+            "url:https://…, plugin:plugin-id/source:resource, or a video path"
         )
     return OpenCVFrameSource(source, fps=fps, loop=loop)
 

@@ -110,8 +110,9 @@ jobs:
       - name: Verify installed wheel and packaged resources
         run: |
           python -m pip install --force-reinstall dist/*.whl
-          python -c "from importlib.resources import files; import glyph_forge; root = files('glyph_forge'); assert root.joinpath('resources/eidos_profile.yml').is_file(); assert root.joinpath('ui/web/index.html').is_file(); assert not root.joinpath('services/image_to_Glyph.py').is_file()"
+          python -c "from importlib.resources import files; import glyph_forge; from glyph_forge.plugins import PLUGIN_API_VERSION, PluginManifest, PluginRegistry; root = files('glyph_forge'); assert root.joinpath('resources/eidos_profile.yml').is_file(); assert root.joinpath('ui/web/index.html').is_file(); assert root.joinpath('plugins/contracts.py').is_file(); assert not root.joinpath('services/image_to_Glyph.py').is_file(); assert PLUGIN_API_VERSION == 1; assert PluginManifest(name='CI', version='1').name == 'CI'; assert PluginRegistry(discoverer=lambda: ()).inventory() == ()"
           glyph-forge version
+          glyph-forge plugins --json
           glyph-forge demo --width 24 --mode braille
       - uses: actions/upload-artifact@v7
         with:

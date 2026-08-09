@@ -11,7 +11,7 @@ import html
 from dataclasses import dataclass, replace
 from enum import Enum
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,6 +20,9 @@ from PIL import Image
 from ..runtime import RuntimeProfile, detect_runtime_profile
 from ..utils.alphabet_manager import AlphabetManager
 from .edges import EdgeAlgorithm, detect_edges, directional_glyphs, normalize_algorithm
+
+if TYPE_CHECKING:
+    from ..plugins import PluginRegistry, RendererExtension
 
 RGBFrame = NDArray[np.uint8]
 
@@ -43,12 +46,19 @@ class ColorOutput(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class PluginRenderMode:
+    """Qualified name for a renderer supplied by an installed plugin."""
+
+    value: str
+
+
+@dataclass(frozen=True, slots=True)
 class RenderConfig:
     """Immutable rendering options reusable across a live session."""
 
     width: int = 100
     height: int | None = None
-    mode: RenderMode | str = RenderMode.GLYPH
+    mode: RenderMode | PluginRenderMode | str = RenderMode.GLYPH
     color: ColorOutput | str = ColorOutput.NONE
     charset: str = "general"
     invert: bool = False
@@ -83,17 +93,33 @@ class RenderResult:
     text: str
     width: int
     height: int
-    mode: RenderMode
+    mode: RenderMode | PluginRenderMode
 
 
-def _normalize_mode(mode: RenderMode | str) -> RenderMode:
+def normalize_render_mode(
+    mode: RenderMode | PluginRenderMode | str,
+) -> RenderMode | PluginRenderMode:
+    """Normalize a built-in mode or validate an explicit plugin reference."""
+
     if isinstance(mode, RenderMode):
         return mode
+    if isinstance(mode, PluginRenderMode):
+        return mode
+    if not isinstance(mode, str):
+        raise ValueError("Render mode must be a string or RenderMode")
+    if mode.casefold().startswith("plugin:"):
+        from ..plugins import parse_component_reference
+
+        reference = parse_component_reference(mode)
+        return PluginRenderMode(f"plugin:{reference.qualified}")
     try:
         return RenderMode(mode.casefold())
     except ValueError as exc:
         choices = ", ".join(item.value for item in RenderMode)
-        raise ValueError(f"Unknown render mode {mode!r}; choose {choices}") from exc
+        raise ValueError(
+            f"Unknown render mode {mode!r}; choose {choices}, or "
+            "plugin:plugin-id/renderer"
+        ) from exc
 
 
 def _normalize_color(color: ColorOutput | str) -> ColorOutput:
@@ -340,6 +366,7 @@ class FrameRenderer:
         config: RenderConfig | None = None,
         *,
         profile: RuntimeProfile | None = None,
+        plugin_registry: PluginRegistry | None = None,
     ) -> None:
         if config is None:
             selected = profile or detect_runtime_profile()
@@ -354,7 +381,7 @@ class FrameRenderer:
         if not 0 <= config.edge_threshold <= 255:
             raise ValueError("edge_threshold must be between 0 and 255")
         self.config = config
-        self.mode = _normalize_mode(config.mode)
+        self.mode = normalize_render_mode(config.mode)
         self.color = _normalize_color(config.color)
         self.edge_algorithm = normalize_algorithm(config.edge_algorithm)
         self.charset = (
@@ -367,6 +394,16 @@ class FrameRenderer:
         if config.invert:
             self.charset = self.charset[::-1]
         self._glyphs = np.asarray(tuple(self.charset), dtype="<U1")
+        self._plugin_renderer: RendererExtension | None = None
+        if isinstance(self.mode, PluginRenderMode):
+            from ..plugins import RendererRequest, get_plugin_registry
+
+            registry = plugin_registry or get_plugin_registry()
+            reference = self.mode.value.removeprefix("plugin:")
+            self._plugin_renderer = registry.renderer(
+                reference,
+                RendererRequest(reference=reference, config=config),
+            )
 
     def render(
         self,
@@ -378,6 +415,45 @@ class FrameRenderer:
         """Render a frame, optionally fitting it inside a terminal cell surface."""
 
         normalized = _normalize_frame(frame)
+        if max_width is not None and max_width < 1:
+            raise ValueError("max_width must be positive")
+        if max_height is not None and max_height < 1:
+            raise ValueError("max_height must be positive")
+        if self._plugin_renderer is not None:
+            from ..plugins import PluginContractError, PluginError, PluginExecutionError
+            from ..plugins.registry import validate_render_output
+
+            reference = self.mode.value.removeprefix("plugin:")
+            try:
+                plugin_result = self._plugin_renderer.render(
+                    normalized,
+                    max_width=max_width,
+                    max_height=max_height,
+                )
+            except PluginError:
+                raise
+            except (KeyboardInterrupt, GeneratorExit):
+                raise
+            except BaseException as exc:
+                raise PluginExecutionError(
+                    f"Renderer extension {reference!r} failed: "
+                    f"{type(exc).__name__}: {exc}"
+                ) from exc
+            output = validate_render_output(reference, plugin_result)
+            if max_width is not None and output.width > max_width:
+                raise PluginContractError(
+                    f"Renderer extension {reference!r} exceeded max_width"
+                )
+            if max_height is not None and output.height > max_height:
+                raise PluginContractError(
+                    f"Renderer extension {reference!r} exceeded max_height"
+                )
+            return RenderResult(
+                output.text,
+                output.width,
+                output.height,
+                self.mode,
+            )
         width, height = _cell_dimensions(
             normalized,
             self.config,
@@ -546,8 +622,10 @@ def render_svg(
 __all__ = [
     "ColorOutput",
     "FrameRenderer",
+    "PluginRenderMode",
     "RenderConfig",
     "RenderMode",
     "RenderResult",
+    "normalize_render_mode",
     "render_svg",
 ]

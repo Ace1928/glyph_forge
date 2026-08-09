@@ -8,7 +8,6 @@ the project uses semantic versioning.
 ### Planned
 
 - Native capture adapters and optional compiled rendering hot paths
-- A stable extension SDK for third-party sources, renderers, and exporters
 - Signed standalone installers and an opt-in hosted sharing service
 
 ### Added
@@ -20,6 +19,11 @@ the project uses semantic versioning.
   exact output-byte accounting, resize fallback, and public presenter contracts
 - Aspect-preserving live viewport fitting across every glyph mode, with
   immediate terminal-resize adaptation and an explicit `--no-fit` override
+- Versioned plugin API v1 for third-party sources, renderers, transforms, and
+  exporters, with metadata-only discovery, explicit probing, per-plugin failure
+  isolation, in-process registration, and CLI diagnostics
+- `live source` and top-level `stream` commands that route paths, URLs, devices,
+  and plugin sources through one bounded-latency pipeline
 
 ### Performance
 

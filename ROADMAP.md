@@ -14,7 +14,7 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 | Desktop control | Opt-in focused keyboard and pointer forwarding | Isolated X11 complete; native host adapters active |
 | Sharing | Local exports and style links; optional hosted links later | Active |
 | Native acceleration | Browser GPU atlas now; compiled/native hot paths later | Active |
-| Extension SDK | Third-party source, renderer, transform, and exporter plugins | Planned for 0.4 |
+| Extension SDK | Third-party source, renderer, transform, and exporter plugins | API v1 complete in Unreleased |
 
 ## Fidelity and performance
 
@@ -61,8 +61,9 @@ rejected because injected input can feed back into the focused terminal.
    gains justify their maintenance and packaging cost. The first pass removed
    per-cell half-block colour conversion and made the portable NumPy path fast
    enough to defer a compiled dependency.
-6. Define versioned plugin contracts and isolated discovery for external
-   sources, renderers, and exporters.
+6. ~~Define versioned plugin contracts and isolated discovery for external
+   sources, renderers, transforms, and exporters.~~ Completed with lazy entry
+   points, live-pipeline integration, diagnostics, and failure isolation.
 7. Produce reproducible signed wheels, standalone installers, and opt-in hosted
    sharing without changing the local-first default.
 

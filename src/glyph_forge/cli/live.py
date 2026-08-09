@@ -60,6 +60,7 @@ def _run_source(
     from ..live.input import InputRouter, InputRoutingError, create_input_sink
     from ..live.renderers import FrameRenderer, RenderConfig
     from ..live.session import TerminalSessionConfig, run_terminal_session
+    from ..plugins import PluginError
 
     source = None
     input_router = None
@@ -124,7 +125,7 @@ def _run_source(
             redraw=redraw,
             fit_terminal=fit_terminal,
         ).validated()
-    except (CaptureError, InputRoutingError, ValueError) as exc:
+    except (CaptureError, InputRoutingError, PluginError, ValueError) as exc:
         if source is not None:
             source.close()
         console.print(f"[bold red]Cannot start live view:[/bold red] {exc}")
@@ -151,7 +152,7 @@ def _run_source(
             stop_when=stop_when,
             input_router=input_router,
         )
-    except (CaptureError, InputRoutingError, OSError) as exc:
+    except (CaptureError, InputRoutingError, OSError, PluginError) as exc:
         console.print(f"[bold red]Live session failed:[/bold red] {exc}")
         raise typer.Exit(1) from exc
     console.print(
@@ -163,11 +164,79 @@ def _run_source(
     )
 
 
+@app.command("source")
+def source_command(
+    specification: str = typer.Argument(
+        ...,
+        help=(
+            "Video path, URL, camera:N, screen:N, or plugin:plugin-id/source:resource"
+        ),
+    ),
+    mode: str = typer.Option(
+        "glyph",
+        "--mode",
+        "-m",
+        help="Built-in mode or plugin:plugin-id/renderer",
+    ),
+    color: str = typer.Option(
+        "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
+    ),
+    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
+    height: Optional[int] = typer.Option(None, "--height", min=1),
+    charset: str = typer.Option("detailed", "--charset"),
+    invert: bool = typer.Option(False, "--invert"),
+    dither: bool = typer.Option(False, "--dither/--no-dither"),
+    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
+    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
+    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
+    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
+    frames: Optional[int] = typer.Option(None, "--frames", min=1),
+    loop: bool = typer.Option(False, "--loop/--no-loop"),
+    screen_backend: str = typer.Option(
+        "auto", "--screen-backend", help="Screen backend: auto, mss, or pillow"
+    ),
+    redraw: str = typer.Option(
+        "auto", "--redraw", help="Terminal updates: auto, delta, or full"
+    ),
+    fit_terminal: bool = typer.Option(
+        True,
+        "--fit/--no-fit",
+        help="Fit output inside the live terminal while preserving aspect ratio",
+    ),
+    performance: str = typer.Option("auto", "--performance"),
+) -> None:
+    """Open any built-in or plugin source through one streaming command."""
+
+    _run_source(
+        specification,
+        mode=mode,
+        color=color,
+        width=width,
+        height=height,
+        charset=charset,
+        invert=invert,
+        dither=dither,
+        edge_algorithm=edge_algorithm,
+        edge_threshold=edge_threshold,
+        fps=fps,
+        duration=duration,
+        max_frames=frames,
+        performance=performance,
+        redraw=redraw,
+        fit_terminal=fit_terminal,
+        loop=loop,
+        screen_backend=screen_backend,
+    )
+
+
 @app.command("camera")
 def camera_command(
     index: int = typer.Argument(0, min=0, help="Webcam/device index."),
     mode: str = typer.Option(
-        "braille", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
+        "braille",
+        "--mode",
+        "-m",
+        help="Built-in mode or plugin:plugin-id/renderer",
     ),
     color: str = typer.Option(
         "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
@@ -220,7 +289,10 @@ def screen_command(
         1, min=0, help="Monitor index (0 is the combined desktop in MSS)."
     ),
     mode: str = typer.Option(
-        "half-block", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
+        "half-block",
+        "--mode",
+        "-m",
+        help="Built-in mode or plugin:plugin-id/renderer",
     ),
     color: str = typer.Option(
         "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
@@ -295,7 +367,10 @@ def video_command(
         resolve_path=True,
     ),
     mode: str = typer.Option(
-        "glyph", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
+        "glyph",
+        "--mode",
+        "-m",
+        help="Built-in mode or plugin:plugin-id/renderer",
     ),
     color: str = typer.Option(
         "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
@@ -348,7 +423,10 @@ def video_command(
 def url_command(
     source: str = typer.Argument(..., help="Video page URL supported by yt-dlp."),
     mode: str = typer.Option(
-        "glyph", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
+        "glyph",
+        "--mode",
+        "-m",
+        help="Built-in mode or plugin:plugin-id/renderer",
     ),
     color: str = typer.Option(
         "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
@@ -483,6 +561,7 @@ __all__ = [
     "camera_command",
     "launch_command",
     "screen_command",
+    "source_command",
     "url_command",
     "video_command",
 ]

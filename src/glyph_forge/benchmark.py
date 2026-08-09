@@ -8,7 +8,13 @@ from typing import Any, Iterable
 
 import numpy as np
 
-from .live.renderers import FrameRenderer, RenderConfig, RenderMode
+from .live.renderers import (
+    FrameRenderer,
+    PluginRenderMode,
+    RenderConfig,
+    RenderMode,
+    normalize_render_mode,
+)
 from .runtime import RuntimeProfile, detect_runtime_profile
 
 
@@ -60,7 +66,7 @@ def _source_dimensions(profile: RuntimeProfile) -> tuple[int, int]:
 def benchmark_renderers(
     preference: str = "auto",
     *,
-    modes: Iterable[RenderMode | str] | None = None,
+    modes: Iterable[RenderMode | PluginRenderMode | str] | None = None,
     iterations: int = 3,
     warmup: int = 1,
 ) -> list[RendererBenchmark]:
@@ -77,7 +83,7 @@ def benchmark_renderers(
     results: list[RendererBenchmark] = []
 
     for value in selected_modes:
-        mode = value if isinstance(value, RenderMode) else RenderMode(value.casefold())
+        mode = normalize_render_mode(value)
         color = "ansi256" if mode is RenderMode.HALF_BLOCK else "none"
         renderer = FrameRenderer(
             RenderConfig(
