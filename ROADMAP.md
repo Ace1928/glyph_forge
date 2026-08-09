@@ -22,7 +22,8 @@ The maintained modes are `glyph`, `edge`, `braille`, `half-block`, and
 `quadrant`, plus scalable SVG still export and the Studio GPU atlas. The capture
 pipeline keeps bounded buffers and favors latency over rendering every frame.
 Resolution, worker count, sampling, and FPS come from a portable runtime profile
-and remain explicitly overridable.
+and remain explicitly overridable. Terminal presentation also selects between
+changed-row and complete-frame updates from their measured payload sizes.
 
 Benchmark automation is available now through `glyph-forge benchmark`. Future
 optimization work must use repeatable before/after measurements and retain the

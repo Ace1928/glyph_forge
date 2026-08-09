@@ -43,7 +43,13 @@ from .renderers import (
     RenderResult,
     render_svg,
 )
-from .session import LiveSessionStats, TerminalSessionConfig, run_terminal_session
+from .session import (
+    LiveSessionStats,
+    TerminalPresenter,
+    TerminalRedraw,
+    TerminalSessionConfig,
+    run_terminal_session,
+)
 from .video import (
     GlyphVideoRenderer,
     MissingMediaDependency,
@@ -91,6 +97,8 @@ __all__ = [
     "RenderResult",
     "RenderViewport",
     "ResolvedNetworkSource",
+    "TerminalPresenter",
+    "TerminalRedraw",
     "TerminalSessionConfig",
     "VideoExportConfig",
     "VideoExportError",

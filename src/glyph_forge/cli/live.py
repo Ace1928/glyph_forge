@@ -47,6 +47,7 @@ def _run_source(
     duration: float | None,
     max_frames: int | None,
     performance: str,
+    redraw: str = "auto",
     loop: bool = False,
     screen_backend: str = "auto",
     stop_when: Callable[[], bool] | None = None,
@@ -121,7 +122,8 @@ def _run_source(
             max_frames=max_frames,
             alternate_screen=True,
             show_stats=True,
-        )
+            redraw=redraw,
+        ).validated()
     except (CaptureError, InputRoutingError, ValueError) as exc:
         if source is not None:
             source.close()
@@ -154,7 +156,9 @@ def _run_source(
         raise typer.Exit(1) from exc
     console.print(
         f"Stopped after {stats.elapsed:.1f}s · {stats.presented_frames} displayed · "
-        f"{stats.dropped_frames} stale frames dropped"
+        f"{stats.dropped_frames} stale frames dropped · "
+        f"{stats.output_bytes / 1024:.1f} KiB written · "
+        f"{stats.full_redraws} full/{stats.delta_redraws} delta redraws"
         + (f" · {stats.input_events} inputs routed" if control else "")
     )
 
@@ -178,6 +182,9 @@ def camera_command(
     fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
     duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
     frames: Optional[int] = typer.Option(None, "--frames", min=1),
+    redraw: str = typer.Option(
+        "auto", "--redraw", help="Terminal updates: auto, delta, or full"
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Render a webcam as responsive terminal glyph art."""
@@ -197,6 +204,7 @@ def camera_command(
         duration=duration,
         max_frames=frames,
         performance=performance,
+        redraw=redraw,
     )
 
 
@@ -235,6 +243,9 @@ def screen_command(
     input_backend: str = typer.Option(
         "auto", "--input-backend", help="Input backend: auto, pynput, or none"
     ),
+    redraw: str = typer.Option(
+        "auto", "--redraw", help="Terminal updates: auto, delta, or full"
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Mirror a desktop through high-fidelity terminal glyph rendering."""
@@ -254,6 +265,7 @@ def screen_command(
         duration=duration,
         max_frames=frames,
         performance=performance,
+        redraw=redraw,
         screen_backend=backend,
         control=control,
         input_backend=input_backend,
@@ -287,6 +299,9 @@ def video_command(
     duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
     frames: Optional[int] = typer.Option(None, "--frames", min=1),
     loop: bool = typer.Option(False, "--loop/--no-loop"),
+    redraw: str = typer.Option(
+        "auto", "--redraw", help="Terminal updates: auto, delta, or full"
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Play a video directly in the terminal without preloading its frames."""
@@ -306,6 +321,7 @@ def video_command(
         duration=duration,
         max_frames=frames,
         performance=performance,
+        redraw=redraw,
         loop=loop,
     )
 
@@ -329,6 +345,9 @@ def url_command(
     fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
     duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
     frames: Optional[int] = typer.Option(None, "--frames", min=1),
+    redraw: str = typer.Option(
+        "auto", "--redraw", help="Terminal updates: auto, delta, or full"
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Play a supported video-site URL without downloading it first."""
@@ -348,6 +367,7 @@ def url_command(
         duration=duration,
         max_frames=frames,
         performance=performance,
+        redraw=redraw,
     )
 
 
@@ -374,6 +394,9 @@ def launch_command(
     ),
     input_backend: str = typer.Option(
         "auto", "--input-backend", help="Input backend: auto, pynput, or none"
+    ),
+    redraw: str = typer.Option(
+        "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
@@ -404,6 +427,7 @@ def launch_command(
                 duration=duration,
                 max_frames=None,
                 performance=performance,
+                redraw=redraw,
                 screen_backend="mss",
                 stop_when=lambda: process.poll() is not None,
                 control=control,

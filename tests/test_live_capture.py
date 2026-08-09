@@ -26,8 +26,17 @@ from glyph_forge.live.capture import (
     create_frame_source,
     create_screen_source,
 )
-from glyph_forge.live.renderers import FrameRenderer, RenderConfig
-from glyph_forge.live.session import TerminalSessionConfig, run_terminal_session
+from glyph_forge.live.renderers import (
+    FrameRenderer,
+    RenderConfig,
+    RenderMode,
+    RenderResult,
+)
+from glyph_forge.live.session import (
+    TerminalPresenter,
+    TerminalSessionConfig,
+    run_terminal_session,
+)
 
 
 def test_iterable_source_normalizes_gray_and_rgba_frames() -> None:
@@ -106,6 +115,8 @@ def test_terminal_session_renders_and_returns_metrics() -> None:
     assert stats.captured_frames == 1
     assert stats.presented_frames == 1
     assert stats.dropped_frames == 0
+    assert stats.output_bytes == len("⣿\n".encode())
+    assert stats.full_redraws == 1
 
 
 class _TTYBuffer(io.StringIO):
@@ -129,12 +140,93 @@ def test_terminal_session_restores_the_terminal_surface() -> None:
     assert text.endswith("\x1b[0m\x1b[?25h\x1b[?1049l")
 
 
+def test_terminal_presenter_emits_exact_changed_row_delta() -> None:
+    output = _TTYBuffer()
+    presenter = TerminalPresenter(output, alternate_screen=True, redraw="delta")
+    first = RenderResult("aa\nbb\ncc", 2, 3, RenderMode.GLYPH)
+    second = RenderResult("aa\nbc\ncc", 2, 3, RenderMode.GLYPH)
+
+    presenter.present(first)
+    boundary = len(output.getvalue())
+    presenter.present(second)
+
+    assert output.getvalue()[boundary:] == "\x1b[2;1Hbc\x1b[K"
+    assert presenter.full_redraws == 1
+    assert presenter.delta_redraws == 1
+
+
+def test_terminal_presenter_auto_selects_the_smaller_update() -> None:
+    output = _TTYBuffer()
+    presenter = TerminalPresenter(output, alternate_screen=True)
+    row = "a" * 100
+    first = RenderResult("\n".join([row] * 4), 100, 4, RenderMode.GLYPH)
+    changed = "b" + row[1:]
+    sparse = RenderResult(
+        "\n".join([row, changed, row, row]),
+        100,
+        4,
+        RenderMode.GLYPH,
+    )
+    busy = RenderResult("\n".join(["c" * 100] * 4), 100, 4, RenderMode.GLYPH)
+
+    presenter.present(first)
+    presenter.present(sparse)
+    presenter.present(busy)
+
+    assert presenter.full_redraws == 2
+    assert presenter.delta_redraws == 1
+
+
+def test_terminal_presenter_skips_unchanged_surface() -> None:
+    output = _TTYBuffer()
+    presenter = TerminalPresenter(output, alternate_screen=True)
+    result = RenderResult("static", 6, 1, RenderMode.GLYPH)
+
+    presenter.present(result)
+    boundary = len(output.getvalue())
+    presenter.present(result)
+
+    assert output.getvalue()[boundary:] == ""
+    assert presenter.skipped_redraws == 1
+
+
+def test_terminal_presenter_falls_back_to_full_redraw_after_resize() -> None:
+    output = _TTYBuffer()
+    presenter = TerminalPresenter(output, alternate_screen=True, redraw="delta")
+    presenter.present(RenderResult("old", 3, 1, RenderMode.GLYPH))
+    boundary = len(output.getvalue())
+
+    presenter.present(RenderResult("new\nsize", 4, 2, RenderMode.GLYPH))
+
+    assert output.getvalue()[boundary:] == "\x1b[Hnew\nsize\x1b[J"
+    assert presenter.full_redraws == 2
+    assert presenter.delta_redraws == 0
+
+
+def test_adaptive_presentation_reduces_static_terminal_bytes() -> None:
+    result = RenderResult("\n".join(["x" * 100] * 10), 100, 10, RenderMode.GLYPH)
+
+    def write_sequence(redraw: str) -> int:
+        presenter = TerminalPresenter(
+            _TTYBuffer(),
+            alternate_screen=True,
+            redraw=redraw,
+        )
+        for frame in range(20):
+            presenter.present(result, f"frame {frame}")
+        presenter.close()
+        return presenter.output_bytes
+
+    assert write_sequence("auto") < write_sequence("full") // 5
+
+
 @pytest.mark.parametrize(
     "config",
     [
         TerminalSessionConfig(target_fps=0),
         TerminalSessionConfig(duration=0),
         TerminalSessionConfig(max_frames=0),
+        TerminalSessionConfig(redraw="paint"),
     ],
 )
 def test_terminal_session_rejects_invalid_limits(config: TerminalSessionConfig) -> None:
@@ -266,6 +358,14 @@ def test_webcam_and_desktop_are_direct_unified_cli_aliases(
     assert calls[0][0] == "camera:2"
     assert calls[1][0] == "screen:0"
     assert calls[0][1]["max_frames"] == 1
+
+
+def test_live_commands_expose_adaptive_redraw_control() -> None:
+    result = CliRunner().invoke(app, ["live", "screen", "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "--redraw" in result.output
+    assert "Terminal updates" in result.output
 
 
 def test_host_desktop_control_refuses_same_terminal_feedback() -> None:

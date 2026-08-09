@@ -16,11 +16,15 @@ the project uses semantic versioning.
 - Explicit isolated-desktop keyboard and pointer control through a typed input
   protocol, lazy pynput adapter, UTF-8/SGR terminal parser, viewport coordinate
   mapping, and Ctrl+] emergency release
+- Adaptive terminal presentation with `auto`, `delta`, and `full` redraw modes,
+  exact output-byte accounting, resize fallback, and public presenter contracts
 
 ### Performance
 
 - Vectorized half-block palette conversion and run-length terminal emission,
   removing per-cell NumPy allocations and redundant ANSI256 colour sequences
+- Changed-row terminal updates which automatically fall back to complete frames
+  when cursor-addressed output would be larger
 
 ### Security
 

@@ -119,6 +119,7 @@ Install `glyph-forge[media]` for the primary live backends.
 glyph-forge live video clip.mp4 --mode braille
 glyph-forge webcam 0 --mode braille --fps 30
 glyph-forge desktop 1 --mode half-block --color truecolor
+glyph-forge desktop 1 --redraw auto
 
 # Supported sites are resolved without saving the media to disk
 glyph-forge live url "https://example.com/video-page" --mode edge
@@ -131,6 +132,13 @@ glyph-forge video clip.mp4 output.mp4 --performance workstation --crf 16
 The exporter streams OpenCV frames directly through a vectorized glyph atlas
 to FFmpeg. It does not create a temporary image sequence, and the destination
 is replaced only after encoding succeeds.
+
+Live terminal views default to adaptive redraws. Glyph Forge compares the
+actual UTF-8 payload for a complete frame with cursor-addressed changed rows,
+uses whichever is smaller, and sends nothing when both the surface and footer
+are unchanged. `--redraw delta` forces row updates and `--redraw full` provides
+a compatibility fallback; redirected output always stays full-frame and
+line-oriented.
 
 `desktop` is a high-fidelity host-screen viewer. The original desktop remains
 interactive through its normal display. Glyph Forge intentionally refuses to
@@ -301,7 +309,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite contains 281 tests and measures at least 70% branch-aware
+The current suite contains 288 tests and measures at least 70% branch-aware
 coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource
