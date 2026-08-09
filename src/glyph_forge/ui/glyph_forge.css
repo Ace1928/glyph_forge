@@ -1,4 +1,235 @@
-/* Minimal styles for Glyph Forge TUI */
+$background: #050a09;
+$surface: #091311;
+$surface-raised: #0d1b18;
+$line: #1d3932;
+$mint: #5fffc1;
+$text: #e8fff7;
+$muted: #86a89d;
+
 Screen {
+    background: $background;
+    color: $text;
+}
+
+Header {
+    background: $surface;
+    color: $text;
+    border-bottom: solid $line;
+}
+
+Footer {
+    background: $surface;
+    color: $muted;
+    border-top: solid $line;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+Tabs {
+    background: $surface;
+    color: $muted;
+    border-bottom: solid $line;
+}
+
+Tab.-active {
+    color: $mint;
+}
+
+TabPane {
+    padding: 0;
+}
+
+.workflow {
+    height: 1fr;
+}
+
+.form-panel {
+    width: 38;
+    min-width: 32;
+    padding: 1 2;
+    background: $surface;
+    border-right: solid $line;
+    overflow-y: auto;
+}
+
+.preview-panel {
+    width: 1fr;
+    padding: 1 2;
+    background: $background;
+}
+
+.eyebrow {
+    width: 1fr;
+    height: 2;
+    color: $mint;
+    text-style: bold;
+}
+
+.hint {
+    height: auto;
+    margin: 0 0 1 0;
+    color: $muted;
+}
+
+Label {
+    height: 1;
+    margin-top: 1;
+    color: $muted;
+}
+
+Input,
+Select {
+    margin-top: 0;
+    border: tall $line;
+    background: $surface-raised;
+}
+
+Input:focus,
+Select:focus {
+    border: tall $mint;
+}
+
+Button {
+    min-width: 8;
+    border: tall $line;
+}
+
+Button.-success {
+    background: #24634e;
+    color: $text;
+}
+
+.primary-action {
+    width: 1fr;
+    margin-top: 1;
+}
+
+.input-row {
+    height: 3;
+}
+
+.input-row Input {
+    width: 1fr;
+}
+
+.input-row Button {
+    width: 10;
+}
+
+.field-row {
+    height: 5;
+}
+
+.field-row > Vertical {
+    width: 1fr;
+}
+
+.field-row > Vertical:first-child {
+    margin-right: 1;
+}
+
+.switch-row {
+    height: 3;
+    align: left middle;
+}
+
+.switch-row Label {
+    width: auto;
+    margin: 0 1 0 0;
+}
+
+.switch-row Switch {
+    width: 6;
+    margin-right: 2;
+}
+
+.action-row {
+    height: 4;
+    margin-top: 1;
+}
+
+.action-row Button {
+    width: 1fr;
+}
+
+.preview-heading {
+    height: 2;
+}
+
+.metrics {
+    width: auto;
+    color: $muted;
+    text-align: right;
+}
+
+.preview-scroll {
+    height: 1fr;
+    border: solid $line;
+    background: #030706;
+    padding: 1;
+    scrollbar-color: #2d5e50;
+}
+
+.glyph-preview {
+    width: auto;
+    height: auto;
+    color: $text;
+    text-wrap: nowrap;
+}
+
+.runtime-panel {
+    padding: 2 3;
+    overflow-y: auto;
+}
+
+.runtime-heading {
+    height: 5;
+    align: left middle;
+}
+
+.runtime-heading > Vertical {
+    width: 1fr;
+}
+
+.runtime-heading Button {
+    width: auto;
+    margin-left: 1;
+}
+
+#runtime-report {
+    height: auto;
+    margin-top: 1;
+}
+
+FilePicker {
     align: center middle;
+    background: rgba(3, 7, 6, 0.85);
+}
+
+#file-picker-dialog {
+    width: 80%;
+    height: 80%;
+    max-width: 100;
+    padding: 1 2;
+    border: round $mint;
+    background: $surface;
+}
+
+.dialog-title {
+    height: 2;
+    color: $mint;
+    text-style: bold;
+}
+
+#media-tree {
+    height: 1fr;
+    border: solid $line;
+    background: $background;
+}
+
+.dialog-actions {
+    height: 3;
+    align-horizontal: right;
 }

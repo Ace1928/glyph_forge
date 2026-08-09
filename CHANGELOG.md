@@ -71,6 +71,19 @@ This document maps the evolution pathway of Glyph Forge through its structural i
   callbacks, portable font discovery, and atomic output saves
 - Low-latency glyph, Braille 2×4, true-color half-block, and quadrant renderers
 - Scalable SVG text export for lossless zoomable stills
+- `glyph-forge live camera`, `live screen`, and `live video` commands plus the
+  convenient `webcam` and `desktop` aliases
+- Cross-platform OpenCV camera/video capture and MSS/Pillow screen capture
+  behind a shared source protocol
+- Private local browser Studio with image/video drag and drop, webcam and screen
+  capture, WebGL2 glyph-atlas previews, Canvas2D fallback, live controls, and
+  PNG/SVG/TXT export
+- Browser-native sharing and copyable style links without uploading private
+  media to a Glyph Forge service
+- A redesigned full-screen TUI with filtered media browsing, image and text
+  previews, live sources, saving, runtime diagnostics, and Studio handoff
+- Executable self-checks in `glyph-forge doctor` so broken FFmpeg installations
+  are reported accurately instead of being treated as available
 
 ### ⚡ Performance
 
@@ -78,13 +91,31 @@ This document maps the evolution pathway of Glyph Forge through its structural i
   temporary images or unbounded frame lists
 - Existing video frame APIs now use lazy iterators internally while preserving
   their list-returning compatibility functions
+- Live capture uses a single newest-frame slot and intentionally drops stale
+  frames when rendering falls behind, keeping latency and memory bounded
+- The browser Studio renders through a GPU glyph atlas when WebGL2 is available
+  and automatically falls back to a portable Canvas2D renderer
+
+### 🔒 Security
+
+- Browser Studio binds to loopback by default and requires an explicit
+  `--allow-network` flag before accepting a non-loopback address
+- Studio responses include a restrictive content-security policy, disable
+  caching, and prevent MIME sniffing, framing, and referrer leakage
+
+### 🔧 Repository
+
+- Consolidated development history onto `main`, made it the GitHub default,
+  and removed redundant local and remote branches
+- Integrated the standalone glyph-video prototype into the tested package and
+  unified CLI, eliminating the duplicate script without losing its controls
 
 ### 🔮 Development Vector
 
 - Format-specific rendering optimizations
 - Pattern recognition system with feature preservation
 - Extended format support with conversion integrity
-- Webcam and desktop capture with bounded latest-frame scheduling
+- Optional desktop input routing with explicit permissions and focus control
 - Stable API contracts with backward compatibility
 - CLI enhancement with progress visualization
 

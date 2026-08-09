@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -18,6 +19,8 @@ from ..config.settings import ConfigManager, get_config
 from ..runtime import detect_runtime_profile, runtime_report
 from .bannerize import app as bannerize_app
 from .imagize import app as imagize_app
+from .live import app as live_app
+from .live import camera_command, screen_command
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -32,6 +35,9 @@ app = typer.Typer(
 )
 app.add_typer(bannerize_app, name="bannerize", help="Legacy text-banner commands")
 app.add_typer(imagize_app, name="imagize", help="Legacy image-conversion commands")
+app.add_typer(live_app, name="live")
+app.command("webcam")(camera_command)
+app.command("desktop")(screen_command)
 
 
 @app.callback(invoke_without_command=True)
@@ -365,7 +371,12 @@ def doctor(
         features.add_row(
             status,
             item["label"],
-            item["purpose"],
+            item["purpose"]
+            + (
+                f" ({item['detail']})"
+                if item.get("detail") and not item["available"]
+                else ""
+            ),
             "" if item["available"] else (item["install_hint"] or ""),
         )
     console.print(features)
@@ -374,19 +385,30 @@ def doctor(
 @app.command()
 def launch(
     interface: str = typer.Argument(
-        "auto", help="Interface to launch: auto, tui, or cli."
+        "auto", help="Interface to launch: auto, gui, tui, or cli."
     ),
 ) -> None:
     """Launch the best available interface or an explicitly selected one."""
 
     selected = interface.casefold()
-    if selected not in {"auto", "tui", "cli"}:
-        raise typer.BadParameter("Choose auto, tui, or cli", param_hint="interface")
+    if selected not in {"auto", "gui", "studio", "tui", "cli"}:
+        raise typer.BadParameter(
+            "Choose auto, gui, tui, or cli", param_hint="interface"
+        )
     dependencies = check_for_external_dependencies()
     if selected == "auto":
         selected = "tui" if dependencies["textual"] and sys.stdin.isatty() else "cli"
     if selected == "tui":
         interactive()
+        return
+    if selected in {"gui", "studio"}:
+        studio(
+            host="127.0.0.1",
+            port=0,
+            open_browser=True,
+            allow_network=False,
+            duration=None,
+        )
         return
     display_banner()
     _display_quick_start()
@@ -406,7 +428,67 @@ def interactive() -> None:
             )
             raise typer.Exit(2) from exc
         raise
-    GlyphForgeApp().run()
+    result = GlyphForgeApp().run()
+    if result == "studio":
+        studio(
+            host="127.0.0.1",
+            port=0,
+            open_browser=True,
+            allow_network=False,
+            duration=None,
+        )
+
+
+@app.command()
+def studio(
+    host: str = typer.Option(
+        "127.0.0.1", "--host", help="Address for the local studio server."
+    ),
+    port: int = typer.Option(
+        0, "--port", min=0, max=65535, help="Port; zero chooses a free port."
+    ),
+    open_browser: bool = typer.Option(
+        True, "--open/--no-open", help="Open the studio in the default browser."
+    ),
+    allow_network: bool = typer.Option(
+        False,
+        "--allow-network",
+        help="Explicitly allow a non-loopback bind for trusted LAN sharing.",
+    ),
+    duration: Optional[float] = typer.Option(
+        None,
+        "--duration",
+        min=0.01,
+        hidden=True,
+        help="Stop automatically after N seconds (automation/testing).",
+    ),
+) -> None:
+    """Open the private local GUI for files, video, webcam, and screen art."""
+
+    from ..studio import StudioError, StudioServer
+
+    try:
+        server = StudioServer(
+            host,
+            port,
+            allow_network=allow_network,
+            quiet=True,
+        ).start(open_browser=open_browser)
+    except (StudioError, ValueError) as exc:
+        error_console.print(f"[bold red]Could not start studio:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+
+    console.print(Panel.fit(f"[bold cyan]{server.url}[/bold cyan]", title="Studio"))
+    error_console.print("Your media stays in this browser session. Ctrl+C stops it.")
+    try:
+        if duration is not None:
+            threading.Event().wait(duration)
+        else:
+            server.wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.close()
 
 
 @app.command("list-commands")
@@ -420,6 +502,10 @@ def list_commands() -> None:
         ("image", "Convert and preview an image"),
         ("text", "Create a text banner"),
         ("video", "Stream a full-colour glyph video to MP4"),
+        ("live", "View a camera, video, or desktop with bounded latency"),
+        ("studio", "Open the local browser GUI and sharing surface"),
+        ("webcam", "Direct alias for live camera"),
+        ("desktop", "Direct alias for live screen"),
         ("styles", "Browse charsets and styles"),
         ("launch", "Choose CLI or TUI automatically"),
         ("doctor", "Inspect features and adaptive defaults"),
@@ -458,6 +544,9 @@ def _display_quick_start() -> None:
     console.print("  glyph-forge image photo.jpg")
     console.print("  glyph-forge text 'Hello friends'")
     console.print("  glyph-forge video clip.mp4")
+    console.print("  glyph-forge webcam")
+    console.print("  glyph-forge desktop")
+    console.print("  glyph-forge studio")
     console.print("  glyph-forge launch tui")
     console.print("  glyph-forge doctor")
     console.print("\nRun [cyan]glyph-forge --help[/cyan] for every option.")

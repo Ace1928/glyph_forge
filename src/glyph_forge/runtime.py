@@ -11,6 +11,7 @@ import importlib.util
 import os
 import platform
 import shutil
+import subprocess
 from dataclasses import asdict, dataclass
 from enum import Enum
 from importlib import metadata
@@ -56,6 +57,7 @@ class Capability:
     kind: str
     purpose: str
     install_hint: str | None = None
+    detail: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation."""
@@ -211,14 +213,41 @@ def iter_capabilities() -> Iterable[Capability]:
             install_hint=hint,
         )
     for command, label, purpose, hint in _TOOL_CAPABILITIES:
+        available, detail = _probe_tool(command)
         yield Capability(
             key=command,
             label=label,
-            available=shutil.which(command) is not None,
+            available=available,
             kind="tool",
             purpose=purpose,
             install_hint=hint,
+            detail=detail,
         )
+
+
+def _probe_tool(command: str) -> tuple[bool, str | None]:
+    """Confirm a media executable can start, not merely that a path exists."""
+
+    executable = shutil.which(command)
+    if executable is None:
+        return False, "not found on PATH"
+    try:
+        result = subprocess.run(
+            [executable, "-version"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=3,
+            text=True,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, f"found at {executable}, but self-check failed: {exc}"
+    if result.returncode:
+        error = (result.stderr or "").strip().splitlines()
+        reason = error[-1] if error else f"exit status {result.returncode}"
+        return False, f"found at {executable}, but cannot run: {reason}"
+    return True, executable
 
 
 def package_version() -> str:

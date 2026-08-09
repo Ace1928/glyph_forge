@@ -3,16 +3,17 @@
 > *"Where characters and pixels merge with structural integrity."*
 
 A fast, portable toolkit for turning images, text, video, cameras, and screens
-into expressive character art. Glyph Forge scales its defaults to the machine
-it is running on and offers focused CLI commands, memory-bounded video export,
-and subpixel live renderers today. Webcam, screen, and desktop-mirror
-experiences are tracked on the [product roadmap](ROADMAP.md).
+into expressive character art. Glyph Forge scales itself to the machine it is
+running on and offers the same creative engine through a friendly CLI,
+full-screen TUI, and private local browser Studio. Its live pipeline stays
+responsive by keeping only the newest frame, while its video exporter streams
+directly to FFmpeg without temporary frame collections.
 
 ![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Status](https://img.shields.io/badge/status-beta-purple.svg)
-![Tests](https://img.shields.io/badge/tests-212%20passed-green.svg)
+![Tests](https://img.shields.io/badge/tests-235%20passed-green.svg)
 
 ## 📋 Table of Contents
 
@@ -27,6 +28,8 @@ experiences are tracked on the [product roadmap](ROADMAP.md).
   - [Image Conversion](#image-conversion)
   - [Text Banners](#text-banners)
   - [Video Processing](#video-processing)
+  - [Live Media and Desktop](#live-media-and-desktop)
+  - [Browser Studio](#browser-studio)
 - [Configuration](#%EF%B8%8F-configuration)
 - [Character Sets](#-character-sets)
 - [Styling System](#-styling-system)
@@ -45,6 +48,9 @@ Glyph Forge is a comprehensive toolkit for converting visual media into text-bas
 - **Image-to-Glyph Conversion**: Transform any image into ASCII/Unicode art with intelligent character mapping
 - **Text Banner Generation**: Create stylized text banners using FIGlet fonts with multiple effects
 - **Video Frame Extraction**: Convert video files and GIFs into sequences of glyph art frames
+- **Live Media**: Render webcams, videos, and screens through a bounded-latency pipeline
+- **Browser Studio**: Drag-and-drop previews, webcam/screen capture, GPU glyph atlases, and exports
+- **Subpixel Rendering**: Braille 2×4, true-colour half blocks, quadrants, and scalable SVG
 - **Multiple Output Formats**: Support for plain text, ANSI terminal colors, HTML, and SVG
 - **Extensive Customization**: Fine-tune every aspect of the conversion process
 
@@ -74,6 +80,9 @@ pip install -e ".[tui]"
 
 # Add video, webcam, and screen-capture backends
 pip install -e ".[media]"
+
+# Install every user interface and media backend
+pip install -e ".[all]"
 
 # Install with documentation tools
 pip install -e ".[docs]"
@@ -126,9 +135,18 @@ glyph-forge text "GLYPH FORGE" --font slant --style boxed
 glyph-forge video clip.mp4
 glyph-forge video clip.mp4 party-glyphs.mp4 --performance workstation
 
+# Open the zero-extra-dependency browser GUI or full-screen terminal UI
+glyph-forge studio
+glyph-forge interactive
+
+# Render live sources directly in the terminal
+glyph-forge webcam 0 --mode braille
+glyph-forge desktop 1 --mode half-block
+glyph-forge live video clip.mp4 --mode quadrant
+
 # Browse styles, choose an interface, or inspect optional features
 glyph-forge styles --preview
-glyph-forge launch tui
+glyph-forge launch auto
 glyph-forge doctor
 
 # Show available options
@@ -153,7 +171,11 @@ for compatibility.
 | **Auto-scaling** | Automatic output sizing to fit terminal dimensions |
 | **Caching** | Performance-optimized banner caching system |
 | **Streaming Video** | One-pass OpenCV → vectorized glyph atlas → FFmpeg export with audio |
+| **Live Capture** | Webcam, screen, and video sources with a newest-frame-only scheduler |
 | **Subpixel Modes** | Glyph, Braille 2×4, half-block true color, and quadrant renderers |
+| **Browser Studio** | Responsive WebGL2 preview with Canvas2D fallback, drag/drop, and capture |
+| **Exports and Sharing** | PNG, real-text SVG, TXT, Web Share, downloads, and copyable style links |
+| **Full-screen TUI** | Image browser, text studio, live preview, saving, and runtime diagnostics |
 | **Adaptive Profiles** | Eco, balanced, and workstation defaults with explicit overrides |
 
 ### Character Sets
@@ -182,8 +204,11 @@ glyph_forge/
 │   ├── banner_generator.py # Text-to-banner engine
 │   └── style_manager.py    # Styling and borders
 ├── live/                   # Low-latency and high-fidelity media engine
+│   ├── capture.py          # Camera, video, and portable screen sources
 │   ├── renderers.py        # Glyph, Braille, block, quadrant, and SVG output
+│   ├── session.py          # Bounded live scheduling and terminal presentation
 │   └── video.py            # Vectorized atlas rendering and FFmpeg streaming
+├── studio.py               # Secure local server for the browser Studio
 ├── services/               # High-level service functions
 │   ├── image_to_glyph.py  # Image conversion service
 │   ├── text_to_banner.py  # Banner generation service
@@ -199,7 +224,8 @@ glyph_forge/
 ├── config/                 # Configuration management
 │   └── settings.py        # ConfigManager class
 └── ui/                     # User interface components
-    └── tui.py             # Terminal UI (Textual)
+    ├── tui.py              # Full-screen terminal Studio (Textual)
+    └── web/                # Dependency-free WebGL2/Canvas browser Studio
 ```
 
 ## 📖 Usage Guide
@@ -400,8 +426,42 @@ glyph-forge video clip.mov output.mp4 \
     --start 5 --duration 20 --crf 18 --preset veryfast
 ```
 
-The older `imagize`, `bannerize`, and `glyphfy` commands are thin compatibility
-surfaces for existing automation; new projects should use `image` and `text`.
+#### Live Media and Desktop
+
+```bash
+# Webcam, screen, and memory-bounded terminal video playback
+glyph-forge live camera 0 --mode braille --fps 30
+glyph-forge live screen 1 --mode half-block --color truecolor
+glyph-forge live video clip.mp4 --mode glyph --loop
+
+# Convenient top-level aliases
+glyph-forge webcam 0
+glyph-forge desktop 1
+```
+
+Live output uses an alternate terminal screen and restores it on exit. If the
+renderer falls behind, stale frames are dropped instead of building latency.
+Desktop mode is currently a high-fidelity viewer: keyboard and pointer input
+are not injected into the captured desktop.
+
+#### Browser Studio
+
+```bash
+# Private loopback server; opens the default browser
+glyph-forge studio
+
+# Explicit trusted-LAN access
+glyph-forge studio --host 0.0.0.0 --allow-network
+```
+
+The Studio supports image/video drag-and-drop, webcam and screen selection,
+live style controls, WebGL2 glyph-atlas rendering with a Canvas fallback, PNG,
+real-text SVG and TXT export, and platform sharing where the browser supports
+it. Media processing stays in the browser. The server binds only to loopback
+unless network access is explicitly enabled.
+
+The older `imagize`, `bannerize`, and `glyphfy` entry points remain available
+for existing automation; new projects should use the unified commands.
 
 ## ⚙️ Configuration
 
@@ -610,24 +670,25 @@ class BannerGenerator:
 
 ## ⚡ Performance
 
-### Benchmarks
+### Reference renderer throughput
 
-| Operation | Input | Time | Notes |
-|-----------|-------|------|-------|
-| Image conversion | 800×600 | ~90ms | Level 2 optimization |
-| Image conversion | 1920×1080 | ~180ms | Level 2 optimization |
-| Image conversion | 4K UHD | ~420ms | Level 2 optimization |
-| Image conversion | 4K UHD | ~120ms | Level 4 (parallel) |
-| Banner generation | 10 chars | ~5ms | Cached |
-| Banner generation | 50 chars | ~15ms | First render |
+The vectorized video glyph-atlas renderer was measured on a modest Android
+development device. These figures are illustrative rather than guarantees;
+codec, font, source and hardware all affect end-to-end export speed.
+
+| Adaptive profile | Frame size | Glyph grid | Render time | Throughput |
+|------------------|------------|------------|-------------|------------|
+| Eco | 640×360 | 80×45 | ~4.2 ms | ~240 FPS |
+| Balanced | 1280×720 | 128×72 | ~16.3 ms | ~61 FPS |
+| Workstation | 1920×1080 | 160×90 | ~39.4 ms | ~25 FPS |
 
 ### Optimization Tips
 
-1. **Use caching**: Banner generation caches results automatically
-2. **Enable parallel processing**: Set `threads > 1` for large images
-3. **Reduce output size**: Smaller `width` = faster processing
-4. **Choose simpler charsets**: Fewer characters = faster mapping
-5. **Disable auto-scale**: Set `auto_scale=False` if terminal size is known
+1. **Start with auto**: Runtime profiles select conservative defaults from CPU and memory
+2. **Choose a subpixel mode deliberately**: Braille maximizes spatial samples; half-block maximizes colour fidelity
+3. **Reduce the character grid first**: It usually saves more work than reducing capture resolution
+4. **Keep live buffers bounded**: Glyph Forge's live commands do this automatically
+5. **Use `glyph-forge doctor`**: It verifies that optional modules and media executables can actually start
 
 ## 🧪 Testing
 
@@ -650,15 +711,11 @@ python -m pytest tests/test_api.py -v
 
 ### Test Coverage
 
-The test suite covers:
-- API functionality (21 tests)
-- Banner generation (12 tests)
-- Image conversion (23 tests)
-- Services layer (3 tests)
-- Style management (2 tests)
-- Profile management (2 tests)
+The suite covers the public API, image and text workflows, renderers, streamed
+video, capture scheduling, the local Studio server, TUI interaction, runtime
+diagnostics, services, configuration, and compatibility entry points.
 
-**Current Status**: 63 tests passing
+**Current Status**: 235 tests passing
 
 ## 🤝 Contributing
 
@@ -705,6 +762,11 @@ Security is a priority. See our [Security Policy](SECURITY.md) for:
 - Vulnerability reporting procedures
 - Supported versions
 - Security best practices
+
+The browser Studio serves static assets with a restrictive content-security
+policy, disables caching, and refuses non-loopback binds without the explicit
+`--allow-network` flag. Webcam and screen permissions remain controlled by the
+browser and operating system.
 
 ## 📝 Changelog
 

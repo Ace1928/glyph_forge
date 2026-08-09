@@ -1,5 +1,18 @@
 """Low-latency capture and subpixel glyph rendering."""
 
+from .capture import (
+    CaptureBackendUnavailable,
+    CapturedFrame,
+    CaptureError,
+    FrameSource,
+    IterableFrameSource,
+    LatestFramePump,
+    MSSScreenSource,
+    OpenCVFrameSource,
+    PillowScreenSource,
+    create_frame_source,
+    create_screen_source,
+)
 from .renderers import (
     ColorOutput,
     FrameRenderer,
@@ -8,6 +21,7 @@ from .renderers import (
     RenderResult,
     render_svg,
 )
+from .session import LiveSessionStats, TerminalSessionConfig, run_terminal_session
 from .video import (
     GlyphVideoRenderer,
     MissingMediaDependency,
@@ -22,20 +36,34 @@ from .video import (
 )
 
 __all__ = [
+    "CaptureError",
+    "CaptureBackendUnavailable",
+    "CapturedFrame",
     "ColorOutput",
+    "FrameSource",
     "FrameRenderer",
     "GlyphVideoRenderer",
+    "IterableFrameSource",
+    "LatestFramePump",
+    "LiveSessionStats",
+    "MSSScreenSource",
     "MissingMediaDependency",
+    "OpenCVFrameSource",
+    "PillowScreenSource",
     "RenderConfig",
     "RenderMode",
     "RenderResult",
+    "TerminalSessionConfig",
     "VideoExportConfig",
     "VideoExportError",
     "VideoExportProgress",
     "VideoExportResult",
     "build_ffmpeg_command",
+    "create_frame_source",
+    "create_screen_source",
     "export_glyph_video",
     "find_monospace_font",
     "glyph_atlas",
     "render_svg",
+    "run_terminal_session",
 ]

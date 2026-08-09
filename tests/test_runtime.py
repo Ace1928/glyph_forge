@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image
 from typer.testing import CliRunner
 
+from glyph_forge import runtime
 from glyph_forge.cli import app
 from glyph_forge.runtime import PerformanceTier, detect_runtime_profile, runtime_report
 
@@ -44,6 +45,23 @@ def test_runtime_report_is_json_serializable() -> None:
     assert report["profile"]["tier"] == "eco"
     assert any(item["key"] == "PIL" for item in report["capabilities"])
     json.dumps(report)
+
+
+def test_tool_probe_rejects_a_binary_that_exists_but_cannot_start(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(runtime.shutil, "which", lambda _command: "/tools/ffmpeg")
+    completed = subprocess.CompletedProcess(
+        ["/tools/ffmpeg", "-version"],
+        returncode=127,
+        stderr="shared library could not be loaded\n",
+    )
+    monkeypatch.setattr(runtime.subprocess, "run", lambda *_args, **_kwargs: completed)
+
+    available, detail = runtime._probe_tool("ffmpeg")
+
+    assert not available
+    assert detail is not None and "cannot run" in detail
 
 
 def test_package_import_is_lazy_and_has_no_home_side_effects(tmp_path: Path) -> None:

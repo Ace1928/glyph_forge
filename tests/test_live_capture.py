@@ -1,0 +1,243 @@
+"""Tests for portable capture and bounded-latency live sessions."""
+
+from __future__ import annotations
+
+import io
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pytest
+from typer.testing import CliRunner
+
+from glyph_forge.cli import app
+from glyph_forge.cli import live as live_cli
+from glyph_forge.live import capture
+from glyph_forge.live.capture import (
+    CaptureBackendUnavailable,
+    CaptureError,
+    IterableFrameSource,
+    LatestFramePump,
+    OpenCVFrameSource,
+    create_frame_source,
+    create_screen_source,
+)
+from glyph_forge.live.renderers import FrameRenderer, RenderConfig
+from glyph_forge.live.session import TerminalSessionConfig, run_terminal_session
+
+
+def test_iterable_source_normalizes_gray_and_rgba_frames() -> None:
+    source = IterableFrameSource(
+        [
+            np.full((2, 3), 12, dtype=np.uint8),
+            np.full((2, 3, 4), 24, dtype=np.uint8),
+        ]
+    )
+
+    gray = source.read()
+    rgba = source.read()
+
+    assert gray is not None and gray.shape == (2, 3, 3)
+    assert rgba is not None and rgba.shape == (2, 3, 3)
+    assert source.read() is None
+
+
+def test_latest_frame_pump_drops_stale_burst_frames() -> None:
+    frames = [np.full((1, 1, 3), value, dtype=np.uint8) for value in range(5)]
+    pump = LatestFramePump(IterableFrameSource(frames)).start()
+
+    # Waiting for an impossible sequence lets the finite producer reach EOF.
+    assert pump.next_frame(999, timeout=1) is None
+    latest = pump.next_frame(0, timeout=0)
+
+    assert latest is not None
+    assert latest.sequence == 5
+    assert int(latest.pixels[0, 0, 0]) == 4
+    assert pump.captured_frames == 5
+    pump.stop()
+
+
+class _BrokenSource:
+    name = "broken"
+
+    def read(self) -> np.ndarray:
+        raise RuntimeError("camera disconnected")
+
+    def close(self) -> None:
+        pass
+
+
+def test_capture_thread_errors_surface_to_the_consumer() -> None:
+    pump = LatestFramePump(_BrokenSource()).start()
+
+    with pytest.raises(CaptureError, match="camera disconnected"):
+        pump.next_frame(timeout=1)
+    pump.stop()
+
+
+def test_terminal_session_renders_and_returns_metrics() -> None:
+    source = IterableFrameSource(
+        [np.full((4, 2, 3), 255, dtype=np.uint8)],
+        name="one-frame",
+    )
+    renderer = FrameRenderer(
+        RenderConfig(width=1, height=1, mode="braille", color="none")
+    )
+    output = io.StringIO()
+
+    stats = run_terminal_session(
+        source,
+        renderer,
+        TerminalSessionConfig(
+            target_fps=120,
+            max_frames=1,
+            alternate_screen=False,
+            show_stats=False,
+        ),
+        output=output,
+    )
+
+    assert output.getvalue() == "⣿\n"
+    assert stats.source == "one-frame"
+    assert stats.captured_frames == 1
+    assert stats.presented_frames == 1
+    assert stats.dropped_frames == 0
+
+
+class _TTYBuffer(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def test_terminal_session_restores_the_terminal_surface() -> None:
+    output = _TTYBuffer()
+    renderer = FrameRenderer(RenderConfig(width=1, height=1, charset="@"))
+
+    run_terminal_session(
+        IterableFrameSource([np.zeros((1, 1, 3), dtype=np.uint8)]),
+        renderer,
+        TerminalSessionConfig(max_frames=1, show_stats=False),
+        output=output,
+    )
+
+    text = output.getvalue()
+    assert text.startswith("\x1b[?1049h\x1b[?25l")
+    assert text.endswith("\x1b[0m\x1b[?25h\x1b[?1049l")
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        TerminalSessionConfig(target_fps=0),
+        TerminalSessionConfig(duration=0),
+        TerminalSessionConfig(max_frames=0),
+    ],
+)
+def test_terminal_session_rejects_invalid_limits(config: TerminalSessionConfig) -> None:
+    with pytest.raises(ValueError):
+        config.validated()
+
+
+class _FakeCapture:
+    def __init__(self) -> None:
+        self.released = 0
+        self.settings: list[tuple[int, float]] = []
+        self.frames = iter([np.asarray([[[1, 2, 3]]], dtype=np.uint8)])
+
+    def isOpened(self) -> bool:
+        return True
+
+    def set(self, property_id: int, value: float) -> bool:
+        self.settings.append((property_id, value))
+        return True
+
+    def get(self, _property_id: int) -> float:
+        return 30.0
+
+    def read(self) -> tuple[bool, np.ndarray | None]:
+        try:
+            return True, next(self.frames)
+        except StopIteration:
+            return False, None
+
+    def release(self) -> None:
+        self.released += 1
+
+
+class _FakeCv2:
+    CAP_PROP_FRAME_WIDTH = 1
+    CAP_PROP_FRAME_HEIGHT = 2
+    CAP_PROP_FPS = 3
+    CAP_PROP_POS_FRAMES = 4
+
+    def __init__(self, device: _FakeCapture) -> None:
+        self.device = device
+
+    def VideoCapture(self, _source: int | str) -> _FakeCapture:
+        return self.device
+
+
+def test_opencv_camera_sets_requested_properties_and_converts_bgr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    device = _FakeCapture()
+    monkeypatch.setattr(capture, "_load_opencv", lambda: _FakeCv2(device))
+    source = OpenCVFrameSource(0, width=640, height=480, fps=24)
+
+    frame = source.read()
+    source.close()
+    source.close()
+
+    assert frame is not None
+    assert frame.tolist() == [[[3, 2, 1]]]
+    assert device.settings == [(1, 640), (2, 480), (3, 24)]
+    assert device.released == 1
+
+
+def test_screen_factory_falls_back_only_when_backend_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fallback = IterableFrameSource([])
+
+    def unavailable(*_args: Any, **_kwargs: Any) -> None:
+        raise CaptureBackendUnavailable("not installed")
+
+    monkeypatch.setattr(capture, "MSSScreenSource", unavailable)
+    monkeypatch.setattr(capture, "PillowScreenSource", lambda **_kwargs: fallback)
+
+    assert create_screen_source(backend="auto") is fallback
+    with pytest.raises(CaptureBackendUnavailable):
+        create_screen_source(backend="mss")
+
+
+@pytest.mark.parametrize("specification", ["camera:nope", "screen:nope", "missing.mov"])
+def test_frame_source_specs_fail_clearly(specification: str) -> None:
+    with pytest.raises((CaptureError, ValueError)):
+        create_frame_source(specification)
+
+
+def test_webcam_and_desktop_are_direct_unified_cli_aliases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def fake_run(specification: str, **options: Any) -> None:
+        calls.append((specification, options))
+
+    monkeypatch.setattr(live_cli, "_run_source", fake_run)
+    runner = CliRunner()
+
+    webcam = runner.invoke(app, ["webcam", "2", "--frames", "1"])
+    desktop = runner.invoke(app, ["desktop", "0", "--frames", "1"])
+
+    assert webcam.exit_code == 0, webcam.output
+    assert desktop.exit_code == 0, desktop.output
+    assert calls[0][0] == "camera:2"
+    assert calls[1][0] == "screen:0"
+    assert calls[0][1]["max_frames"] == 1
+
+
+def test_live_video_command_requires_an_existing_file(tmp_path: Path) -> None:
+    result = CliRunner().invoke(app, ["live", "video", str(tmp_path / "missing.mp4")])
+
+    assert result.exit_code != 0
