@@ -1,46 +1,67 @@
-# Glyph Forge
+<div align="center">
+
+# ⚡ Glyph Forge
+
+**Images. Text. Video. Webcam. Screen. URLs — everything becomes character art.**
 
 [![CI](https://github.com/Ace1928/glyph_forge/actions/workflows/ci.yml/badge.svg)](https://github.com/Ace1928/glyph_forge/actions/workflows/ci.yml)
 [![Python 3.10–3.14](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://www.python.org/)
 [![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Play in browser](https://img.shields.io/badge/▶%20Play%20in%20browser-Studio-purple)](https://ace1928.github.io/glyph_forge/)
 
-Glyph Forge turns images, text, videos, webcams, screens, and supported media
-URLs into character art. The same rendering engine is available through a
-direct CLI, a full-screen terminal UI, a private browser Studio, and a Python
-API.
+---
 
-It is designed to start quickly on modest hardware and scale its defaults on a
-workstation. Live sessions keep one newest-frame slot instead of building a
-queue, so a slow renderer drops stale frames rather than accumulating latency.
-
-## Install
-
-Glyph Forge supports Python 3.10 through 3.14 on Windows, macOS, Linux, and
-other Python environments supported by its core dependencies.
-
-```bash
-# Small core: images, text, browser Studio, demo, and diagnostics
-python -m pip install glyph-forge
-
-# Everything, including the TUI and live-media backends
-python -m pip install "glyph-forge[all]"
+```
+                                                                 
+        _/_/_/  _/    _/      _/  _/_/_/    _/    _/             
+     _/        _/      _/  _/    _/    _/  _/    _/              
+    _/  _/_/  _/        _/      _/_/_/    _/_/_/_/               
+   _/    _/  _/        _/      _/        _/    _/                
+    _/_/_/  _/_/_/_/  _/      _/        _/    _/                 
+                                                                 
+                                                                 
 ```
 
-For an isolated command-line installation, use pipx:
+*This banner, and every artwork below, was rendered by Glyph Forge itself.*
 
-```bash
-pipx install "glyph-forge[all]"
-```
+</div>
 
-Or use `uv` for a fast isolated install—or even a one-off run with no permanent
-environment:
+The same rendering engine runs everywhere: a direct CLI, a full-screen terminal
+UI, a private browser Studio, and a Python API. One command renders anything,
+and `glyph-forge demo` throws the whole toolkit at your terminal — memes and
+video thumbnails included.
 
-```bash
-uv tool install "glyph-forge[all]"
-uvx --from "glyph-forge[all]" glyph-forge launch
-```
+---
 
-Install only what you use:
+## ▶ Try it right now — no install
+
+The browser Studio is the same renderer as the CLI, and it runs entirely in
+your browser:
+
+> ### **[ace1928.github.io/glyph_forge](https://ace1928.github.io/glyph_forge/)**
+>
+> Drag in an image or video, pick a mode, and export PNG, SVG, or text.
+> WebGL2 with a full Canvas2D fallback — no GPU, no install, no account.
+
+---
+
+## Install on any OS
+
+Glyph Forge supports Python 3.10–3.14 on Windows, macOS, Linux, and other
+Python environments supported by its core dependencies (it runs great on
+Termux/Android too).
+
+| OS | Fastest path |
+|---|---|
+| **Windows** | `py -m pip install "glyph-forge[all]"` |
+| **macOS / Linux** | `python3 -m pip install "glyph-forge[all]"` |
+| **Any OS, isolated** | `pipx install "glyph-forge[all]"` |
+| **Any OS, fastest** | `uv tool install "glyph-forge[all]"` |
+| **No install at all** | `uvx --from "glyph-forge[all]" glyph-forge launch` |
+| **Small core** | `python -m pip install glyph-forge` — images, text, Studio, demo |
+| **Portable binaries** | Tagged releases ship no-Python one-directory archives for all three OSes |
+
+Install only what you use with extras:
 
 | Extra | Adds |
 |---|---|
@@ -53,18 +74,46 @@ Install only what you use:
 | `bundle` | Maintainer tooling for standalone portable app builds |
 | `dev` | Tests, Ruff, mypy, build, and release checks |
 
-Full-colour video export also needs `ffmpeg` and `ffprobe` on `PATH`. The
-isolated app display needs Xvfb and is available on Linux/FreeBSD X11 systems.
-Run `glyph-forge doctor` for exact capability and installation guidance.
+Full-colour video export also needs `ffmpeg` and `ffprobe` on `PATH`. Run
+`glyph-forge doctor` for exact capability and installation guidance for your
+machine.
 
-Tagged releases also produce no-Python, one-directory archives for Windows,
-macOS, and Linux. Unpack one and run `glyph-forge` (`glyph-forge.exe` on
-Windows); keeping the bundle as a directory avoids slow one-file extraction on
-every launch. Release archives include all Python feature extras, SHA-256
-checksums, and signed GitHub/Sigstore build provenance. FFmpeg, Xvfb, and OS
-capture permissions remain external platform facilities. See the
-[installation guide](docs/install.md) for upgrades, verification, and the
-tradeoffs between `uv`, pipx, and portable archives.
+---
+
+## Showcase in one command
+
+The self-contained demo needs no input files and no internet agreement — it
+downloads its own assets (with offline stand-ins) and tours the entire toolkit:
+
+```bash
+glyph-forge demo
+
+# The whole show, saved as art
+glyph-forge demo --output-dir ./gallery
+
+# Nothing leaves your machine
+glyph-forge demo --offline --no-media
+```
+
+```text
+━━━═◇  MEME WALL · public templates, downloaded live  ◇═━━━
+▶ drake — 'me installing glyph-forge'
+  Glyph Forge · braille
+⣿⣿⣿⣿⣿⣿ ...
+```
+
+Every banner font, every character set, every text style, every render mode,
+live memes, and the internet's most shown video frames — all rendered locally,
+in less time than it takes to read this page.
+
+**Sanity check after install:**
+
+```bash
+glyph-forge doctor   # every capability, every extra, one report
+glyph-forge benchmark  # how fast is this exact machine?
+```
+
+---
 
 ## Start anywhere
 
@@ -76,14 +125,10 @@ glyph-forge launch
 glyph-forge launch gui
 glyph-forge launch tui
 glyph-forge launch cli
-
-# Immediate no-input showcase and hardware report
-glyph-forge demo
-glyph-forge doctor
 ```
 
-`glyph-forge` with no arguments prints a compact quick start. Every command has
-focused help, for example `glyph-forge image --help`.
+`glyph-forge` with no arguments prints a compact quick start, and every
+command has focused help (`glyph-forge image --help`).
 
 ## Images and text
 
@@ -219,7 +264,8 @@ supports drag-and-drop images and videos, local text sources, webcam capture,
 browser-mediated screen capture, live style controls, and presentation
 fullscreen. Its WebGL2 renderer exposes the same density, edge, Braille 2×4,
 quadrant 2×2, and true-colour half-block modes as the maintained live engine;
-a complete Canvas2D fallback keeps those modes available without a GPU.
+a complete Canvas2D fallback keeps those modes available without a GPU. The
+same static pages power the GitHub Pages playground.
 
 For uploaded videos, **Render full video** restarts at frame zero and saves the
 whole processed result when playback ends. Webcam and screen sources use a
@@ -414,7 +460,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite has 396 passing tests (plus one platform-dependent skip) and
+The current suite has 401 passing tests (plus one platform-dependent skip) and
 measures at least 70% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource

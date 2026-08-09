@@ -103,10 +103,31 @@ def image_command(
         resolve_path=True,
         help="Save the glyph art to this file.",
     ),
-    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
-    height: Optional[int] = typer.Option(None, "--height", min=1),
-    charset: str = typer.Option("general", "--charset", "-c"),
-    style: Optional[str] = typer.Option(None, "--style", "-s"),
+    width: Optional[int] = typer.Option(
+        None,
+        "--width",
+        "-w",
+        min=1,
+        help="Target width in columns; adaptive default when omitted.",
+    ),
+    height: Optional[int] = typer.Option(
+        None,
+        "--height",
+        min=1,
+        help="Target height in rows; computed from the aspect ratio when omitted.",
+    ),
+    charset: str = typer.Option(
+        "general",
+        "--charset",
+        "-c",
+        help="Character set for brightness mapping.",
+    ),
+    style: Optional[str] = typer.Option(
+        None,
+        "--style",
+        "-s",
+        help="Style preset to apply to the rendered art.",
+    ),
     color: str = typer.Option("none", "--color", help="none, ansi, or html"),
     render_mode: str = typer.Option(
         "glyph",
@@ -124,6 +145,7 @@ def image_command(
         "--edge-threshold",
         min=0,
         max=255,
+        help="Edge detector sensitivity (0–255).",
     ),
     aspect: Optional[float] = typer.Option(
         None,
@@ -131,17 +153,29 @@ def image_command(
         min=0.01,
         help="Force character-grid width/height ratio.",
     ),
-    invert: bool = typer.Option(False, "--invert"),
-    brightness: float = typer.Option(1.0, "--brightness", min=0.0, max=2.0),
-    contrast: float = typer.Option(1.0, "--contrast", min=0.0, max=2.0),
+    invert: bool = typer.Option(
+        False, "--invert", help="Invert light and dark glyph mapping."
+    ),
+    brightness: float = typer.Option(
+        1.0, "--brightness", min=0.0, max=2.0, help="Brightness multiplier (0.0–2.0)."
+    ),
+    contrast: float = typer.Option(
+        1.0, "--contrast", min=0.0, max=2.0, help="Contrast multiplier (0.0–2.0)."
+    ),
     optimize: bool = typer.Option(
         False,
         "--optimize",
         help="Automatically stretch source contrast before rendering.",
     ),
-    dithering: bool = typer.Option(False, "--dither/--no-dither"),
-    fit_terminal: bool = typer.Option(True, "--fit/--no-fit"),
-    preview: bool = typer.Option(True, "--preview/--no-preview"),
+    dithering: bool = typer.Option(
+        False, "--dither/--no-dither", help="Apply dithering to smooth gradients."
+    ),
+    fit_terminal: bool = typer.Option(
+        True, "--fit/--no-fit", help="Fit the output to the terminal width."
+    ),
+    preview: bool = typer.Option(
+        True, "--preview/--no-preview", help="Print the result in the terminal."
+    ),
     performance: str = typer.Option(
         "auto",
         "--performance",
@@ -334,13 +368,26 @@ def text_command(
         file_okay=True,
         dir_okay=False,
         resolve_path=True,
+        help="Save the banner to this file.",
     ),
-    font: str = typer.Option("slant", "--font", "-f"),
-    style: str = typer.Option("minimal", "--style", "-s"),
-    width: int = typer.Option(80, "--width", "-w", min=10),
-    color: bool = typer.Option(False, "--color/--no-color"),
-    list_fonts: bool = typer.Option(False, "--list-fonts"),
-    list_styles: bool = typer.Option(False, "--list-styles"),
+    font: str = typer.Option("slant", "--font", "-f", help="FIGlet font name or path."),
+    style: str = typer.Option("minimal", "--style", "-s", help="Style preset name."),
+    width: int = typer.Option(
+        80, "--width", "-w", min=10, help="Maximum banner width in columns."
+    ),
+    color: bool = typer.Option(
+        False, "--color/--no-color", help="Add ANSI colour to the banner."
+    ),
+    list_fonts: bool = typer.Option(
+        False,
+        "--list-fonts",
+        help="List every installed FIGlet font and exit.",
+    ),
+    list_styles: bool = typer.Option(
+        False,
+        "--list-styles",
+        help="List every text style and exit.",
+    ),
     preview: bool = typer.Option(
         False,
         "--preview",
@@ -404,11 +451,19 @@ def video_command(
         resolve_path=True,
         help="Output video (defaults to <input>.glyph.mp4).",
     ),
-    width: Optional[int] = typer.Option(None, "--width", min=2),
-    height: Optional[int] = typer.Option(None, "--height", min=2),
-    columns: Optional[int] = typer.Option(None, "--columns", min=1),
-    rows: Optional[int] = typer.Option(None, "--rows", min=1),
-    charset: str = typer.Option("detailed", "--charset", "-c"),
+    width: Optional[int] = typer.Option(
+        None, "--width", min=2, help="Output video width in pixels."
+    ),
+    height: Optional[int] = typer.Option(
+        None, "--height", min=2, help="Output video height in pixels."
+    ),
+    columns: Optional[int] = typer.Option(
+        None, "--columns", min=1, help="Glyph grid columns."
+    ),
+    rows: Optional[int] = typer.Option(None, "--rows", min=1, help="Glyph grid rows."),
+    charset: str = typer.Option(
+        "detailed", "--charset", "-c", help="Character set for brightness mapping."
+    ),
     font: Optional[str] = typer.Option(
         None,
         "--font",
@@ -421,7 +476,13 @@ def video_command(
         min=0.001,
         help="Seconds to render; the rest of the video is used when omitted.",
     ),
-    crf: int = typer.Option(18, "--crf", min=0, max=51),
+    crf: int = typer.Option(
+        18,
+        "--crf",
+        min=0,
+        max=51,
+        help="FFmpeg quality; lower values are higher quality (0–51).",
+    ),
     preset: str = typer.Option("veryfast", "--preset", help="FFmpeg x264 preset."),
     ffmpeg: str = typer.Option("ffmpeg", "--ffmpeg", help="FFmpeg executable."),
     workers: Optional[int] = typer.Option(
@@ -910,71 +971,83 @@ def share(
 @app.command()
 def demo(
     mode: str = typer.Option(
-        "edge",
+        "all",
         "--mode",
         "-m",
-        help="Built-in mode or plugin:plugin-id/renderer",
+        help="all, or one of glyph, edge, braille, half-block, quadrant.",
     ),
-    width: Optional[int] = typer.Option(None, "--width", "-w", min=10),
-    color: bool = typer.Option(True, "--color/--no-color"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o"),
-    performance: str = typer.Option("auto", "--performance"),
+    width: Optional[int] = typer.Option(
+        None,
+        "--width",
+        "-w",
+        min=10,
+        help="Target width in columns; fitted to the terminal when omitted.",
+    ),
+    color: bool = typer.Option(
+        True,
+        "--color/--no-color",
+        help="Add ANSI colour when the terminal supports it.",
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Save the complete showcase text to this file."
+    ),
+    output_dir: Optional[Path] = typer.Option(
+        None,
+        "--output-dir",
+        file_okay=False,
+        dir_okay=True,
+        help="Save every scene, render, meme, and thumbnail into this directory.",
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Never touch the network; craft every asset locally instead.",
+    ),
+    media: bool = typer.Option(
+        True,
+        "--media/--no-media",
+        help="Fetch popular video thumbnails for the video scene.",
+    ),
+    performance: str = typer.Option(
+        "auto", "--performance", help="auto, eco, balanced, or workstation."
+    ),
 ) -> None:
-    """Render a built-in showcase immediately—no input file needed."""
+    """Run the self-contained showcase: memes, media, modes, fonts, styles."""
 
-    from ..benchmark import synthetic_frame
-    from ..live.renderers import (
-        FrameRenderer,
-        RenderConfig,
-        RenderMode,
-        normalize_render_mode,
-    )
-    from ..plugins import PluginError
-    from ..services.text_to_banner import text_to_banner
+    from ..demo import run_demo
 
     try:
-        selected_mode = normalize_render_mode(mode)
-        profile = detect_runtime_profile(performance)
-    except (PluginError, ValueError) as exc:
-        raise typer.BadParameter(str(exc)) from exc
-    selected_width = width or min(
-        profile.stream_width,
-        max(20, shutil.get_terminal_size((profile.stream_width, 24)).columns - 2),
-    )
-    frame = synthetic_frame(640, 360)
-    selected_color = "ansi256" if color and sys.stdout.isatty() else "none"
-    if selected_mode is RenderMode.HALF_BLOCK and color:
-        selected_color = "truecolor" if sys.stdout.isatty() else "ansi256"
-    try:
-        art = (
-            FrameRenderer(
-                RenderConfig(
-                    width=selected_width,
-                    mode=selected_mode,
-                    color=selected_color,
-                    charset="detailed",
-                    edge_algorithm="scharr",
-                    resample=profile.resample,
-                )
-            )
-            .render(frame)
-            .text
+        result = run_demo(
+            mode=mode,
+            width=width,
+            color=color,
+            offline=offline,
+            media=media,
+            performance=performance,
+            output_dir=output_dir,
         )
-    except PluginError as exc:
-        error_console.print(f"[bold red]Plugin render failed:[/bold red] {exc}")
-        raise typer.Exit(2) from exc
-    banner = text_to_banner(
-        "GLYPH FORGE",
-        font="small",
-        style="minimal",
-        width=selected_width,
-    )
-    result = f"Glyph Forge · {selected_mode.value}\n{banner}\n\n{art}"
-    typer.echo(result)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    try:
+        typer.echo(result.text)
+    except UnicodeEncodeError:
+        typer.echo(result.text.encode("utf-8", "replace").decode("utf-8", "replace"))
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(result, encoding="utf-8")
+        output.write_text(result.text, encoding="utf-8")
         error_console.print(f"[green]Saved[/green] {output}")
+    if output_dir is not None:
+        error_console.print(
+            f"[green]Saved[/green] {len(result.artifacts)} artifacts to {output_dir}"
+        )
+        for artifact in result.artifacts:
+            error_console.print(f"  {artifact.name}")
+    stats = result.stats
+    error_console.print(
+        f"[cyan]Show complete[/cyan] · {stats.renders} renders · "
+        f"{stats.assets_fetched} assets fetched · "
+        f"{stats.assets_fallback} crafted offline · {stats.elapsed_seconds:.1f}s"
+    )
 
 
 @app.command()
@@ -985,10 +1058,21 @@ def benchmark(
         "-m",
         help="all, a built-in mode, or plugin:plugin-id/renderer",
     ),
-    iterations: int = typer.Option(3, "--iterations", "-n", min=1, max=100),
-    warmup: int = typer.Option(1, "--warmup", min=0, max=20),
-    performance: str = typer.Option("auto", "--performance"),
-    as_json: bool = typer.Option(False, "--json"),
+    iterations: int = typer.Option(
+        3,
+        "--iterations",
+        "-n",
+        min=1,
+        max=100,
+        help="Timed rendering passes per mode.",
+    ),
+    warmup: int = typer.Option(
+        1, "--warmup", min=0, max=20, help="Unmeasured warm-up passes before timing."
+    ),
+    performance: str = typer.Option(
+        "auto", "--performance", help="auto, eco, balanced, or workstation."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Measure renderer throughput with a deterministic local frame."""
 

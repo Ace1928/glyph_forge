@@ -12,6 +12,11 @@ the project uses semantic versioning.
 
 ### Added
 
+- Self-contained `glyph-forge demo` showcase: an entertaining, self-sufficient
+  tour of the whole toolkit, with meme templates and popular video thumbnails
+  downloaded at runtime (deterministic offline stand-ins when the network is
+  unavailable), every banner font, character set, text style, and render mode,
+  and per-scene artifacts saved with `--output-dir`
 - Browser Studio parity for density glyph, directional edge, Braille 2×4,
   quadrant 2×2, and true-colour half-block rendering, plus local text sources
   and a fullscreen output surface
@@ -42,6 +47,18 @@ the project uses semantic versioning.
   and plugin sources through one bounded-latency pipeline
 - Complete machine-readable video export metrics covering duration, throughput,
   worker count, source/output/raw sizes, glyph rate, and real-time factor
+
+### Changed
+
+- Every CLI command, option, and argument now carries an explicit help
+  description, so `--help` fully explains each workflow without reading docs
+- The repeated live-media options (mode, colour, width, charset, edges, timing,
+  performance) are defined once through shared builders so their help and
+  defaults stay consistent across `live source`, `camera`, `screen`, `video`,
+  `url`, `launch`, and their top-level aliases
+- The `examples` directory is now a regular package so the runnable plugin
+  example imports even when an unrelated `examples` module shadows it earlier
+  on `sys.path`
 
 ### Performance
 

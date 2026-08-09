@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import typer
 from rich.console import Console
@@ -20,6 +20,102 @@ app = typer.Typer(
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
+
+
+def _live_mode(default: str = "glyph") -> Any:
+    return typer.Option(
+        default,
+        "--mode",
+        "-m",
+        help="Built-in mode or plugin:plugin-id/renderer.",
+    )
+
+
+def _live_color() -> Any:
+    return typer.Option(
+        "auto", "--color", "-c", help="auto, none, ansi256, or truecolor."
+    )
+
+
+def _live_width() -> Any:
+    return typer.Option(
+        None,
+        "--width",
+        "-w",
+        min=1,
+        help="Maximum grid width in columns; fitted to the terminal when omitted.",
+    )
+
+
+def _live_height() -> Any:
+    return typer.Option(
+        None,
+        "--height",
+        min=1,
+        help="Exact grid height in rows; keeps the aspect ratio when omitted.",
+    )
+
+
+def _live_charset(default: str = "detailed") -> Any:
+    return typer.Option(
+        default, "--charset", help="Character set for brightness mapping."
+    )
+
+
+def _live_invert() -> Any:
+    return typer.Option(False, "--invert", help="Invert light and dark glyph mapping.")
+
+
+def _live_dither() -> Any:
+    return typer.Option(
+        False, "--dither/--no-dither", help="Apply dithering to smooth gradients."
+    )
+
+
+def _live_edge_algorithm() -> Any:
+    return typer.Option(
+        "sobel",
+        "--edge-algorithm",
+        help="sobel, prewitt, scharr, laplacian, or canny.",
+    )
+
+
+def _live_edge_threshold() -> Any:
+    return typer.Option(
+        48,
+        "--edge-threshold",
+        min=0,
+        max=255,
+        help="Edge detector sensitivity (0–255).",
+    )
+
+
+def _live_fps() -> Any:
+    return typer.Option(None, "--fps", min=1, max=120, help="Target frames per second.")
+
+
+def _live_duration() -> Any:
+    return typer.Option(
+        None, "--duration", min=0.01, help="Stop automatically after this many seconds."
+    )
+
+
+def _live_frames() -> Any:
+    return typer.Option(
+        None, "--frames", min=1, help="Stop automatically after this many frames."
+    )
+
+
+def _live_loop() -> Any:
+    return typer.Option(
+        False, "--loop/--no-loop", help="Restart the source when it reaches the end."
+    )
+
+
+def _live_performance() -> Any:
+    return typer.Option(
+        "auto", "--performance", help="auto, eco, balanced, or workstation."
+    )
 
 
 def _capture_dimensions(profile: RuntimeProfile) -> tuple[int, int]:
@@ -172,26 +268,19 @@ def source_command(
             "Video path, URL, camera:N, screen:N, or plugin:plugin-id/source:resource"
         ),
     ),
-    mode: str = typer.Option(
-        "glyph",
-        "--mode",
-        "-m",
-        help="Built-in mode or plugin:plugin-id/renderer",
-    ),
-    color: str = typer.Option(
-        "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
-    ),
-    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
-    height: Optional[int] = typer.Option(None, "--height", min=1),
-    charset: str = typer.Option("detailed", "--charset"),
-    invert: bool = typer.Option(False, "--invert"),
-    dither: bool = typer.Option(False, "--dither/--no-dither"),
-    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
-    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
-    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
-    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
-    frames: Optional[int] = typer.Option(None, "--frames", min=1),
-    loop: bool = typer.Option(False, "--loop/--no-loop"),
+    mode: str = _live_mode("glyph"),
+    color: str = _live_color(),
+    width: Optional[int] = _live_width(),
+    height: Optional[int] = _live_height(),
+    charset: str = _live_charset(),
+    invert: bool = _live_invert(),
+    dither: bool = _live_dither(),
+    edge_algorithm: str = _live_edge_algorithm(),
+    edge_threshold: int = _live_edge_threshold(),
+    fps: Optional[float] = _live_fps(),
+    duration: Optional[float] = _live_duration(),
+    frames: Optional[int] = _live_frames(),
+    loop: bool = _live_loop(),
     screen_backend: str = typer.Option(
         "auto", "--screen-backend", help="Screen backend: auto, mss, or pillow"
     ),
@@ -203,7 +292,7 @@ def source_command(
         "--fit/--no-fit",
         help="Fit output inside the live terminal while preserving aspect ratio",
     ),
-    performance: str = typer.Option("auto", "--performance"),
+    performance: str = _live_performance(),
 ) -> None:
     """Open any built-in or plugin source through one streaming command."""
 
@@ -232,25 +321,18 @@ def source_command(
 @app.command("camera")
 def camera_command(
     index: int = typer.Argument(0, min=0, help="Webcam/device index."),
-    mode: str = typer.Option(
-        "braille",
-        "--mode",
-        "-m",
-        help="Built-in mode or plugin:plugin-id/renderer",
-    ),
-    color: str = typer.Option(
-        "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
-    ),
-    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
-    height: Optional[int] = typer.Option(None, "--height", min=1),
-    charset: str = typer.Option("general", "--charset"),
-    invert: bool = typer.Option(False, "--invert"),
-    dither: bool = typer.Option(False, "--dither/--no-dither"),
-    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
-    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
-    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
-    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
-    frames: Optional[int] = typer.Option(None, "--frames", min=1),
+    mode: str = _live_mode("braille"),
+    color: str = _live_color(),
+    width: Optional[int] = _live_width(),
+    height: Optional[int] = _live_height(),
+    charset: str = _live_charset("general"),
+    invert: bool = _live_invert(),
+    dither: bool = _live_dither(),
+    edge_algorithm: str = _live_edge_algorithm(),
+    edge_threshold: int = _live_edge_threshold(),
+    fps: Optional[float] = _live_fps(),
+    duration: Optional[float] = _live_duration(),
+    frames: Optional[int] = _live_frames(),
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
@@ -259,7 +341,7 @@ def camera_command(
         "--fit/--no-fit",
         help="Fit output inside the live terminal while preserving aspect ratio",
     ),
-    performance: str = typer.Option("auto", "--performance"),
+    performance: str = _live_performance(),
 ) -> None:
     """Render a webcam as responsive terminal glyph art."""
 
@@ -288,25 +370,18 @@ def screen_command(
     monitor: int = typer.Argument(
         1, min=0, help="Monitor index (0 is the combined desktop in MSS)."
     ),
-    mode: str = typer.Option(
-        "half-block",
-        "--mode",
-        "-m",
-        help="Built-in mode or plugin:plugin-id/renderer",
-    ),
-    color: str = typer.Option(
-        "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
-    ),
-    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
-    height: Optional[int] = typer.Option(None, "--height", min=1),
-    charset: str = typer.Option("detailed", "--charset"),
-    invert: bool = typer.Option(False, "--invert"),
-    dither: bool = typer.Option(False, "--dither/--no-dither"),
-    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
-    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
-    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
-    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
-    frames: Optional[int] = typer.Option(None, "--frames", min=1),
+    mode: str = _live_mode("half-block"),
+    color: str = _live_color(),
+    width: Optional[int] = _live_width(),
+    height: Optional[int] = _live_height(),
+    charset: str = _live_charset(),
+    invert: bool = _live_invert(),
+    dither: bool = _live_dither(),
+    edge_algorithm: str = _live_edge_algorithm(),
+    edge_threshold: int = _live_edge_threshold(),
+    fps: Optional[float] = _live_fps(),
+    duration: Optional[float] = _live_duration(),
+    frames: Optional[int] = _live_frames(),
     backend: str = typer.Option(
         "auto", "--backend", help="Screen backend: auto, mss, or pillow"
     ),
@@ -329,7 +404,7 @@ def screen_command(
         "--fit/--no-fit",
         help="Fit output inside the live terminal while preserving aspect ratio",
     ),
-    performance: str = typer.Option("auto", "--performance"),
+    performance: str = _live_performance(),
 ) -> None:
     """Mirror a desktop through high-fidelity terminal glyph rendering."""
 
@@ -365,27 +440,21 @@ def video_command(
         dir_okay=False,
         readable=True,
         resolve_path=True,
+        help="Video file to play in the terminal.",
     ),
-    mode: str = typer.Option(
-        "glyph",
-        "--mode",
-        "-m",
-        help="Built-in mode or plugin:plugin-id/renderer",
-    ),
-    color: str = typer.Option(
-        "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
-    ),
-    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
-    height: Optional[int] = typer.Option(None, "--height", min=1),
-    charset: str = typer.Option("detailed", "--charset"),
-    invert: bool = typer.Option(False, "--invert"),
-    dither: bool = typer.Option(False, "--dither/--no-dither"),
-    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
-    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
-    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
-    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
-    frames: Optional[int] = typer.Option(None, "--frames", min=1),
-    loop: bool = typer.Option(False, "--loop/--no-loop"),
+    mode: str = _live_mode("glyph"),
+    color: str = _live_color(),
+    width: Optional[int] = _live_width(),
+    height: Optional[int] = _live_height(),
+    charset: str = _live_charset(),
+    invert: bool = _live_invert(),
+    dither: bool = _live_dither(),
+    edge_algorithm: str = _live_edge_algorithm(),
+    edge_threshold: int = _live_edge_threshold(),
+    fps: Optional[float] = _live_fps(),
+    duration: Optional[float] = _live_duration(),
+    frames: Optional[int] = _live_frames(),
+    loop: bool = _live_loop(),
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
@@ -394,7 +463,7 @@ def video_command(
         "--fit/--no-fit",
         help="Fit output inside the live terminal while preserving aspect ratio",
     ),
-    performance: str = typer.Option("auto", "--performance"),
+    performance: str = _live_performance(),
 ) -> None:
     """Play a video directly in the terminal without preloading its frames."""
 
@@ -422,25 +491,18 @@ def video_command(
 @app.command("url")
 def url_command(
     source: str = typer.Argument(..., help="Video page URL supported by yt-dlp."),
-    mode: str = typer.Option(
-        "glyph",
-        "--mode",
-        "-m",
-        help="Built-in mode or plugin:plugin-id/renderer",
-    ),
-    color: str = typer.Option(
-        "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
-    ),
-    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
-    height: Optional[int] = typer.Option(None, "--height", min=1),
-    charset: str = typer.Option("detailed", "--charset"),
-    invert: bool = typer.Option(False, "--invert"),
-    dither: bool = typer.Option(False, "--dither/--no-dither"),
-    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
-    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
-    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
-    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
-    frames: Optional[int] = typer.Option(None, "--frames", min=1),
+    mode: str = _live_mode("glyph"),
+    color: str = _live_color(),
+    width: Optional[int] = _live_width(),
+    height: Optional[int] = _live_height(),
+    charset: str = _live_charset(),
+    invert: bool = _live_invert(),
+    dither: bool = _live_dither(),
+    edge_algorithm: str = _live_edge_algorithm(),
+    edge_threshold: int = _live_edge_threshold(),
+    fps: Optional[float] = _live_fps(),
+    duration: Optional[float] = _live_duration(),
+    frames: Optional[int] = _live_frames(),
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
@@ -449,7 +511,7 @@ def url_command(
         "--fit/--no-fit",
         help="Fit output inside the live terminal while preserving aspect ratio",
     ),
-    performance: str = typer.Option("auto", "--performance"),
+    performance: str = _live_performance(),
 ) -> None:
     """Play a supported video-site URL without downloading it first."""
 
@@ -482,13 +544,28 @@ def launch_command(
         ...,
         help="Application command and arguments; place -- before app options.",
     ),
-    display_width: int = typer.Option(1280, "--display-width", min=64),
-    display_height: int = typer.Option(720, "--display-height", min=64),
-    columns: Optional[int] = typer.Option(None, "--columns", min=1),
-    mode: str = typer.Option("edge", "--mode", "-m"),
-    color: str = typer.Option("auto", "--color", "-c"),
-    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
-    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
+    display_width: int = typer.Option(
+        1280,
+        "--display-width",
+        min=64,
+        help="Virtual X11 display width in pixels.",
+    ),
+    display_height: int = typer.Option(
+        720,
+        "--display-height",
+        min=64,
+        help="Virtual X11 display height in pixels.",
+    ),
+    columns: Optional[int] = typer.Option(
+        None,
+        "--columns",
+        min=1,
+        help="Glyph grid columns; fitted to the terminal when omitted.",
+    ),
+    mode: str = _live_mode("edge"),
+    color: str = _live_color(),
+    fps: Optional[float] = _live_fps(),
+    duration: Optional[float] = _live_duration(),
     control: bool = typer.Option(
         False,
         "--control/--view-only",
@@ -505,7 +582,7 @@ def launch_command(
         "--fit/--no-fit",
         help="Fit output inside the live terminal while preserving aspect ratio",
     ),
-    performance: str = typer.Option("auto", "--performance"),
+    performance: str = _live_performance(),
 ) -> None:
     """Launch an app in isolated Xvfb and render its display in the terminal."""
 

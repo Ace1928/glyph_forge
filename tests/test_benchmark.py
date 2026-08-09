@@ -59,7 +59,16 @@ def test_benchmark_cli_can_emit_machine_readable_json() -> None:
 def test_demo_needs_no_external_file() -> None:
     result = CliRunner().invoke(
         app,
-        ["demo", "--mode", "braille", "--width", "20", "--no-color"],
+        [
+            "demo",
+            "--mode",
+            "braille",
+            "--width",
+            "20",
+            "--no-color",
+            "--offline",
+            "--no-media",
+        ],
     )
 
     assert result.exit_code == 0, result.output
