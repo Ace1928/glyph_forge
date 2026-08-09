@@ -54,7 +54,9 @@ rejected because injected input can feed back into the focused terminal.
 4. Add native Windows, macOS, and Wayland capture adapters behind the existing
    source protocol.
 5. Profile hot paths and introduce optional compiled kernels only where measured
-   gains justify their maintenance and packaging cost.
+   gains justify their maintenance and packaging cost. The first pass removed
+   per-cell half-block colour conversion and made the portable NumPy path fast
+   enough to defer a compiled dependency.
 6. Define versioned plugin contracts and isolated discovery for external
    sources, renderers, and exporters.
 7. Produce reproducible signed wheels, standalone installers, and opt-in hosted

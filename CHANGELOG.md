@@ -17,12 +17,22 @@ the project uses semantic versioning.
   protocol, lazy pynput adapter, UTF-8/SGR terminal parser, viewport coordinate
   mapping, and Ctrl+] emergency release
 
+### Performance
+
+- Vectorized half-block palette conversion and run-length terminal emission,
+  removing per-cell NumPy allocations and redundant ANSI256 colour sequences
+
 ### Security
 
 - Input forwarding is opt-in, independent from capture permission, and refuses
   unsafe same-display terminal injection that could create an event loop
 - Isolated capture, child processes, and input routing receive their target X11
   display explicitly instead of mutating the process-global `DISPLAY`
+
+### Repository
+
+- Package validation now rejects stale case-colliding legacy modules in built
+  wheels
 
 ## [0.2.0] - 2026-08-09
 

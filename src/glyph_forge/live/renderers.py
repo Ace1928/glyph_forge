@@ -183,8 +183,74 @@ def _cell_height(frame: RGBFrame, config: RenderConfig) -> int:
 
 
 def _ansi256(rgb: NDArray[np.uint8]) -> NDArray[np.uint16]:
-    levels = np.rint(rgb.astype(np.float32) / 255 * 5).astype(np.uint16)
-    return 16 + levels[:, :, 0] * 36 + levels[:, :, 1] * 6 + levels[:, :, 2]
+    # Integer arithmetic is both faster and exactly equivalent to rounding an
+    # 8-bit channel onto the six-level xterm colour cube.  Ellipsis keeps the
+    # helper useful for both whole frames and individual rows.
+    levels = (rgb.astype(np.uint16) * 5 + 127) // 255
+    return 16 + levels[..., 0] * 36 + levels[..., 1] * 6 + levels[..., 2]
+
+
+def _half_block_lines(
+    upper: RGBFrame,
+    lower: RGBFrame,
+    mode: ColorOutput,
+) -> list[str]:
+    """Encode paired pixel rows with one vectorized colour conversion.
+
+    Terminals retain the active foreground and background colours, so each
+    row is emitted as runs.  In indexed mode the run comparison happens after
+    quantization: RGB values which produce the same terminal colour no longer
+    waste bandwidth on redundant escape sequences.
+    """
+
+    height, width, _ = upper.shape
+    lines: list[str] = []
+    block = "▀"
+
+    if mode is ColorOutput.ANSI256:
+        upper_indices = _ansi256(upper)
+        lower_indices = _ansi256(lower)
+        pairs = (upper_indices.astype(np.uint32) << 8) | lower_indices
+        for y in range(height):
+            row = pairs[y]
+            starts = np.flatnonzero(
+                np.concatenate((np.ones(1, dtype=np.bool_), row[1:] != row[:-1]))
+            )
+            ends = np.append(starts[1:], width)
+            parts: list[str] = []
+            for start, end in zip(starts, ends, strict=True):
+                foreground = int(upper_indices[y, start])
+                background = int(lower_indices[y, start])
+                parts.append(f"\x1b[38;5;{foreground};48;5;{background}m")
+                parts.append(block * int(end - start))
+            parts.append("\x1b[0m")
+            lines.append("".join(parts))
+        return lines
+
+    for y in range(height):
+        top = upper[y]
+        bottom = lower[y]
+        changed = np.empty(width, dtype=np.bool_)
+        changed[0] = True
+        changed[1:] = np.logical_or(
+            np.any(top[1:] != top[:-1], axis=1),
+            np.any(bottom[1:] != bottom[:-1], axis=1),
+        )
+        starts = np.flatnonzero(changed)
+        ends = np.append(starts[1:], width)
+        parts = []
+        for start, end in zip(starts, ends, strict=True):
+            foreground = top[start]
+            background = bottom[start]
+            parts.append(
+                f"\x1b[38;2;{int(foreground[0])};{int(foreground[1])};"
+                f"{int(foreground[2])};48;2;{int(background[0])};"
+                f"{int(background[1])};{int(background[2])}m"
+            )
+            parts.append(block * int(end - start))
+        parts.append("\x1b[0m")
+        lines.append("".join(parts))
+    return lines
 
 
 def _colorize_rows(
@@ -366,30 +432,7 @@ class FrameRenderer:
 
         upper = resized[0::2]
         lower = resized[1::2]
-        lines: list[str] = []
-        for y in range(height):
-            parts: list[str] = []
-            previous: tuple[int, ...] | None = None
-            for x in range(self.config.width):
-                top = tuple(int(value) for value in upper[y, x])
-                bottom = tuple(int(value) for value in lower[y, x])
-                current = top + bottom
-                if current != previous:
-                    if self.color is ColorOutput.TRUECOLOR:
-                        parts.append(
-                            f"\x1b[38;2;{top[0]};{top[1]};{top[2]};"
-                            f"48;2;{bottom[0]};{bottom[1]};{bottom[2]}m"
-                        )
-                    else:
-                        pair = np.asarray([[top, bottom]], dtype=np.uint8)
-                        indices = _ansi256(pair)[0]
-                        parts.append(
-                            f"\x1b[38;5;{int(indices[0])};48;5;{int(indices[1])}m"
-                        )
-                parts.append("▀")
-                previous = current
-            parts.append("\x1b[0m")
-            lines.append("".join(parts))
+        lines = _half_block_lines(upper, lower, self.color)
         return RenderResult("\n".join(lines), self.config.width, height, self.mode)
 
     def _render_quadrant(self, frame: RGBFrame) -> RenderResult:

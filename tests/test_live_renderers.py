@@ -75,6 +75,40 @@ def test_half_block_truecolor_keeps_independent_cell_colours() -> None:
     assert result.text.endswith("\x1b[0m")
 
 
+def test_half_block_truecolor_groups_identical_colour_pairs() -> None:
+    frame = np.asarray(
+        [
+            [[255, 0, 0], [255, 0, 0], [0, 255, 0]],
+            [[0, 0, 255], [0, 0, 255], [0, 0, 0]],
+        ],
+        dtype=np.uint8,
+    )
+
+    result = FrameRenderer(
+        RenderConfig(width=3, height=1, mode="half-block", color="truecolor")
+    ).render(frame)
+
+    assert result.text == (
+        "\x1b[38;2;255;0;0;48;2;0;0;255m▀▀\x1b[38;2;0;255;0;48;2;0;0;0m▀\x1b[0m"
+    )
+
+
+def test_half_block_ansi256_groups_equivalent_quantized_colours() -> None:
+    frame = np.asarray(
+        [
+            [[250, 0, 0], [255, 0, 0]],
+            [[0, 0, 250], [0, 0, 255]],
+        ],
+        dtype=np.uint8,
+    )
+
+    result = FrameRenderer(
+        RenderConfig(width=2, height=1, mode="half-block", color="ansi256")
+    ).render(frame)
+
+    assert result.text == "\x1b[38;5;196;48;5;21m▀▀\x1b[0m"
+
+
 def test_ansi256_renderer_groups_terminal_colours() -> None:
     frame = np.full((1, 3, 3), [255, 0, 0], dtype=np.uint8)
 
