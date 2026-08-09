@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 from glyph_forge.cli import app
@@ -438,7 +439,7 @@ def test_top_level_stream_combines_plugin_source_and_renderer(
 
     assert result.exit_code == 0, result.output
     assert "@@" in result.output
-    assert "1 displayed" in result.output
+    assert "1 displayed" in Text.from_ansi(result.output).plain
 
 
 def test_environment_switch_disables_external_discovery_but_not_manual_plugins(
