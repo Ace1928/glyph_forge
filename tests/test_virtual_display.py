@@ -41,6 +41,7 @@ def test_virtual_display_starts_and_stops_cleanly(monkeypatch) -> None:
         assert active.name == ":42"
         assert active.environment()["DISPLAY"] == ":42"
         assert display.options["size"] == (800, 600)
+        assert display.options["manage_global_env"] is False
 
     assert display.stopped is True
     assert session.active is False

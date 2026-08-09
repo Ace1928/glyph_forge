@@ -52,6 +52,20 @@ class CapturedFrame:
     captured_at: float
 
 
+@dataclass(frozen=True, slots=True)
+class CaptureRegion:
+    """Absolute pixel bounds represented by a screen-capture source."""
+
+    left: int
+    top: int
+    width: int
+    height: int
+
+    def __post_init__(self) -> None:
+        if self.width < 1 or self.height < 1:
+            raise ValueError("Capture-region dimensions must be positive")
+
+
 def _as_rgb_frame(frame: NDArray[Any]) -> RGBFrame:
     pixels = np.asarray(frame)
     if pixels.ndim == 2:
@@ -172,6 +186,7 @@ class MSSScreenSource:
         *,
         fps: float = 30,
         region: tuple[int, int, int, int] | None = None,
+        display_name: str | None = None,
     ) -> None:
         try:
             import mss  # type: ignore[import-untyped]
@@ -180,7 +195,9 @@ class MSSScreenSource:
                 "Screen capture needs MSS; install glyph-forge[media]"
             ) from exc
         try:
-            self._mss = mss.mss()
+            factory = getattr(mss, "MSS", None) or mss.mss
+            options = {"display": display_name} if display_name is not None else {}
+            self._mss = factory(**options)
         except Exception as exc:
             raise CaptureBackendUnavailable(
                 f"MSS could not initialize screen capture: {exc}"
@@ -207,12 +224,25 @@ class MSSScreenSource:
                 "height": height,
             }
         self._monitor = monitor
+        self._display_name = display_name
         self._closed = False
         self._pacer = _FramePacer(fps)
 
     @property
     def name(self) -> str:
-        return f"screen:{self._monitor}"
+        display = f"{self._display_name}/" if self._display_name else ""
+        return f"{display}screen:{self._monitor}"
+
+    @property
+    def capture_region(self) -> CaptureRegion:
+        """Return the desktop pixel bounds used for pointer mapping."""
+
+        return CaptureRegion(
+            left=self._bounds["left"],
+            top=self._bounds["top"],
+            width=self._bounds["width"],
+            height=self._bounds["height"],
+        )
 
     def read(self) -> RGBFrame | None:
         if self._closed:
@@ -254,6 +284,18 @@ class PillowScreenSource:
     @property
     def name(self) -> str:
         return "screen:pillow"
+
+    @property
+    def capture_region(self) -> CaptureRegion | None:
+        """Return explicit bounds when known.
+
+        Pillow does not expose the origin of an implicit combined desktop, so
+        that case intentionally remains viewer-only.
+        """
+
+        if self._region is None:
+            return None
+        return CaptureRegion(*self._region)
 
     def read(self) -> RGBFrame | None:
         if self._closed:
@@ -306,6 +348,7 @@ def create_screen_source(
     fps: float = 30,
     region: tuple[int, int, int, int] | None = None,
     backend: str = "auto",
+    display_name: str | None = None,
 ) -> FrameSource:
     """Create the preferred available screen source with a safe fallback."""
 
@@ -314,10 +357,19 @@ def create_screen_source(
         raise ValueError("Screen backend must be auto, mss, or pillow")
     if selected in {"auto", "mss"}:
         try:
-            return MSSScreenSource(monitor, fps=fps, region=region)
+            return MSSScreenSource(
+                monitor,
+                fps=fps,
+                region=region,
+                display_name=display_name,
+            )
         except CaptureBackendUnavailable:
             if selected == "mss":
                 raise
+    if display_name is not None:
+        raise CaptureBackendUnavailable(
+            "Capturing a specific X11 display requires the MSS backend"
+        )
     return PillowScreenSource(fps=min(fps, 15), region=region)
 
 
@@ -329,6 +381,7 @@ def create_frame_source(
     fps: float = 30,
     loop: bool = False,
     screen_backend: str = "auto",
+    screen_display: str | None = None,
 ) -> FrameSource:
     """Resolve a camera, screen, local video, or optional network source."""
 
@@ -345,7 +398,12 @@ def create_frame_source(
             monitor = int(value)
         except ValueError as exc:
             raise ValueError("Screen source must look like screen:1") from exc
-        return create_screen_source(monitor, fps=fps, backend=screen_backend)
+        return create_screen_source(
+            monitor,
+            fps=fps,
+            backend=screen_backend,
+            display_name=screen_display,
+        )
     network_value = (
         value if separator and normalized in {"url", "network"} else specification
     )
@@ -487,6 +545,7 @@ __all__ = [
     "CaptureError",
     "CaptureBackendUnavailable",
     "CapturedFrame",
+    "CaptureRegion",
     "FrameSource",
     "IterableFrameSource",
     "LatestFramePump",

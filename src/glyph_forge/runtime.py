@@ -86,6 +86,12 @@ _PYTHON_CAPABILITIES: tuple[tuple[str, str, str, str | None], ...] = (
         "isolated X11 application displays",
         "pip install 'glyph-forge[virtual]' and install Xvfb",
     ),
+    (
+        "pynput",
+        "pynput",
+        "explicit keyboard and pointer forwarding",
+        "pip install 'glyph-forge[control]' and grant OS input permission",
+    ),
 )
 
 _TOOL_CAPABILITIES: tuple[tuple[str, str, str, str | None], ...] = (

@@ -7,10 +7,22 @@ the project uses semantic versioning.
 
 ### Planned
 
-- Explicit, permission-aware keyboard and pointer forwarding for desktop views
 - Native capture adapters and optional compiled rendering hot paths
 - A stable extension SDK for third-party sources, renderers, and exporters
 - Signed standalone installers and an opt-in hosted sharing service
+
+### Added
+
+- Explicit isolated-desktop keyboard and pointer control through a typed input
+  protocol, lazy pynput adapter, UTF-8/SGR terminal parser, viewport coordinate
+  mapping, and Ctrl+] emergency release
+
+### Security
+
+- Input forwarding is opt-in, independent from capture permission, and refuses
+  unsafe same-display terminal injection that could create an event loop
+- Isolated capture, child processes, and input routing receive their target X11
+  display explicitly instead of mutating the process-global `DISPLAY`
 
 ## [0.2.0] - 2026-08-09
 

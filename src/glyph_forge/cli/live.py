@@ -50,12 +50,25 @@ def _run_source(
     loop: bool = False,
     screen_backend: str = "auto",
     stop_when: Callable[[], bool] | None = None,
+    control: bool = False,
+    input_backend: str = "auto",
+    control_display: str | None = None,
+    capture_display: str | None = None,
 ) -> None:
-    from ..live.capture import CaptureError, create_frame_source
+    from ..live.capture import CaptureError, CaptureRegion, create_frame_source
+    from ..live.input import InputRouter, InputRoutingError, create_input_sink
     from ..live.renderers import FrameRenderer, RenderConfig
     from ..live.session import TerminalSessionConfig, run_terminal_session
 
+    source = None
+    input_router = None
     try:
+        if control and control_display is None:
+            raise InputRoutingError(
+                "Host-desktop control from its own terminal can feed injected "
+                "events back into that terminal. Use 'glyph-forge live launch "
+                "--control -- COMMAND' for a safely isolated desktop or app"
+            )
         profile = detect_runtime_profile(performance)
         terminal = shutil.get_terminal_size((profile.stream_width, 30))
         render_width = width or min(profile.stream_width, max(20, terminal.columns))
@@ -85,7 +98,23 @@ def _run_source(
             fps=target_fps,
             loop=loop,
             screen_backend=screen_backend,
+            screen_display=capture_display,
         )
+        if control:
+            if not sys.stdin.isatty() or not sys.stdout.isatty():
+                raise InputRoutingError(
+                    "Desktop control requires focused terminal stdin and stdout"
+                )
+            region = getattr(source, "capture_region", None)
+            if not isinstance(region, CaptureRegion):
+                raise InputRoutingError(
+                    "This capture backend cannot map pointer coordinates safely; "
+                    "install glyph-forge[media,control] and use --backend mss"
+                )
+            input_router = InputRouter(
+                create_input_sink(input_backend, display_name=control_display),
+                region,
+            )
         session = TerminalSessionConfig(
             target_fps=target_fps,
             duration=duration,
@@ -93,7 +122,9 @@ def _run_source(
             alternate_screen=True,
             show_stats=True,
         )
-    except (CaptureError, ValueError) as exc:
+    except (CaptureError, InputRoutingError, ValueError) as exc:
+        if source is not None:
+            source.close()
         console.print(f"[bold red]Cannot start live view:[/bold red] {exc}")
         raise typer.Exit(2) from exc
 
@@ -107,16 +138,24 @@ def _run_source(
 
     console.print(
         f"[cyan]{source.name}[/cyan] · {renderer.mode.value} · "
-        f"{renderer.config.width} columns · {target_fps:g} FPS · Ctrl+C to stop"
+        f"{renderer.config.width} columns · {target_fps:g} FPS · "
+        + ("CONTROL ACTIVE · Ctrl+] to stop" if control else "Ctrl+C to stop")
     )
     try:
-        stats = run_terminal_session(source, renderer, session, stop_when=stop_when)
-    except CaptureError as exc:
-        console.print(f"[bold red]Live capture failed:[/bold red] {exc}")
+        stats = run_terminal_session(
+            source,
+            renderer,
+            session,
+            stop_when=stop_when,
+            input_router=input_router,
+        )
+    except (CaptureError, InputRoutingError, OSError) as exc:
+        console.print(f"[bold red]Live session failed:[/bold red] {exc}")
         raise typer.Exit(1) from exc
     console.print(
         f"Stopped after {stats.elapsed:.1f}s · {stats.presented_frames} displayed · "
         f"{stats.dropped_frames} stale frames dropped"
+        + (f" · {stats.input_events} inputs routed" if control else "")
     )
 
 
@@ -185,6 +224,17 @@ def screen_command(
     backend: str = typer.Option(
         "auto", "--backend", help="Screen backend: auto, mss, or pillow"
     ),
+    control: bool = typer.Option(
+        False,
+        "--control/--view-only",
+        help=(
+            "Request input forwarding (safe isolated targets only; host views "
+            "explain the supported alternative)."
+        ),
+    ),
+    input_backend: str = typer.Option(
+        "auto", "--input-backend", help="Input backend: auto, pynput, or none"
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Mirror a desktop through high-fidelity terminal glyph rendering."""
@@ -205,6 +255,8 @@ def screen_command(
         max_frames=frames,
         performance=performance,
         screen_backend=backend,
+        control=control,
+        input_backend=input_backend,
     )
 
 
@@ -315,6 +367,14 @@ def launch_command(
     color: str = typer.Option("auto", "--color", "-c"),
     fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
     duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
+    control: bool = typer.Option(
+        False,
+        "--control/--view-only",
+        help="Forward terminal keyboard and pointer input; Ctrl+] is the hard stop.",
+    ),
+    input_backend: str = typer.Option(
+        "auto", "--input-backend", help="Input backend: auto, pynput, or none"
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Launch an app in isolated Xvfb and render its display in the terminal."""
@@ -346,6 +406,10 @@ def launch_command(
                 performance=performance,
                 screen_backend="mss",
                 stop_when=lambda: process.poll() is not None,
+                control=control,
+                input_backend=input_backend,
+                control_display=display.name,
+                capture_display=display.name,
             )
     except (VirtualDisplayError, ValueError) as exc:
         console.print(f"[bold red]Virtual display failed:[/bold red] {exc}")

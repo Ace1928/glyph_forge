@@ -40,6 +40,7 @@ Install only what you use:
 | `media` | OpenCV video/webcam capture and fast MSS screen capture |
 | `network` | yt-dlp URL resolution for `live url` |
 | `virtual` | PyVirtualDisplay support for isolated X11 applications |
+| `control` | Explicit keyboard and pointer forwarding through pynput |
 | `all` | Every optional interface and backend |
 | `dev` | Tests, Ruff, mypy, build, and release checks |
 
@@ -131,10 +132,11 @@ The exporter streams OpenCV frames directly through a vectorized glyph atlas
 to FFmpeg. It does not create a temporary image sequence, and the destination
 is replaced only after encoding succeeds.
 
-`desktop` is currently a high-fidelity viewer. The original desktop remains
-interactive through its normal display, but keyboard and pointer events are
-not yet forwarded from the glyph view. Input routing is tracked separately
-because capture permission and input injection have different security models.
+`desktop` is a high-fidelity host-screen viewer. The original desktop remains
+interactive through its normal display. Glyph Forge intentionally refuses to
+inject events from a terminal back into that same host display because a
+synthetic key received by the focused terminal can create an input feedback
+loop.
 
 On an X11 host, Glyph Forge can launch one application in an isolated virtual
 display and render that display through the same pipeline:
@@ -143,9 +145,19 @@ display and render that display through the same pipeline:
 python -m pip install "glyph-forge[media,virtual]"
 glyph-forge live launch -- xterm
 glyph-forge live launch --display-width 1600 --display-height 900 -- firefox
+
+# Explicit interactive mode (install media, virtual, and control extras)
+python -m pip install "glyph-forge[media,virtual,control]"
+glyph-forge live launch --control -- xterm
 ```
 
-The child application and virtual display are closed when the viewer exits.
+Interactive isolated mode parses UTF-8 keys and SGR mouse events without
+blocking the renderer, maps only the visible glyph viewport into target pixels,
+and routes events to the isolated display. Ctrl+] is an unconditional hard
+stop that releases held buttons before restoring the terminal. The feature is
+off unless `--control` is supplied; capture permission never implies input
+permission. The child application and virtual display are closed when the
+viewer exits.
 
 ## Browser Studio and sharing
 
@@ -240,7 +252,8 @@ print(result.text)
 
 For low-level capture, video export, and live presentation, the public package
 also lazily exports `create_frame_source`, `LatestFramePump`,
-`VideoExportConfig`, `export_glyph_video`, and `run_terminal_session`.
+`VideoExportConfig`, `export_glyph_video`, `InputRouter`, and
+`run_terminal_session`.
 [`examples/api_examples.py`](examples/api_examples.py) is a complete runnable
 example that uses only generated in-memory media.
 
@@ -254,6 +267,9 @@ example that uses only generated in-memory media.
 - Screen capture under Wayland may require a desktop portal or compositor
   permission; `mss` support is backend-dependent.
 - `live launch` is an X11 feature. It reports an actionable error elsewhere.
+- Input injection is opt-in and depends on OS Accessibility/input-control
+  permission. Safe terminal control currently targets a distinct isolated X11
+  display; direct host-screen views remain viewer-only.
 - ANSI and Unicode fidelity depend on terminal and font support.
 
 ## Compatibility
@@ -285,7 +301,8 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite contains 269 tests and measures 72% branch-aware coverage.
+The current suite contains 279 tests and measures at least 70% branch-aware
+coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource
 checks.

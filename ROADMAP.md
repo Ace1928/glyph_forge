@@ -11,7 +11,7 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 | Unified experiences | Friendly CLI, TUI, browser Studio, and compatibility launchers | Complete in 0.2 |
 | Live media | Stream files, cameras, screens, and URLs with bounded latency | Complete in 0.2 |
 | Desktop viewing | Render a desktop or isolated X11 app through glyph modes | Viewer complete in 0.2 |
-| Desktop control | Opt-in focused keyboard and pointer forwarding | Planned for 0.3 |
+| Desktop control | Opt-in focused keyboard and pointer forwarding | Isolated X11 complete; native host adapters active |
 | Sharing | Local exports and style links; optional hosted links later | Active |
 | Native acceleration | Browser GPU atlas now; compiled/native hot paths later | Active |
 | Extension SDK | Third-party source, renderer, transform, and exporter plugins | Planned for 0.4 |
@@ -30,10 +30,11 @@ portable NumPy/Pillow fallback.
 
 ## Desktop control boundary
 
-Capture and input injection are separate permissions. Input forwarding will be
-explicitly opt-in, active only while the glyph viewport is focused, and provide
-an immediate escape chord. Pointer coordinates must map through letterboxing and
-scaling before platform adapters receive them.
+Capture and input injection are separate permissions. Input forwarding is
+explicitly opt-in and provides Ctrl+] as an immediate escape chord. Pointer
+coordinates map through the visible viewport before platform adapters receive
+them. Isolated X11 targets are available now. A same-display terminal target is
+rejected because injected input can feed back into the focused terminal.
 
 | Platform | Preferred capture direction | Input/permission direction |
 |---|---|---|
@@ -41,15 +42,15 @@ scaling before platform adapters receive them.
 | macOS | ScreenCaptureKit | Screen Recording and Accessibility grants |
 | Linux X11 | XShm/XComposite | XTest scoped to the selected display |
 | Linux Wayland | PipeWire desktop portal | User-mediated portal/compositor support |
-| Portable fallback | MSS or Pillow | Viewer only |
+| Portable fallback | MSS or Pillow | Viewer only; typed no-op input sink |
 
 ## Delivery sequence
 
 1. Complete 0.2 packaging, cross-platform CI, documentation, and release checks.
-2. Add an input-routing protocol with a no-op default and platform capability
-   reporting.
-3. Implement and test focused X11 routing first, including coordinate mapping,
-   emergency release, and virtual-display interaction.
+2. ~~Add an input-routing protocol with a no-op default and platform capability
+   reporting.~~ Completed.
+3. ~~Implement and test isolated X11 routing first, including coordinate
+   mapping, emergency release, and virtual-display interaction.~~ Completed.
 4. Add native Windows, macOS, and Wayland capture adapters behind the existing
    source protocol.
 5. Profile hot paths and introduce optional compiled kernels only where measured

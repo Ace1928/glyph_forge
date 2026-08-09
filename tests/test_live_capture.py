@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import io
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 import pytest
+import typer
 from typer.testing import CliRunner
 
 from glyph_forge.cli import app
@@ -18,6 +21,7 @@ from glyph_forge.live.capture import (
     CaptureError,
     IterableFrameSource,
     LatestFramePump,
+    MSSScreenSource,
     OpenCVFrameSource,
     create_frame_source,
     create_screen_source,
@@ -208,6 +212,33 @@ def test_screen_factory_falls_back_only_when_backend_is_unavailable(
     assert create_screen_source(backend="auto") is fallback
     with pytest.raises(CaptureBackendUnavailable):
         create_screen_source(backend="mss")
+    with pytest.raises(CaptureBackendUnavailable, match="specific X11 display"):
+        create_screen_source(backend="auto", display_name=":42")
+
+
+def test_mss_screen_source_targets_an_explicit_display(monkeypatch) -> None:
+    options: list[dict[str, str]] = []
+
+    class FakeMSS:
+        monitors = [
+            {"left": 0, "top": 0, "width": 1920, "height": 1080},
+            {"left": -1280, "top": 40, "width": 1280, "height": 720},
+        ]
+
+        def close(self) -> None:
+            pass
+
+    def factory(**kwargs):
+        options.append(kwargs)
+        return FakeMSS()
+
+    monkeypatch.setitem(sys.modules, "mss", SimpleNamespace(MSS=factory))
+    source = MSSScreenSource(1, display_name=":42")
+
+    assert options == [{"display": ":42"}]
+    assert source.name == ":42/screen:1"
+    assert source.capture_region == capture.CaptureRegion(-1280, 40, 1280, 720)
+    source.close()
 
 
 @pytest.mark.parametrize("specification", ["camera:nope", "screen:nope", "missing.mov"])
@@ -235,6 +266,28 @@ def test_webcam_and_desktop_are_direct_unified_cli_aliases(
     assert calls[0][0] == "camera:2"
     assert calls[1][0] == "screen:0"
     assert calls[0][1]["max_frames"] == 1
+
+
+def test_host_desktop_control_refuses_same_terminal_feedback() -> None:
+    with pytest.raises(typer.Exit) as error:
+        live_cli._run_source(
+            "screen:0",
+            mode="glyph",
+            color="none",
+            width=10,
+            height=5,
+            charset="general",
+            invert=False,
+            dither=False,
+            edge_algorithm="sobel",
+            edge_threshold=48,
+            fps=1,
+            duration=0.1,
+            max_frames=1,
+            performance="eco",
+            control=True,
+        )
+    assert error.value.exit_code == 2
 
 
 def test_live_video_command_requires_an_existing_file(tmp_path: Path) -> None:

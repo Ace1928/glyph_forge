@@ -69,6 +69,7 @@ class VirtualDisplaySession:
                 visible=False,
                 size=(self.width, self.height),
                 color_depth=self.color_depth,
+                manage_global_env=False,
             )
             display.start()
         except Exception as exc:
@@ -83,10 +84,11 @@ class VirtualDisplaySession:
 
         if self._display is None:
             raise VirtualDisplayError("The virtual display is not active")
+        environment = os.environ.copy()
         env_method = getattr(self._display, "env", None)
         if callable(env_method):
-            return dict(env_method())
-        environment = os.environ.copy()
+            environment.update(dict(env_method()))
+            return environment
         environment["DISPLAY"] = str(self._display.new_display_var)
         return environment
 
