@@ -243,11 +243,11 @@ def test_bundle_smoke_checks_version_demo_and_studio(
     executable = tmp_path / "glyph-forge"
     executable.write_bytes(b"executable")
     calls: list[list[str]] = []
+    options: list[dict[str, Any]] = []
 
-    def fake_run(
-        command: list[str], **_kwargs: Any
-    ) -> subprocess.CompletedProcess[str]:
+    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         calls.append(command)
+        options.append(kwargs)
         stdout = (
             f'{{"glyph_forge":"{glyph_forge.__version__}"}}\n'
             if command[1:] == ["version", "--json"]
@@ -263,6 +263,7 @@ def test_bundle_smoke_checks_version_demo_and_studio(
     assert len(report) == 3
     assert [command[1] for command in calls] == ["version", "demo", "studio"]
     assert calls[-1][-3:] == ["--no-open", "--duration", "0.05"]
+    assert all(item["encoding"] == "utf-8" for item in options)
 
 
 def test_bundle_smoke_wraps_version_timeout(

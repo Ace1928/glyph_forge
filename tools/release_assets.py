@@ -385,7 +385,7 @@ def _run_smoke_command(executable: Path, arguments: list[str]) -> dict[str, Any]
             [str(executable), *arguments],
             check=False,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             timeout=90,
         )
     except (OSError, subprocess.SubprocessError) as exc:
@@ -416,7 +416,7 @@ def smoke_bundle(bundle: Path, *, version: str | None = None) -> list[dict[str, 
             [str(executable), "version", "--json"],
             check=False,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             timeout=90,
         )
     except (OSError, subprocess.SubprocessError) as exc:
