@@ -304,6 +304,8 @@ def test_bundle_spec_and_release_workflow_cover_every_supported_os() -> None:
 
     for runner in ("ubuntu-latest", "windows-latest", "macos-latest"):
         assert runner in workflow
+    validate_job = workflow.split("  python-package:", 1)[0]
+    assert 'python-version: "3.10"' in validate_job
     assert '- "v*"' in workflow
     assert "verify-tag --tag" in workflow
     assert "actions/attest@v4" in workflow
