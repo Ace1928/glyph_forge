@@ -1,34 +1,37 @@
-from typing import Dict, List, Optional, Union, Any, Mapping
-from enum import Enum
 import re
+from enum import Enum
+from typing import Any, Dict, List, Mapping, Optional, Union
+
 
 class AlphabetCategory(Enum):
     """Categorization of different alphabet types"""
-    DENSITY = "density"      # For grayscale density mapping
-    SPECIAL = "special"      # For special character collections
-    SYMBOLIC = "symbolic"    # For symbolic representation
-    ARTISTIC = "artistic"    # For artistic effects
-    LANGUAGES = "languages"    # For language-specific characters
+
+    DENSITY = "density"  # For grayscale density mapping
+    SPECIAL = "special"  # For special character collections
+    SYMBOLIC = "symbolic"  # For symbolic representation
+    ARTISTIC = "artistic"  # For artistic effects
+    LANGUAGES = "languages"  # For language-specific characters
+
 
 # Collection of character sets for different conversion purposes
 ALPHABETS = {
     # Density-based alphabets (dark to light)
     "general": " .,:;i1tfLCG08@",  # General purpose, 14 levels
-    "detailed": " .'`^\",:;Il!i><~+_-?][}{1)(|/'\'tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$", # Detailed, 70 levels
-    "simple": "@%#*+=-:. ", # Simple, 10 levels (reversed)
-    "blocks": " ░▒▓█", # Unicode block characters, 5 levels
-    "binary": "01", # Binary, 2 levels
-    "dots": " ⠄⠆⠖⠶⡶⣩⣪⣫", # Braille patterns, 10 levels
-    "eidosian": "⚡✨🔥💫🌟⭐⚪⭕⚫", # Special Eidosian alphabet, 9 levels
-    "cosmic": "✧·˚✫⋆˚。⋆｡⋆☾˚⋆✦✩★", # Cosmic symbols, 12 levels
-    "matrix": "日+*%$#@&01", # Matrix-like characters, 10 levels
-    "shadows": " ░▒▓▀▁▂▃▄▅▆▇█", # Shadows with gradients, 13 levels
-    "minimal": " .-=+*#%@", # Minimal set, 9 levels
-    "contrast": " █", # Maximum contrast, 2 levels
-    "extended": " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$▀▄█", # Extended with blocks, 73 levels
-    "ethereal": "·°•○◎●◉✷✸✹✺✻✼❂⊛⊕⦿", # Ethereal patterns, 16 levels
-    "quantum": "⟨⟩⟪⟫⦑⦒⦓⦔⦦⦧⦨⦩⦪⦫⦬⦭⦮⦯⦰⦱⦲⦳⦴⦵⦶⦷⦸⦹⦺⦻⦼⦽⦾⦿", # Quantum-like symbols, 17 levels
-    "dimensional": "⎲⎳⏏⏑⏒⏣⏤⏥⎔⎕⌘⌑⌓⌭⌬", # Dimensional symbols, 15 levels
+    "detailed": " .'`^\",:;Il!i><~+_-?][}{1)(|/''tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",  # Detailed, 70 levels
+    "simple": "@%#*+=-:. ",  # Simple, 10 levels (reversed)
+    "blocks": " ░▒▓█",  # Unicode block characters, 5 levels
+    "binary": "01",  # Binary, 2 levels
+    "dots": " ⠄⠆⠖⠶⡶⣩⣪⣫",  # Braille patterns, 10 levels
+    "eidosian": "⚡✨🔥💫🌟⭐⚪⭕⚫",  # Special Eidosian alphabet, 9 levels
+    "cosmic": "✧·˚✫⋆˚。⋆｡⋆☾˚⋆✦✩★",  # Cosmic symbols, 12 levels
+    "matrix": "日+*%$#@&01",  # Matrix-like characters, 10 levels
+    "shadows": " ░▒▓▀▁▂▃▄▅▆▇█",  # Shadows with gradients, 13 levels
+    "minimal": " .-=+*#%@",  # Minimal set, 9 levels
+    "contrast": " █",  # Maximum contrast, 2 levels
+    "extended": " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$▀▄█",  # Extended with blocks, 73 levels
+    "ethereal": "·°•○◎●◉✷✸✹✺✻✼❂⊛⊕⦿",  # Ethereal patterns, 16 levels
+    "quantum": "⟨⟩⟪⟫⦑⦒⦓⦔⦦⦧⦨⦩⦪⦫⦬⦭⦮⦯⦰⦱⦲⦳⦴⦵⦶⦷⦸⦹⦺⦻⦼⦽⦾⦿",  # Quantum-like symbols, 17 levels
+    "dimensional": "⎲⎳⏏⏑⏒⏣⏤⏥⎔⎕⌘⌑⌓⌭⌬",  # Dimensional symbols, 15 levels
 }
 
 # Specialized character sets grouped by purpose
@@ -39,13 +42,11 @@ SPECIAL_SETS = {
     "braille": "⠀⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿",
     "arrows": "←↑→↓↔↕↖↗↘↙↚↛↜↝↞↟↠↡↢↣↤↥↦↧↨↩↪↫↬↭↮↯↰↱↲↳↴↵↶↷↸↹↺↻",
     "math": "∀∁∂∃∄∅∆∇∈∉∊∋∌∍∎∏∐∑−∓∔∕∖∗∘∙√∛∜∝∞∟∠∡∢∣∤∥∦∧∨∩∪∫∬∭∮∯∰∱∲∳∴∵∶∷∸∹∺∻∼∽∾∿≀≁≂≃≄≅≆≇≈≉≊≋≌≍≎≏≐≑≒≓≔≕≖≗≘≙≚≛≜≝≞≟≠≡≢≣≤≥≦≧≨≩≪≫≬≭≮≯≰≱≲≳≴≵≶≷≸≹≺≻≼≽≾≿",
-    
     # Eidosian specialized sets
     "eidosian_energy": "⚡⚪⭕⚫✨⭐★☀︎⚝✴️✫☉☼☄︎",
     "eidosian_cosmic": "☽☾★✩✧⋆✫✬✭✮✯✰⚝✢✣✤✥❂❈❉❊❋✱✲✳✴✵✶✷✸✹✺✻✼❄❅❆❇❈❉❊❋",
     "eidosian_mystic": "⚕♱♰☤⚚⚖⚘⚛⚜⚝⚢⚣⚤⚥⚦⚧⚨",
     "eidosian_elements": "🔥💧🌪️⛰️✨💫⭐",
-    
     # Additional specialized sets
     "geometric": "■□▢▣▤▥▦▧▨▩▪▫▬▭▮▯▰▱▲△▴▵▶▷▸▹►▻▼▽▾▿◀◁◂◃◄◅◆◇◈◉◊○◌◍◎●◐◑◒◓◔◕◖◗◘◙◚◛◜◝◞◟◠◡◢◣◤◥◦◧◨◩◪◫◬◭◮◯",
     "shapes": "■□▢▣▤▥▦▧▨▩◆◇◈◊○◌◍◎●◐◑◒◓◔◕◖◗◘◙◚◛◜◝◞◟◠◡◢◣◤◥◦◧◨◩◪◫◬◭◮◯",
@@ -86,11 +87,14 @@ LANGUAGES = {
     "sundanese": "ᮃᮄᮅᮆᮇᮈᮉᮊᮋᮌᮍᮎᮏᮐᮑᮒᮓᮔᮕᮖᮗᮘᮙᮚᮛᮜᮝᮞᮟᮠᮡᮢᮣᮤᮥᮦᮧᮨᮩ᮪᮫ᮬᮭ᮰᮱᮲᮳᮴᮵᮶᮷᮸᮹.,;:!?\"'`()[]{}",
     "javanese": "ꦄꦅꦆꦇꦈꦉꦊꦋꦌꦍꦎꦏꦐꦑꦒꦓꦔꦕꦖꦗꦘꦙꦚꦛꦜꦝꦞꦟꦠꦡꦢꦣꦤꦥꦦꦧꦨꦩꦪꦫꦬꦭꦮꦯꦰꦱꦲ꦳ꦴꦵꦶꦷꦸꦹꦺꦻꦼꦽꦾꦿ꧀꧁꧂꧃꧄꧅꧆꧇꧈꧉꧊꧋꧌꧍꧎ꧏ꧐꧑꧒꧓꧔꧕꧖꧗꧘꧙.,;:!?\"'`()[]{}",
 }
-    
+
 
 ALPHABET_CATEGORIES: Dict[Union[str, AlphabetCategory], List[str]] = {}
 
-def populate_alphabet_categories(*category_sources: Mapping[Union[str, AlphabetCategory], Any]) -> None:
+
+def populate_alphabet_categories(
+    *category_sources: Mapping[Union[str, AlphabetCategory], Any],
+) -> None:
     """
     Procedurally build ALPHABET_CATEGORIES from any number of sources.
     Each source can map a category (any key) to various data structures (lists, dicts, etc.).
@@ -100,7 +104,7 @@ def populate_alphabet_categories(*category_sources: Mapping[Union[str, AlphabetC
         for cat_key, data in source.items():
             if cat_key not in ALPHABET_CATEGORIES:
                 ALPHABET_CATEGORIES[cat_key] = []
-            
+
             # Handle various data structures that might be in sources
             if isinstance(data, dict):
                 ALPHABET_CATEGORIES[cat_key].extend(list(data.keys()))
@@ -109,16 +113,18 @@ def populate_alphabet_categories(*category_sources: Mapping[Union[str, AlphabetC
             else:
                 # Single item
                 ALPHABET_CATEGORIES[cat_key].append(str(data))
-            
+
             # Deduplicate entries
             ALPHABET_CATEGORIES[cat_key] = list(set(ALPHABET_CATEGORIES[cat_key]))
+
 
 # Initialize categorization - call this at module load time
 populate_alphabet_categories(
     {AlphabetCategory.DENSITY: ALPHABETS},
     {AlphabetCategory.SPECIAL: SPECIAL_SETS},
-    {AlphabetCategory.LANGUAGES: LANGUAGES}
+    {AlphabetCategory.LANGUAGES: LANGUAGES},
 )
+
 
 class AlphabetManager:
     """Manager for alphabets, special sets, and languages."""
@@ -140,12 +146,10 @@ class AlphabetManager:
     @staticmethod
     def get_special_set(name: str) -> Optional[str]:
         return SPECIAL_SETS.get(name)
-    
+
     @staticmethod
     def register_alphabet(
-        name: str, 
-        charset: str, 
-        category: AlphabetCategory = AlphabetCategory.DENSITY
+        name: str, charset: str, category: AlphabetCategory = AlphabetCategory.DENSITY
     ) -> None:
         ALPHABETS[name] = charset
         if category not in ALPHABET_CATEGORIES:
@@ -155,9 +159,7 @@ class AlphabetManager:
 
     @staticmethod
     def register_special_set(
-        name: str, 
-        charset: str, 
-        category: AlphabetCategory = AlphabetCategory.SPECIAL
+        name: str, charset: str, category: AlphabetCategory = AlphabetCategory.SPECIAL
     ) -> None:
         SPECIAL_SETS[name] = charset
         if category not in ALPHABET_CATEGORIES:
@@ -176,10 +178,7 @@ class AlphabetManager:
 
     @staticmethod
     def create_custom_density_map(
-        charset: str,
-        min_value: int = 0,
-        max_value: int = 255,
-        reverse: bool = False
+        charset: str, min_value: int = 0, max_value: int = 255, reverse: bool = False
     ) -> Dict[int, str]:
         if reverse:
             charset = charset[::-1]
@@ -224,10 +223,12 @@ class AlphabetManager:
 
     @staticmethod
     def filter_charset(charset: str, pattern: str) -> str:
-        return ''.join(c for c in charset if re.match(pattern, c))
+        return "".join(c for c in charset if re.match(pattern, c))
 
     @staticmethod
-    def get_charset_info(name: str) -> Dict[str, Union[str, int, AlphabetCategory, bool, None]]:
+    def get_charset_info(
+        name: str,
+    ) -> Dict[str, Union[str, int, AlphabetCategory, bool, None]]:
         cs = AlphabetManager.get_alphabet(name)
         cat = AlphabetManager.get_category(name)
         return {
@@ -235,14 +236,15 @@ class AlphabetManager:
             "charset": cs,
             "length": len(cs),
             "category": cat,
-            "is_special": name in SPECIAL_SETS
+            "is_special": name in SPECIAL_SETS,
         }
+
     @staticmethod
     def get_weighted_charset(base_charset: str, weights: List[float]) -> str:
         if len(base_charset) != len(weights):
             raise ValueError("Character set and weights must have the same length.")
         result = ""
-        for ch, w in zip(base_charset, weights):
+        for ch, w in zip(base_charset, weights, strict=True):
             result += ch * max(1, int(w * 10))
         return result
 
@@ -252,9 +254,7 @@ class AlphabetManager:
 
     @staticmethod
     def create_interpolated_charset(
-        charset1: str,
-        charset2: str,
-        ratio: float = 0.5
+        charset1: str, charset2: str, ratio: float = 0.5
     ) -> str:
         ratio = max(0.0, min(1.0, ratio))
         len1, len2 = len(charset1), len(charset2)

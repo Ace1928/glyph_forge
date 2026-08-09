@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import typer
 from rich.console import Console
@@ -40,12 +41,15 @@ def _run_source(
     charset: str,
     invert: bool,
     dither: bool,
+    edge_algorithm: str,
+    edge_threshold: int,
     fps: float | None,
     duration: float | None,
     max_frames: int | None,
     performance: str,
     loop: bool = False,
     screen_backend: str = "auto",
+    stop_when: Callable[[], bool] | None = None,
 ) -> None:
     from ..live.capture import CaptureError, create_frame_source
     from ..live.renderers import FrameRenderer, RenderConfig
@@ -67,6 +71,8 @@ def _run_source(
                 charset=charset,
                 invert=invert,
                 dither=dither,
+                edge_algorithm=edge_algorithm,
+                edge_threshold=edge_threshold,
                 resample=profile.resample,
             )
         )
@@ -104,7 +110,7 @@ def _run_source(
         f"{renderer.config.width} columns · {target_fps:g} FPS · Ctrl+C to stop"
     )
     try:
-        stats = run_terminal_session(source, renderer, session)
+        stats = run_terminal_session(source, renderer, session, stop_when=stop_when)
     except CaptureError as exc:
         console.print(f"[bold red]Live capture failed:[/bold red] {exc}")
         raise typer.Exit(1) from exc
@@ -118,7 +124,7 @@ def _run_source(
 def camera_command(
     index: int = typer.Argument(0, min=0, help="Webcam/device index."),
     mode: str = typer.Option(
-        "braille", "--mode", "-m", help="glyph, braille, half-block, quadrant"
+        "braille", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
     ),
     color: str = typer.Option(
         "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
@@ -128,6 +134,8 @@ def camera_command(
     charset: str = typer.Option("general", "--charset"),
     invert: bool = typer.Option(False, "--invert"),
     dither: bool = typer.Option(False, "--dither/--no-dither"),
+    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
+    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
     fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
     duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
     frames: Optional[int] = typer.Option(None, "--frames", min=1),
@@ -144,6 +152,8 @@ def camera_command(
         charset=charset,
         invert=invert,
         dither=dither,
+        edge_algorithm=edge_algorithm,
+        edge_threshold=edge_threshold,
         fps=fps,
         duration=duration,
         max_frames=frames,
@@ -157,7 +167,7 @@ def screen_command(
         1, min=0, help="Monitor index (0 is the combined desktop in MSS)."
     ),
     mode: str = typer.Option(
-        "half-block", "--mode", "-m", help="glyph, braille, half-block, quadrant"
+        "half-block", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
     ),
     color: str = typer.Option(
         "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
@@ -167,6 +177,8 @@ def screen_command(
     charset: str = typer.Option("detailed", "--charset"),
     invert: bool = typer.Option(False, "--invert"),
     dither: bool = typer.Option(False, "--dither/--no-dither"),
+    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
+    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
     fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
     duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
     frames: Optional[int] = typer.Option(None, "--frames", min=1),
@@ -186,6 +198,8 @@ def screen_command(
         charset=charset,
         invert=invert,
         dither=dither,
+        edge_algorithm=edge_algorithm,
+        edge_threshold=edge_threshold,
         fps=fps,
         duration=duration,
         max_frames=frames,
@@ -205,7 +219,7 @@ def video_command(
         resolve_path=True,
     ),
     mode: str = typer.Option(
-        "glyph", "--mode", "-m", help="glyph, braille, half-block, quadrant"
+        "glyph", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
     ),
     color: str = typer.Option(
         "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
@@ -215,6 +229,8 @@ def video_command(
     charset: str = typer.Option("detailed", "--charset"),
     invert: bool = typer.Option(False, "--invert"),
     dither: bool = typer.Option(False, "--dither/--no-dither"),
+    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
+    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
     fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
     duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
     frames: Optional[int] = typer.Option(None, "--frames", min=1),
@@ -232,6 +248,8 @@ def video_command(
         charset=charset,
         invert=invert,
         dither=dither,
+        edge_algorithm=edge_algorithm,
+        edge_threshold=edge_threshold,
         fps=fps,
         duration=duration,
         max_frames=frames,
@@ -240,4 +258,113 @@ def video_command(
     )
 
 
-__all__ = ["app", "camera_command", "screen_command", "video_command"]
+@app.command("url")
+def url_command(
+    source: str = typer.Argument(..., help="Video page URL supported by yt-dlp."),
+    mode: str = typer.Option(
+        "glyph", "--mode", "-m", help="glyph, edge, braille, half-block, quadrant"
+    ),
+    color: str = typer.Option(
+        "auto", "--color", "-c", help="auto, none, ansi256, truecolor"
+    ),
+    width: Optional[int] = typer.Option(None, "--width", "-w", min=1),
+    height: Optional[int] = typer.Option(None, "--height", min=1),
+    charset: str = typer.Option("detailed", "--charset"),
+    invert: bool = typer.Option(False, "--invert"),
+    dither: bool = typer.Option(False, "--dither/--no-dither"),
+    edge_algorithm: str = typer.Option("sobel", "--edge-algorithm"),
+    edge_threshold: int = typer.Option(48, "--edge-threshold", min=0, max=255),
+    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
+    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
+    frames: Optional[int] = typer.Option(None, "--frames", min=1),
+    performance: str = typer.Option("auto", "--performance"),
+) -> None:
+    """Play a supported video-site URL without downloading it first."""
+
+    _run_source(
+        f"url:{source}",
+        mode=mode,
+        color=color,
+        width=width,
+        height=height,
+        charset=charset,
+        invert=invert,
+        dither=dither,
+        edge_algorithm=edge_algorithm,
+        edge_threshold=edge_threshold,
+        fps=fps,
+        duration=duration,
+        max_frames=frames,
+        performance=performance,
+    )
+
+
+@app.command(
+    "launch",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def launch_command(
+    command: list[str] = typer.Argument(
+        ...,
+        help="Application command and arguments; place -- before app options.",
+    ),
+    display_width: int = typer.Option(1280, "--display-width", min=64),
+    display_height: int = typer.Option(720, "--display-height", min=64),
+    columns: Optional[int] = typer.Option(None, "--columns", min=1),
+    mode: str = typer.Option("edge", "--mode", "-m"),
+    color: str = typer.Option("auto", "--color", "-c"),
+    fps: Optional[float] = typer.Option(None, "--fps", min=1, max=120),
+    duration: Optional[float] = typer.Option(None, "--duration", min=0.01),
+    performance: str = typer.Option("auto", "--performance"),
+) -> None:
+    """Launch an app in isolated Xvfb and render its display in the terminal."""
+
+    from ..live.virtual import VirtualDisplayError, VirtualDisplaySession
+
+    process = None
+    try:
+        with VirtualDisplaySession(display_width, display_height) as display:
+            process = display.launch(command)
+            console.print(
+                f"[cyan]{display.name}[/cyan] · app PID {process.pid} · "
+                "the app closes with this viewer"
+            )
+            _run_source(
+                "screen:0",
+                mode=mode,
+                color=color,
+                width=columns,
+                height=None,
+                charset="detailed",
+                invert=False,
+                dither=False,
+                edge_algorithm="scharr",
+                edge_threshold=48,
+                fps=fps,
+                duration=duration,
+                max_frames=None,
+                performance=performance,
+                screen_backend="mss",
+                stop_when=lambda: process.poll() is not None,
+            )
+    except (VirtualDisplayError, ValueError) as exc:
+        console.print(f"[bold red]Virtual display failed:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+    finally:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=2)
+
+
+__all__ = [
+    "app",
+    "camera_command",
+    "launch_command",
+    "screen_command",
+    "url_command",
+    "video_command",
+]

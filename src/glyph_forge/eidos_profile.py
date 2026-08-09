@@ -1,14 +1,9 @@
-"""
-🧿 Eidos Profile API
---------------------
-
-Self-aware loader and updater for the `eidos_profile.yml` file. Follows the
-Eidosian principles of precision and exhaustive clarity.
-"""
+"""Bundled design-profile metadata with portable user overrides."""
 
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, TypedDict, cast
 
@@ -16,8 +11,22 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-# Default path two levels above this file (project root)
-PROFILE_PATH = Path(__file__).resolve().parents[2] / "eidos_profile.yml"
+BUNDLED_PROFILE_PATH = Path(__file__).with_name("resources") / "eidos_profile.yml"
+
+
+def _user_profile_path() -> Path:
+    override = os.environ.get("GLYPH_FORGE_EIDOS_PROFILE")
+    if override:
+        return Path(override).expanduser()
+    if os.name == "nt" and os.environ.get("APPDATA"):
+        return Path(os.environ["APPDATA"]) / "GlyphForge" / "eidos_profile.yml"
+    config_root = Path(
+        os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")
+    ).expanduser()
+    return config_root / "glyph-forge" / "eidos_profile.yml"
+
+
+PROFILE_PATH = BUNDLED_PROFILE_PATH
 
 
 class BigFive(TypedDict):
@@ -51,8 +60,10 @@ class EidosProfile(TypedDict, total=False):
 
 
 def load_profile(path: Path | None = None) -> EidosProfile:
-    """Load Eidos profile from YAML with surgical precision."""
-    profile_path = path or PROFILE_PATH
+    """Load an explicit profile, a user override, or the bundled default."""
+
+    user_path = _user_profile_path()
+    profile_path = path or (user_path if user_path.is_file() else PROFILE_PATH)
     with open(profile_path, "r", encoding="utf-8") as f:
         data: EidosProfile = yaml.safe_load(f)
     logger.debug("Loaded profile from %s", profile_path)
@@ -60,8 +71,10 @@ def load_profile(path: Path | None = None) -> EidosProfile:
 
 
 def save_profile(profile: EidosProfile, path: Path | None = None) -> None:
-    """Persist profile data back to YAML."""
-    profile_path = path or PROFILE_PATH
+    """Persist profile data to an explicit path or portable user config."""
+
+    profile_path = path or _user_profile_path()
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
     with open(profile_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(profile, f, sort_keys=False)
     logger.debug("Saved profile to %s", profile_path)
@@ -82,3 +95,13 @@ def _merge_dict(base: Dict[str, Any], overlay: Dict[str, Any]) -> None:
             _merge_dict(base[key], value)
         else:
             base[key] = value
+
+
+__all__ = [
+    "BUNDLED_PROFILE_PATH",
+    "EidosProfile",
+    "PROFILE_PATH",
+    "load_profile",
+    "save_profile",
+    "update_profile",
+]

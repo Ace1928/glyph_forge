@@ -19,6 +19,7 @@ from PIL import Image
 
 from ..runtime import RuntimeProfile, detect_runtime_profile
 from ..utils.alphabet_manager import AlphabetManager
+from .edges import EdgeAlgorithm, detect_edges, directional_glyphs, normalize_algorithm
 
 RGBFrame = NDArray[np.uint8]
 
@@ -27,6 +28,7 @@ class RenderMode(str, Enum):
     """Spatial encoding used for each terminal character cell."""
 
     GLYPH = "glyph"
+    EDGE = "edge"
     BRAILLE = "braille"
     HALF_BLOCK = "half-block"
     QUADRANT = "quadrant"
@@ -52,6 +54,8 @@ class RenderConfig:
     invert: bool = False
     dither: bool = False
     threshold: int = 128
+    edge_algorithm: EdgeAlgorithm | str = EdgeAlgorithm.SOBEL
+    edge_threshold: int = 48
     cell_aspect: float = 0.5
     resample: str = "bilinear"
 
@@ -174,7 +178,8 @@ def _cell_height(frame: RGBFrame, config: RenderConfig) -> int:
     if config.height is not None:
         return max(1, config.height)
     aspect = frame.shape[0] / max(1, frame.shape[1])
-    return max(1, round(aspect * max(1, config.width) * config.cell_aspect))
+    calculated = aspect * max(1, config.width) * config.cell_aspect
+    return max(1, int(round(calculated)))
 
 
 def _ansi256(rgb: NDArray[np.uint8]) -> NDArray[np.uint16]:
@@ -256,9 +261,12 @@ class FrameRenderer:
             raise ValueError("Rendered width must be positive")
         if config.cell_aspect <= 0:
             raise ValueError("cell_aspect must be positive")
+        if not 0 <= config.edge_threshold <= 255:
+            raise ValueError("edge_threshold must be between 0 and 255")
         self.config = config
         self.mode = _normalize_mode(config.mode)
         self.color = _normalize_color(config.color)
+        self.edge_algorithm = normalize_algorithm(config.edge_algorithm)
         self.charset = (
             AlphabetManager.get_alphabet(config.charset)
             if config.charset in AlphabetManager.list_available_alphabets()
@@ -276,6 +284,8 @@ class FrameRenderer:
         normalized = _normalize_frame(frame)
         if self.mode is RenderMode.BRAILLE:
             return self._render_braille(normalized)
+        if self.mode is RenderMode.EDGE:
+            return self._render_edge(normalized)
         if self.mode is RenderMode.HALF_BLOCK:
             return self._render_half_block(normalized)
         if self.mode is RenderMode.QUADRANT:
@@ -290,6 +300,25 @@ class FrameRenderer:
             max=len(self._glyphs) - 1
         )
         mapped = self._glyphs[indices]
+        rows = ["".join(row) for row in mapped.tolist()]
+        text = _colorize_rows(rows, resized, self.color)
+        return RenderResult(text, self.config.width, height, self.mode)
+
+    def _render_edge(self, frame: RGBFrame) -> RenderResult:
+        height = _cell_height(frame, self.config)
+        resized = _resize(frame, self.config.width, height, self.config.resample)
+        gray = _grayscale(resized)
+        indices = (gray.astype(np.uint16) * len(self._glyphs) // 256).clip(
+            max=len(self._glyphs) - 1
+        )
+        mapped = self._glyphs[indices].copy()
+        edges = detect_edges(
+            gray,
+            self.edge_algorithm,
+            threshold=self.config.edge_threshold,
+        )
+        edge_mask = edges.magnitude > 0
+        mapped[edge_mask] = directional_glyphs(edges)[edge_mask]
         rows = ["".join(row) for row in mapped.tolist()]
         text = _colorize_rows(rows, resized, self.color)
         return RenderResult(text, self.config.width, height, self.mode)
@@ -355,7 +384,7 @@ class FrameRenderer:
                         pair = np.asarray([[top, bottom]], dtype=np.uint8)
                         indices = _ansi256(pair)[0]
                         parts.append(
-                            f"\x1b[38;5;{int(indices[0])};" f"48;5;{int(indices[1])}m"
+                            f"\x1b[38;5;{int(indices[0])};48;5;{int(indices[1])}m"
                         )
                 parts.append("▀")
                 previous = current
@@ -413,7 +442,7 @@ def render_svg(
     rows = []
     for index, line in enumerate(result.text.splitlines(), start=1):
         rows.append(
-            f'<text x="0" y="{index * line_height:.2f}">' f"{html.escape(line)}</text>"
+            f'<text x="0" y="{index * line_height:.2f}">{html.escape(line)}</text>'
         )
     family = html.escape(font_family, quote=True)
     return (

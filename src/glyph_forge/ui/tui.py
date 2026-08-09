@@ -232,7 +232,7 @@ class GlyphForgeApp(App[str | None]):
                             yield Input("camera:0", id="live-source")
                             yield Button("Browse", id="live-browse")
                         yield Static(
-                            "Use camera:0, screen:1, or a video path.",
+                            "Use camera:0, screen:1, a video path, or an https URL.",
                             classes="hint",
                         )
                         yield Label("Fidelity mode")
@@ -240,6 +240,7 @@ class GlyphForgeApp(App[str | None]):
                             [
                                 ("Braille · 2×4 subpixels", "braille"),
                                 ("Density glyphs", "glyph"),
+                                ("Directional edges", "edge"),
                                 ("True-colour half blocks", "half-block"),
                                 ("Quadrants · 2×2 subpixels", "quadrant"),
                             ],
@@ -554,7 +555,7 @@ class GlyphForgeApp(App[str | None]):
         self._live_stop.set()
         self.exit("studio")
 
-    def action_quit(self) -> None:
+    async def action_quit(self) -> None:
         self._live_stop.set()
         self.exit(None)
 

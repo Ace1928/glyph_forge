@@ -105,7 +105,7 @@ DitherAlgorithm = Literal[
 class Renderer(Protocol[T_co]):
     """Contract implemented by output renderers."""
 
-    def render(self, matrix: GlyphMatrix, options: RenderOptions) -> T: ...
+    def render(self, matrix: GlyphMatrix, options: RenderOptions) -> T_co: ...
 
 
 class Transformer(Protocol):

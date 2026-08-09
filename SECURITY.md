@@ -1,84 +1,49 @@
-# 🔐 Security Policy
+# Security policy
 
-## ⚡ Supported Versions
+## Supported versions
 
-| Version | Support Status      | Security Updates    | End of Life    |
-|:-------:|:-------------------:|:------------------:|:--------------:|
-| 0.1.0   | ✅ Active           | ✅ Full            | TBD            |
+Security fixes target the current `0.2.x` line and `main`. Older releases may
+receive a fix when practical but are not actively supported.
 
-## 🛡️ Reporting a Vulnerability
+## Report a vulnerability
 
-To report a security vulnerability in Glyph Forge, please:
+Do not open a public issue for a vulnerability that could put users at risk.
+Send a private report to <lloyd.handyside@neuroforge.io> or
+<ace1928@gmail.com> with:
 
-1. **Email**: Send details to <ace1928@gmail.com> or <lloyd.handyside@neuroforge.io>
-2. **Include**:
-    - Clear description of the vulnerability
-    - Steps to reproduce
-    - Affected versions
-    - Potential impact
-    - Any known mitigations
+- affected version and platform;
+- a minimal reproduction or proof of concept;
+- expected impact and required preconditions;
+- any mitigation already known;
+- whether and how you would like to be credited.
 
-We aim to respond within 48 hours and coordinate with you throughout the resolution process.
+The maintainers will acknowledge the report, investigate it, coordinate a fix
+and disclosure, and keep the reporter informed. Response and release timing
+depends on severity, reproducibility, and platform scope; this project does not
+promise a timeline it may be unable to meet.
 
-## 🔍 Vulnerability Handling Process
+## Security boundaries
 
-| Phase | Action | Timeline |
-|-------|--------|----------|
-| 🔔 Receipt | Confirmation sent | Within 48 hours |
-| 🔬 Assessment | Severity/impact analysis | 1-7 days |
-| 🧪 Resolution | Fix development/testing | Based on severity |
-| 🚀 Release | Security patch deployment | After verification |
-| 📝 Disclosure | Public announcement | After patch availability |
+- Browser Studio binds to loopback by default. A non-loopback bind requires the
+  explicit `--allow-network` option and should only be used on a trusted LAN.
+- Studio does not upload source media. Browser Web Share hands an export to an
+  app selected by the user; style links contain settings, not media.
+- Webcam and screen access remain subject to browser and operating-system
+  permission prompts.
+- `live url` contacts the supplied URL and services used by yt-dlp. Treat URLs
+  as network operations and use a current yt-dlp release.
+- `live launch` executes the exact command supplied by the local user. It does
+  not sandbox that application; Xvfb only gives it an isolated display.
+- Desktop capture is read-only in 0.2. Keyboard and pointer injection are not
+  implemented.
+- FFmpeg, OpenCV, yt-dlp, PyVirtualDisplay, and capture backends are optional
+  third-party components with their own security policies and update cycles.
 
-## 🛠️ Security Measures
+## Defensive design
 
-Glyph Forge implements advanced security practices:
-
-- Automated dependency scanning with temporal precision
-- Static analysis with pattern recognition
-- Runtime protection layers with contextual awareness
-- Regular security audits
-- Supply chain verification with signature validation
-
-## 📊 Severity Classification
-
-| Level | Category | Response Time | Description |
-|-------|----------|---------------|------------|
-| 🔴 Critical | 1 | Immediate | System compromise, data exfiltration risks |
-| 🟠 High | 2 | Within 48 hours | Significant functionality impact, partial data risks |
-| 🟡 Medium | 3 | Within 7 days | Limited impact, complex exploitation path |
-| 🟢 Low | 4 | Within 30 days | Minimal impact, edge cases only |
-
-## ⚙️ Security Development Lifecycle
-
-Glyph Forge follows a structured Security Development Lifecycle:
-
-1. **Design** - Threat modeling with comprehensive awareness
-2. **Implement** - Secure coding with integrity patterns
-3. **Verify** - Multi-layered testing with validation
-4. **Release** - Integrity verification with signatures
-5. **Response** - Adaptive patching with minimal time-loss
-
-## 👁️ Disclosure Policy
-
-**Responsible Disclosure**: We practice full transparency after patches are available, with credit to security researchers when permitted.
-
-**CVE Coordination**: Critical vulnerabilities receive CVE identifiers through appropriate channels.
-
-## 🧪 Third-Party Dependencies
-
-We regularly audit dependencies using:
-
-- Automated vulnerability scanners
-- Dependency pinning with hash verification
-- Comprehensive lockfile analysis
-- Scheduled updates with staged deployment
-
-## 🌐 Security Contacts
-
-- Lloyd Handyside (Primary): <lloyd.handyside@neuroforge.io>
-- Eidos (Architecture Security): <syntheticeidos@gmail.com>
-
----
-
-*Glyph Forge security updates align across all environments with precision. Our security policy evolves continuously as we refine our practices.*
+Glyph Forge keeps optional dependencies lazy, validates local server binds,
+sends restrictive browser security headers, avoids shell-based child-process
+launch, uses bounded live buffers, and writes video output through a temporary
+destination before atomic replacement. CI checks formatting, linting, typing,
+tests, package metadata, optional dependency installation, and installed wheel
+resources.

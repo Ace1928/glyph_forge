@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
@@ -53,6 +54,7 @@ def run_terminal_session(
     config: TerminalSessionConfig | None = None,
     *,
     output: TextIO | None = None,
+    stop_when: Callable[[], bool] | None = None,
 ) -> LiveSessionStats:
     """Render the latest available source frame in an ANSI terminal surface."""
 
@@ -77,6 +79,8 @@ def run_terminal_session(
     pump = LatestFramePump(source).start()
     try:
         while True:
+            if stop_when is not None and stop_when():
+                break
             now = time.monotonic()
             if deadline is not None and now >= deadline:
                 break

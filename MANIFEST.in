@@ -1,30 +1,14 @@
-# Source distribution contents. Package modules are discovered from ``src`` by
-# setuptools; this file lists only supporting files that are intentionally
-# shipped. Explicit script names prevent local experiments entering releases.
-
-include LICENSE
-include README.md
-include ROADMAP.md
 include CHANGELOG.md
 include CODE_OF_CONDUCT.md
 include CONTRIBUTING.md
+include LICENSE
+include README.md
+include ROADMAP.md
 include SECURITY.md
 include pyproject.toml
-include setup.py
-include requirements.txt
+
 include src/glyph_forge/py.typed
-
 recursive-include examples *.py
-recursive-include tests *.py
+recursive-include src/glyph_forge/resources *.yml
 recursive-include src/glyph_forge/ui *.css *.html *.js
-
-prune scripts
-include scripts/__init__.py
-include scripts/demo.py
-include scripts/run_tests.py
-include scripts/update_glossary.py
-include scripts/verify_install.py
-
-global-exclude .DS_Store *.py[cod] __pycache__ *.so .*.swp
-prune .github
-prune .vscode
+recursive-include tests *.py

@@ -7,17 +7,16 @@ input formats into glyph matrices.
 
 import os
 import tempfile
-from unittest import mock
 
 import numpy as np
 import pytest
 from PIL import Image
 
 from glyph_forge.transformers import (
-    ImageTransformer,
     ColorMapper,
     DepthAnalyzer,
     EdgeDetector,
+    ImageTransformer,
 )
 
 
@@ -29,24 +28,24 @@ def test_images() -> dict:
     # 1. Gradient image (50x50)
     gradient = np.linspace(0, 255, 50, dtype=np.uint8)
     gradient_img = np.repeat(gradient.reshape(1, 50), 50, axis=0)
-    gradient_pil = Image.fromarray(gradient_img, mode='L')
-    gradient_path = os.path.join(test_dir, 'gradient.png')
+    gradient_pil = Image.fromarray(gradient_img, mode="L")
+    gradient_path = os.path.join(test_dir, "gradient.png")
     gradient_pil.save(gradient_path)
 
     # 2. RGB color test image (50x50)
     rgb_data = np.zeros((50, 50, 3), dtype=np.uint8)
     rgb_data[0:25, :, 0] = 255  # Red top half
     rgb_data[25:50, :, 1] = 255  # Green bottom half
-    rgb_img = Image.fromarray(rgb_data, mode='RGB')
-    rgb_path = os.path.join(test_dir, 'rgb.png')
+    rgb_img = Image.fromarray(rgb_data, mode="RGB")
+    rgb_path = os.path.join(test_dir, "rgb.png")
     rgb_img.save(rgb_path)
 
     # 3. Edge test image (50x50) - black with white cross
     edge_data = np.zeros((50, 50), dtype=np.uint8)
     edge_data[20:30, :] = 255  # Horizontal line
     edge_data[:, 20:30] = 255  # Vertical line
-    edge_img = Image.fromarray(edge_data, mode='L')
-    edge_path = os.path.join(test_dir, 'edges.png')
+    edge_img = Image.fromarray(edge_data, mode="L")
+    edge_path = os.path.join(test_dir, "edges.png")
     edge_img.save(edge_path)
 
     # 4. Depth simulation image (50x50) - center bright, edges dark
@@ -55,20 +54,21 @@ def test_images() -> dict:
     distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
     depth_data = 255 - (distance * 5).astype(np.uint8)
     depth_data = np.clip(depth_data, 0, 255)
-    depth_img = Image.fromarray(depth_data, mode='L')
-    depth_path = os.path.join(test_dir, 'depth.png')
+    depth_img = Image.fromarray(depth_data, mode="L")
+    depth_path = os.path.join(test_dir, "depth.png")
     depth_img.save(depth_path)
 
     yield {
-        'dir': test_dir,
-        'gradient': {'img': gradient_pil, 'path': gradient_path},
-        'rgb': {'img': rgb_img, 'path': rgb_path},
-        'edges': {'img': edge_img, 'path': edge_path},
-        'depth': {'img': depth_img, 'path': depth_path},
+        "dir": test_dir,
+        "gradient": {"img": gradient_pil, "path": gradient_path},
+        "rgb": {"img": rgb_img, "path": rgb_path},
+        "edges": {"img": edge_img, "path": edge_path},
+        "depth": {"img": depth_img, "path": depth_path},
     }
 
     # Cleanup
     import shutil
+
     shutil.rmtree(test_dir)
 
 
@@ -97,7 +97,7 @@ class TestImageTransformer:
         """Test transformation from file path."""
         transformer = ImageTransformer()
         matrix = transformer.transform(
-            test_images['gradient']['path'],
+            test_images["gradient"]["path"],
             width=20,
             height=10,
         )
@@ -111,7 +111,7 @@ class TestImageTransformer:
         """Test transformation from PIL Image object."""
         transformer = ImageTransformer()
         matrix = transformer.transform(
-            test_images['gradient']['img'],
+            test_images["gradient"]["img"],
             width=20,
             height=10,
         )
@@ -132,7 +132,7 @@ class TestImageTransformer:
         """Test transformation with automatic height calculation."""
         transformer = ImageTransformer()
         matrix = transformer.transform(
-            test_images['gradient']['path'],
+            test_images["gradient"]["path"],
             width=40,
         )
 
@@ -144,13 +144,13 @@ class TestImageTransformer:
         """Test transformation with brightness and contrast adjustments."""
         transformer = ImageTransformer()
         matrix_normal = transformer.transform(
-            test_images['gradient']['path'],
+            test_images["gradient"]["path"],
             width=20,
             height=10,
         )
 
         matrix_bright = transformer.transform(
-            test_images['gradient']['path'],
+            test_images["gradient"]["path"],
             width=20,
             height=10,
             brightness=1.5,
@@ -193,7 +193,7 @@ class TestColorMapper:
         """Test transformation of RGB image."""
         mapper = ColorMapper()
         matrix = mapper.transform(
-            test_images['rgb']['path'],
+            test_images["rgb"]["path"],
             width=20,
             height=10,
         )
@@ -205,19 +205,20 @@ class TestColorMapper:
         """Test transformation with saturation preservation."""
         mapper = ColorMapper()
         matrix_normal = mapper.transform(
-            test_images['rgb']['path'],
+            test_images["rgb"]["path"],
             width=20,
             height=10,
         )
 
         matrix_saturated = mapper.transform(
-            test_images['rgb']['path'],
+            test_images["rgb"]["path"],
             width=20,
             height=10,
             preserve_saturation=True,
         )
 
-        # Results may differ when saturation is preserved
+        assert len(matrix_normal) == len(matrix_saturated) == 10
+        assert all(len(row) == 20 for row in matrix_saturated)
         # (depends on actual image content)
         assert len(matrix_saturated) == 10
 
@@ -226,7 +227,7 @@ class TestColorMapper:
         mapper = ColorMapper()
         # Grayscale image should be converted to RGB internally
         matrix = mapper.transform(
-            test_images['gradient']['path'],
+            test_images["gradient"]["path"],
             width=20,
             height=10,
         )
@@ -246,7 +247,7 @@ class TestDepthAnalyzer:
         """Test basic depth analysis transformation."""
         analyzer = DepthAnalyzer()
         matrix = analyzer.transform(
-            test_images['depth']['path'],
+            test_images["depth"]["path"],
             width=20,
             height=10,
         )
@@ -258,14 +259,14 @@ class TestDepthAnalyzer:
         """Test transformation with different depth weights."""
         analyzer = DepthAnalyzer()
         matrix_low = analyzer.transform(
-            test_images['depth']['path'],
+            test_images["depth"]["path"],
             width=20,
             height=10,
             depth_weight=0.1,
         )
 
         matrix_high = analyzer.transform(
-            test_images['depth']['path'],
+            test_images["depth"]["path"],
             width=20,
             height=10,
             depth_weight=0.9,
@@ -278,7 +279,7 @@ class TestDepthAnalyzer:
         """Test transformation with different blur radii."""
         analyzer = DepthAnalyzer()
         matrix = analyzer.transform(
-            test_images['depth']['path'],
+            test_images["depth"]["path"],
             width=20,
             height=10,
             blur_radius=5,
@@ -300,7 +301,7 @@ class TestEdgeDetector:
         """Test basic edge detection transformation."""
         detector = EdgeDetector()
         matrix = detector.transform(
-            test_images['edges']['path'],
+            test_images["edges"]["path"],
             width=20,
             height=10,
         )
@@ -312,10 +313,10 @@ class TestEdgeDetector:
         """Test edge detection with Sobel method."""
         detector = EdgeDetector()
         matrix = detector.transform(
-            test_images['edges']['path'],
+            test_images["edges"]["path"],
             width=20,
             height=10,
-            method='sobel',
+            method="sobel",
         )
 
         assert len(matrix) == 10
@@ -324,10 +325,10 @@ class TestEdgeDetector:
         """Test edge detection with Laplacian method."""
         detector = EdgeDetector()
         matrix = detector.transform(
-            test_images['edges']['path'],
+            test_images["edges"]["path"],
             width=20,
             height=10,
-            method='laplacian',
+            method="laplacian",
         )
 
         assert len(matrix) == 10
@@ -336,14 +337,14 @@ class TestEdgeDetector:
         """Test transformation with different edge weights."""
         detector = EdgeDetector()
         matrix_low = detector.transform(
-            test_images['edges']['path'],
+            test_images["edges"]["path"],
             width=20,
             height=10,
             edge_weight=0.1,
         )
 
         matrix_high = detector.transform(
-            test_images['edges']['path'],
+            test_images["edges"]["path"],
             width=20,
             height=10,
             edge_weight=0.9,
@@ -358,9 +359,7 @@ class TestEdgeDetector:
 class TestTransformerIntegration:
     """Integration tests for transformer classes."""
 
-    def test_all_transformers_produce_valid_output(
-        self, test_images: dict
-    ) -> None:
+    def test_all_transformers_produce_valid_output(self, test_images: dict) -> None:
         """Verify all transformers produce valid glyph matrices."""
         transformers = [
             ImageTransformer(),
@@ -371,7 +370,7 @@ class TestTransformerIntegration:
 
         for transformer in transformers:
             matrix = transformer.transform(
-                test_images['gradient']['path'],
+                test_images["gradient"]["path"],
                 width=20,
                 height=10,
             )
@@ -386,16 +385,14 @@ class TestTransformerIntegration:
                 for char in row
             )
 
-    def test_transformers_with_different_charsets(
-        self, test_images: dict
-    ) -> None:
+    def test_transformers_with_different_charsets(self, test_images: dict) -> None:
         """Test all transformers work with different character sets."""
         charsets = [" .", " .:-=+*#%@", "░▒▓█"]
 
         for charset in charsets:
             transformer = ImageTransformer(charset=charset)
             matrix = transformer.transform(
-                test_images['gradient']['path'],
+                test_images["gradient"]["path"],
                 width=20,
                 height=10,
             )

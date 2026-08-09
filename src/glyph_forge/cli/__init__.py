@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import sys
 import threading
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import typer
+from rich.columns import Columns
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -17,8 +19,6 @@ from rich.text import Text
 
 from ..config.settings import ConfigManager, get_config
 from ..runtime import detect_runtime_profile, runtime_report
-from .bannerize import app as bannerize_app
-from .imagize import app as imagize_app
 from .live import app as live_app
 from .live import camera_command, screen_command
 
@@ -33,8 +33,6 @@ app = typer.Typer(
     no_args_is_help=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-app.add_typer(bannerize_app, name="bannerize", help="Legacy text-banner commands")
-app.add_typer(imagize_app, name="imagize", help="Legacy image-conversion commands")
 app.add_typer(live_app, name="live")
 app.command("webcam")(camera_command)
 app.command("desktop")(screen_command)
@@ -79,8 +77,8 @@ def version(
 
 @app.command("image")
 def image_command(
-    source: Path = typer.Argument(
-        ...,
+    source: Optional[Path] = typer.Argument(
+        None,
         exists=True,
         file_okay=True,
         dir_okay=False,
@@ -102,9 +100,37 @@ def image_command(
     charset: str = typer.Option("general", "--charset", "-c"),
     style: Optional[str] = typer.Option(None, "--style", "-s"),
     color: str = typer.Option("none", "--color", help="none, ansi, or html"),
+    render_mode: str = typer.Option(
+        "glyph",
+        "--mode",
+        "-m",
+        help="glyph, edge, braille, half-block, or quadrant",
+    ),
+    edge_algorithm: str = typer.Option(
+        "sobel",
+        "--edge-algorithm",
+        help="sobel, prewitt, scharr, laplacian, or canny",
+    ),
+    edge_threshold: int = typer.Option(
+        48,
+        "--edge-threshold",
+        min=0,
+        max=255,
+    ),
+    aspect: Optional[float] = typer.Option(
+        None,
+        "--aspect",
+        min=0.01,
+        help="Force character-grid width/height ratio.",
+    ),
     invert: bool = typer.Option(False, "--invert"),
     brightness: float = typer.Option(1.0, "--brightness", min=0.0, max=2.0),
     contrast: float = typer.Option(1.0, "--contrast", min=0.0, max=2.0),
+    optimize: bool = typer.Option(
+        False,
+        "--optimize",
+        help="Automatically stretch source contrast before rendering.",
+    ),
     dithering: bool = typer.Option(False, "--dither/--no-dither"),
     fit_terminal: bool = typer.Option(True, "--fit/--no-fit"),
     preview: bool = typer.Option(True, "--preview/--no-preview"),
@@ -113,37 +139,166 @@ def image_command(
         "--performance",
         help="auto, eco, balanced, or workstation",
     ),
+    list_charsets: bool = typer.Option(
+        False,
+        "--list-charsets",
+        help="List every installed character set and exit.",
+    ),
+    preview_charset: Optional[str] = typer.Option(
+        None,
+        "--preview-charset",
+        help="Preview one character set and exit.",
+    ),
+    sample: Optional[Path] = typer.Option(
+        None,
+        "--sample",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        help="Optional image used by --preview-charset.",
+    ),
 ) -> None:
     """Convert an image with sensible adaptive defaults and an instant preview."""
 
+    from ..live.renderers import RenderMode
     from ..services.image_to_glyph import ImageGlyphConverter
+    from ..utils.alphabet_manager import AlphabetManager
 
-    mode = color.casefold()
-    if mode not in {"none", "ansi", "html"}:
+    if list_charsets:
+        table = Table(title="Character sets")
+        table.add_column("Name", style="bold cyan")
+        table.add_column("Glyphs")
+        for name in sorted(AlphabetManager.list_available_alphabets()):
+            glyphs = AlphabetManager.get_alphabet(name)
+            table.add_row(name, glyphs[:48] + ("…" if len(glyphs) > 48 else ""))
+        console.print(table)
+        return
+    if preview_charset is not None:
+        if preview_charset not in AlphabetManager.list_available_alphabets():
+            raise typer.BadParameter(
+                f"Unknown character set {preview_charset!r}",
+                param_hint="--preview-charset",
+            )
+        glyphs = AlphabetManager.get_alphabet(preview_charset)
+        console.print(f"[bold cyan]{preview_charset}[/bold cyan]\n{glyphs}")
+        if sample is not None:
+            typer.echo(
+                ImageGlyphConverter(
+                    charset=preview_charset,
+                    width=width or 80,
+                    height=height,
+                    auto_scale=fit_terminal,
+                ).convert(str(sample))
+            )
+        return
+    if sample is not None:
+        raise typer.BadParameter(
+            "--sample requires --preview-charset", param_hint="--sample"
+        )
+    if source is None:
+        raise typer.BadParameter(
+            "An image path is required unless listing or previewing character sets",
+            param_hint="source",
+        )
+
+    color_mode = color.casefold()
+    if color_mode not in {"none", "ansi", "html"}:
         raise typer.BadParameter("Choose none, ansi, or html", param_hint="--color")
+    try:
+        selected_render_mode = RenderMode(render_mode.casefold())
+    except ValueError as exc:
+        choices = ", ".join(item.value for item in RenderMode)
+        raise typer.BadParameter(f"Choose {choices}", param_hint="--mode") from exc
+    if selected_render_mode is not RenderMode.GLYPH and color_mode == "html":
+        raise typer.BadParameter(
+            "HTML colour is available in glyph mode; use --color none or ansi",
+            param_hint="--color",
+        )
     try:
         profile = detect_runtime_profile(performance)
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="--performance") from exc
 
-    converter = ImageGlyphConverter(
-        charset=charset,
-        width=width or profile.image_width,
-        height=height,
-        invert=invert,
-        brightness=brightness,
-        contrast=contrast,
-        auto_scale=fit_terminal,
-        dithering=dithering,
-        threads=profile.workers,
-    )
+    selected_width = width or profile.image_width
+    selected_height = height
+    if aspect is not None and selected_height is None:
+        selected_height = max(1, round(selected_width / aspect))
     destination = str(output) if output is not None else None
-    if mode == "none":
-        result = converter.convert(str(source), output_path=destination, style=style)
-    else:
-        result = converter.convert_color(
-            str(source), output_path=destination, color_mode=mode
+    prepared_source: str | Any = str(source)
+    if optimize:
+        from PIL import Image, ImageOps
+
+        with Image.open(source) as image:
+            prepared_source = ImageOps.autocontrast(image.convert("RGB"))
+    if selected_render_mode is RenderMode.GLYPH:
+        converter = ImageGlyphConverter(
+            charset=charset,
+            width=selected_width,
+            height=selected_height,
+            invert=invert,
+            brightness=brightness,
+            contrast=contrast,
+            auto_scale=fit_terminal,
+            dithering=dithering,
+            threads=profile.workers,
         )
+        if color_mode == "none":
+            result = converter.convert(
+                prepared_source, output_path=destination, style=style
+            )
+        else:
+            result = converter.convert_color(
+                prepared_source, output_path=destination, color_mode=color_mode
+            )
+    else:
+        import numpy as np
+        from PIL import Image, ImageEnhance
+
+        from ..core.style_manager import apply_style
+        from ..live.renderers import FrameRenderer, RenderConfig
+
+        if fit_terminal:
+            selected_width = min(
+                selected_width,
+                max(20, shutil.get_terminal_size((selected_width, 24)).columns - 2),
+            )
+        if isinstance(prepared_source, Image.Image):
+            prepared = prepared_source
+        else:
+            with Image.open(source) as image:
+                prepared = image.convert("RGB")
+        if not isinstance(prepared_source, Image.Image):
+            prepared = prepared.copy()
+        if brightness != 1:
+            prepared = ImageEnhance.Brightness(prepared).enhance(brightness)
+        if contrast != 1:
+            prepared = ImageEnhance.Contrast(prepared).enhance(contrast)
+        pixels = np.asarray(prepared, dtype=np.uint8)
+        result = (
+            FrameRenderer(
+                RenderConfig(
+                    width=selected_width,
+                    height=selected_height,
+                    mode=selected_render_mode,
+                    color="truecolor" if color_mode == "ansi" else "none",
+                    charset=charset,
+                    invert=invert,
+                    dither=dithering,
+                    edge_algorithm=edge_algorithm,
+                    edge_threshold=edge_threshold,
+                    resample=profile.resample,
+                )
+            )
+            .render(pixels)
+            .text
+        )
+        if style:
+            result = apply_style(result, style_name=style)
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(result, encoding="utf-8")
     if result.startswith("Error"):
         console.print(f"[bold red]{result}[/bold red]")
         raise typer.Exit(1)
@@ -155,7 +310,7 @@ def image_command(
 
 @app.command("text")
 def text_command(
-    text: str = typer.Argument(..., help="Text to turn into a banner."),
+    text: Optional[str] = typer.Argument(None, help="Text to turn into a banner."),
     output: Optional[Path] = typer.Option(
         None,
         "--output",
@@ -168,17 +323,51 @@ def text_command(
     style: str = typer.Option("minimal", "--style", "-s"),
     width: int = typer.Option(80, "--width", "-w", min=10),
     color: bool = typer.Option(False, "--color/--no-color"),
+    list_fonts: bool = typer.Option(False, "--list-fonts"),
+    list_styles: bool = typer.Option(False, "--list-styles"),
+    preview: bool = typer.Option(
+        False,
+        "--preview",
+        help="Label the result as a preview (retained for compatibility).",
+    ),
 ) -> None:
     """Generate a styled text banner."""
 
+    from ..api import get_api
     from ..services.text_to_banner import text_to_banner
 
+    if list_fonts:
+        fonts = get_api().get_available_fonts()
+        console.print(Columns(sorted(fonts), equal=True, expand=True))
+        return
+    if list_styles:
+        table = Table(title="Text styles")
+        table.add_column("Name", style="bold cyan")
+        table.add_column("Description")
+        for name, data in sorted(get_api().get_available_styles().items()):
+            table.add_row(name, str(data.get("description", "")))
+        console.print(table)
+        return
+    if text is None:
+        raise typer.BadParameter(
+            "Text is required unless --list-fonts or --list-styles is used",
+            param_hint="text",
+        )
+
     result = text_to_banner(text, style=style, font=font, width=width, color=color)
+    if preview:
+        error_console.print(f"[cyan]Preview[/cyan] · {font} · {style}")
     typer.echo(result)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(result, encoding="utf-8")
         error_console.print(f"[green]Saved[/green] {output}")
+
+
+# Compatibility names now point directly at the maintained workflows instead
+# of registering two duplicate command trees.
+app.command("imagize", hidden=True)(image_command)
+app.command("bannerize", hidden=True)(text_command)
 
 
 @app.command("video")
@@ -277,7 +466,7 @@ def video_command(
         last_report = progress.elapsed
         total = str(progress.total_frames) if progress.total_frames else "?"
         error_console.print(
-            f"  {progress.rendered_frames}/{total} frames " f"({progress.elapsed:.1f}s)"
+            f"  {progress.rendered_frames}/{total} frames ({progress.elapsed:.1f}s)"
         )
 
     try:
@@ -491,6 +680,123 @@ def studio(
         server.close()
 
 
+@app.command()
+def demo(
+    mode: str = typer.Option(
+        "edge",
+        "--mode",
+        "-m",
+        help="glyph, edge, braille, half-block, or quadrant",
+    ),
+    width: Optional[int] = typer.Option(None, "--width", "-w", min=10),
+    color: bool = typer.Option(True, "--color/--no-color"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o"),
+    performance: str = typer.Option("auto", "--performance"),
+) -> None:
+    """Render a built-in showcase immediately—no input file needed."""
+
+    from ..benchmark import synthetic_frame
+    from ..live.renderers import FrameRenderer, RenderConfig, RenderMode
+    from ..services.text_to_banner import text_to_banner
+
+    try:
+        selected_mode = RenderMode(mode.casefold())
+        profile = detect_runtime_profile(performance)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    selected_width = width or min(
+        profile.stream_width,
+        max(20, shutil.get_terminal_size((profile.stream_width, 24)).columns - 2),
+    )
+    frame = synthetic_frame(640, 360)
+    selected_color = "ansi256" if color and sys.stdout.isatty() else "none"
+    if selected_mode is RenderMode.HALF_BLOCK and color:
+        selected_color = "truecolor" if sys.stdout.isatty() else "ansi256"
+    art = (
+        FrameRenderer(
+            RenderConfig(
+                width=selected_width,
+                mode=selected_mode,
+                color=selected_color,
+                charset="detailed",
+                edge_algorithm="scharr",
+                resample=profile.resample,
+            )
+        )
+        .render(frame)
+        .text
+    )
+    banner = text_to_banner(
+        "GLYPH FORGE",
+        font="small",
+        style="minimal",
+        width=selected_width,
+    )
+    result = f"Glyph Forge · {selected_mode.value}\n{banner}\n\n{art}"
+    typer.echo(result)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(result, encoding="utf-8")
+        error_console.print(f"[green]Saved[/green] {output}")
+
+
+@app.command()
+def benchmark(
+    mode: str = typer.Option(
+        "all",
+        "--mode",
+        "-m",
+        help="all, glyph, edge, braille, half-block, or quadrant",
+    ),
+    iterations: int = typer.Option(3, "--iterations", "-n", min=1, max=100),
+    warmup: int = typer.Option(1, "--warmup", min=0, max=20),
+    performance: str = typer.Option("auto", "--performance"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Measure renderer throughput with a deterministic local frame."""
+
+    from ..benchmark import benchmark_renderers
+    from ..live.renderers import RenderMode
+
+    if mode.casefold() == "all":
+        modes = list(RenderMode)
+    else:
+        try:
+            modes = [RenderMode(mode.casefold())]
+        except ValueError as exc:
+            raise typer.BadParameter(
+                "Choose all, glyph, edge, braille, half-block, or quadrant",
+                param_hint="--mode",
+            ) from exc
+    try:
+        results = benchmark_renderers(
+            performance,
+            modes=modes,
+            iterations=iterations,
+            warmup=warmup,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if as_json:
+        typer.echo(json.dumps([item.to_dict() for item in results], indent=2))
+        return
+    table = Table(title=f"Renderer benchmark · {performance}")
+    table.add_column("Mode", style="bold cyan")
+    table.add_column("Source")
+    table.add_column("Grid")
+    table.add_column("Latency", justify="right")
+    table.add_column("Throughput", justify="right")
+    for item in results:
+        table.add_row(
+            item.mode,
+            f"{item.source_width}×{item.source_height}",
+            f"{item.columns}×{item.rows}",
+            f"{item.milliseconds:.2f} ms",
+            f"{item.frames_per_second:.1f} FPS",
+        )
+    console.print(table)
+
+
 @app.command("list-commands")
 def list_commands() -> None:
     """Show the main workflows and compatibility commands."""
@@ -504,13 +810,15 @@ def list_commands() -> None:
         ("video", "Stream a full-colour glyph video to MP4"),
         ("live", "View a camera, video, or desktop with bounded latency"),
         ("studio", "Open the local browser GUI and sharing surface"),
+        ("demo", "Render a built-in showcase with no input file"),
+        ("benchmark", "Measure adaptive renderer throughput"),
         ("webcam", "Direct alias for live camera"),
         ("desktop", "Direct alias for live screen"),
         ("styles", "Browse charsets and styles"),
         ("launch", "Choose CLI or TUI automatically"),
         ("doctor", "Inspect features and adaptive defaults"),
-        ("imagize", "Legacy image command group"),
-        ("bannerize", "Legacy banner command group"),
+        ("imagize", "Compatible image command alias"),
+        ("bannerize", "Compatible banner command alias"),
     ):
         table.add_row(command, description)
     console.print(table)

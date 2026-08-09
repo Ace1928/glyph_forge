@@ -1,11 +1,8 @@
-"""Virtual display helpers using pyvirtualdisplay."""
+"""Compatibility helpers for the unified virtual-display engine."""
 
 from typing import Optional
 
-try:
-    from pyvirtualdisplay import Display
-except Exception:  # pragma: no cover - optional dependency
-    Display = None
+from ..live.virtual import VirtualDisplayError, VirtualDisplaySession
 
 
 def start_virtual_display(width: int = 1024, height: int = 768) -> Optional[object]:
@@ -18,14 +15,14 @@ def start_virtual_display(width: int = 1024, height: int = 768) -> Optional[obje
     Returns:
         Display object or ``None`` if pyvirtualdisplay is unavailable.
     """
-    if Display is None:
+    try:
+        return VirtualDisplaySession(width, height).start()
+    except VirtualDisplayError:
         return None
-    display = Display(visible=False, size=(width, height))
-    display.start()
-    return display
 
 
 def stop_virtual_display(display: object) -> None:
     """Stop a previously started virtual display."""
-    if hasattr(display, "stop"):
-        display.stop()
+    close = getattr(display, "close", None)
+    if callable(close):
+        close()

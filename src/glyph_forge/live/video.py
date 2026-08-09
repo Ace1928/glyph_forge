@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -291,10 +291,11 @@ class GlyphVideoRenderer:
         coloured = (
             masks[..., None].astype(np.uint16) * pixels[:, :, None, None, :]
         ) // 255
-        return (
+        return cast(
+            RGBFrame,
             coloured.transpose(0, 2, 1, 3, 4)
             .reshape(self.config.height, self.config.width, 3)
-            .astype(np.uint8)
+            .astype(np.uint8),
         )
 
     def render_bgr(self, frame: NDArray[Any], cv2: Any | None = None) -> RGBFrame:

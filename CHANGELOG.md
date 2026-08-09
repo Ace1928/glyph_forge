@@ -1,126 +1,84 @@
-# 📜 CHANGELOG
+# Changelog
 
-> *"History is a linked list of intentional transformations."*
-
-## ⚡ Glyph Forge Version Timeline ⚡
-
-This document maps the evolution pathway of Glyph Forge through its structural iterations. Each release represents a precise advancement with measurable impact.
-
-<!-- 
-    Change classification system:
-    ⚠️ Breaking - Interface restructuring
-    ✨ Features - Capability expansion
-    🐛 Fixes - Error resolution
-    ⚡ Performance - Execution optimization
-    📚 Documentation - Knowledge crystallization
-    🔧 Refactor - Internal restructuring
-    🔒 Security - Protection enhancements
- -->
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## [0.1.0] - 2024-11-15
-
-> *"Initial implementation—where pixels find their glyph essence."*
-
-### ✨ Added
-
-- Core transformation engine with edge-preserving algorithms
-- Multi-format renderer ecosystem (Text, ANSI, HTML, SVG)
-- Terminal-aware color system with fallback pathways
-- Image processing pipeline with density mapping
-- CLI entry points: `imagize` (alias: `glyphfy`) and `bannerize`
-- Comprehensive type annotations across all interfaces
-- Documentation system with practical examples
-
-### 🔧 Technical Implementation
-
-- Character density mappings with contextual boundary detection
-- Gradient-preserving transformation with minimal information loss
-- Color representation system with environment adaptation
-- Performance baseline established (0.09s standard processing time)
-- Verification system with edge case coverage
-
-### 📚 Documentation
-
-- Installation guide with dependency explanation
-- Quick start examples for immediate productivity
-- API reference with precise parameter definitions
-- Architectural overview with component relationships
-- Contribution guidelines with workflow specifications
-
-### 🛠️ Infrastructure
-
-- Continuous integration pipeline with validation gates
-- Style enforcement hooks for pre-commit verification
-- Distribution system through PyPI with integrity checks
-- Development environment configuration
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All notable changes are recorded here. The format follows Keep a Changelog and
+the project uses semantic versioning.
 
 ## [Unreleased]
 
-> *"Functionality expands like glyph itself—simple elements creating complex structures."*
+### Planned
 
-### ✨ Added
+- Explicit, permission-aware keyboard and pointer forwarding for desktop views
+- Native capture adapters and optional compiled rendering hot paths
+- A stable extension SDK for third-party sources, renderers, and exporters
+- Signed standalone installers and an opt-in hosted sharing service
 
-- Unified `glyph-forge video` command with adaptive eco, balanced, and
-  workstation profiles
-- Full-colour vectorized glyph-atlas video renderer with streamed FFmpeg output
-- Source-audio muxing, subclip controls, encoder quality controls, progress
-  callbacks, portable font discovery, and atomic output saves
-- Low-latency glyph, Braille 2×4, true-color half-block, and quadrant renderers
-- Scalable SVG text export for lossless zoomable stills
-- `glyph-forge live camera`, `live screen`, and `live video` commands plus the
-  convenient `webcam` and `desktop` aliases
-- Cross-platform OpenCV camera/video capture and MSS/Pillow screen capture
-  behind a shared source protocol
-- Private local browser Studio with image/video drag and drop, webcam and screen
-  capture, WebGL2 glyph-atlas previews, Canvas2D fallback, live controls, and
-  PNG/SVG/TXT export
-- Browser-native sharing and copyable style links without uploading private
-  media to a Glyph Forge service
-- A redesigned full-screen TUI with filtered media browsing, image and text
-  previews, live sources, saving, runtime diagnostics, and Studio handoff
-- Executable self-checks in `glyph-forge doctor` so broken FFmpeg installations
-  are reported accurately instead of being treated as available
+## [0.2.0] - 2026-08-09
 
-### ⚡ Performance
+### Added
 
-- Video frames now stream directly from decoder to renderer to encoder without
-  temporary images or unbounded frame lists
-- Existing video frame APIs now use lazy iterators internally while preserving
-  their list-returning compatibility functions
-- Live capture uses a single newest-frame slot and intentionally drops stale
-  frames when rendering falls behind, keeping latency and memory bounded
-- The browser Studio renders through a GPU glyph atlas when WebGL2 is available
-  and automatically falls back to a portable Canvas2D renderer
+- One unified `glyph-forge` CLI for image, text, video, live media, diagnostics,
+  interface launch, demos, and benchmarks
+- Hardware-adaptive eco, balanced, and workstation runtime profiles
+- Vectorized full-colour glyph-video export with FFmpeg streaming, audio muxing,
+  subclips, quality controls, progress reporting, and atomic destinations
+- Bounded-latency webcam, video, and screen capture using a newest-frame slot
+- Glyph, directional edge, Braille 2×4, true-colour half-block, quadrant, and
+  real-text SVG renderers
+- Sobel, Prewitt, Scharr, Laplacian, and Canny-style edge detection
+- Optional yt-dlp URL playback without downloading media to disk
+- Optional isolated X11 app launch through PyVirtualDisplay and Xvfb
+- Private browser Studio with drag/drop, video, webcam, screen capture, WebGL2
+  and Canvas rendering, PNG/SVG/TXT exports, Web Share, and style links
+- Rebuilt Textual TUI with media browsing, previews, live sources, saving,
+  diagnostics, and Studio handoff
+- Deterministic built-in demo and renderer benchmark commands
+- Portable bundled Eidos profile defaults with user-writable overrides
 
-### 🔒 Security
+### Changed
 
-- Browser Studio binds to loopback by default and requires an explicit
-  `--allow-network` flag before accepting a non-loopback address
-- Studio responses include a restrictive content-security policy, disable
-  caching, and prevent MIME sniffing, framing, and referrer leakage
+- Integrated the standalone video script and useful legacy prototype features
+  into tested package modules and CLI commands
+- Replaced eager or unbounded video helpers with lazy iterators while retaining
+  list-returning compatibility functions
+- Reduced `imagize`, `bannerize`, and virtual-display compatibility surfaces to
+  thin adapters over maintained implementations
+- Consolidated development history onto `main`, made it the GitHub default, and
+  removed every redundant local and remote branch
+- Replaced overlapping Black/isort/flake8 workflows with one Ruff configuration,
+  strict mypy checks, a cross-platform test matrix, and installed-wheel tests
+- Simplified packaging metadata, optional extras, examples, and documentation
 
-### 🔧 Repository
+### Fixed
 
-- Consolidated development history onto `main`, made it the GitHub default,
-  and removed redundant local and remote branches
-- Integrated the standalone glyph-video prototype into the tested package and
-  unified CLI, eliminating the duplicate script without losing its controls
+- Public `glyph_forge.image_to_glyph` now resolves to the callable helper rather
+  than the service module
+- `doctor` launches FFmpeg tools instead of trusting executable names alone
+- Configuration discovery no longer creates user directories during import
+- ASCII borders use the correct corner, vertical, and horizontal characters
+- Standalone compatibility help and legacy short-option translation
+- The former duplicate `-h` option and non-existent image optimization call
 
-### 🔮 Development Vector
+### Security
 
-- Format-specific rendering optimizations
-- Pattern recognition system with feature preservation
-- Extended format support with conversion integrity
-- Optional desktop input routing with explicit permissions and focus control
-- Stable API contracts with backward compatibility
-- CLI enhancement with progress visualization
+- Studio binds to loopback by default and requires `--allow-network` for a
+  non-loopback address
+- Studio sends restrictive CSP, no-cache, no-sniff, frame, and referrer headers
+- Network and virtual-display dependencies remain lazy and opt-in
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Repository
 
-© 2023-2024 [Lloyd Handyside](mailto:ace1928@gmail.com) & [Eidos](mailto:syntheticeidos@gmail.com) — Maintained by [Neuroforge](https://neuroforge.io).
+- Removed obsolete generated art, editor settings, copied tutorials, templates,
+  prompt files, duplicate scripts, stale status files, and deprecated setup files
+- Retained compatibility through small tested adapters and Git history rather
+  than parallel implementations
 
-"A changelog is like glyph art—structured information that tells a complete story."
+## [0.1.0] - 2024-11-15
+
+### Added
+
+- Image-to-glyph conversion and density character sets
+- FIGlet text banners and style presets
+- Text, ANSI, HTML, and SVG output renderers
+- Initial `imagize`, `glyphfy`, and `bannerize` commands
+- Public API, configuration, service, transformer, and utility modules
+- Initial tests, package metadata, and contribution documentation

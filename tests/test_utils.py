@@ -4,29 +4,29 @@
 Comprehensive tests for utility functions and helper classes.
 """
 
-import pytest
-from unittest import mock
 import os
+from unittest import mock
 
-from glyph_forge.utils.glyph_utils import (
-    sanitize_text,
-    resolve_style,
-    trim_margins,
-    center_Glyph_art,
-    measure_Glyph_art,
-    detect_box_borders,
-    get_terminal_size,
-    detect_text_color_support,
-    apply_ansi_style,
-    wrap_text,
-)
+import pytest
 
+from glyph_forge.utils import configure, detect_capabilities
 from glyph_forge.utils.alphabet_manager import (
-    AlphabetManager,
-    AlphabetCategory,
     ALPHABETS,
-    SPECIAL_SETS,
     LANGUAGES,
+    SPECIAL_SETS,
+    AlphabetManager,
+)
+from glyph_forge.utils.glyph_utils import (
+    apply_ansi_style,
+    center_Glyph_art,
+    detect_box_borders,
+    detect_text_color_support,
+    get_terminal_size,
+    measure_Glyph_art,
+    resolve_style,
+    sanitize_text,
+    trim_margins,
+    wrap_text,
 )
 
 
@@ -61,6 +61,31 @@ class TestSanitizeText:
         result = sanitize_text(text)
         assert "\n\n\n" not in result
         assert "line1\n\nline2" == result
+
+
+def test_detect_capabilities_has_concrete_terminal_fields() -> None:
+    capabilities = detect_capabilities()
+
+    assert {"ansi16", "ansi256", "truecolor", "unicode", "encoding"} <= set(
+        capabilities
+    )
+
+
+def test_configure_persists_named_sections(monkeypatch: pytest.MonkeyPatch) -> None:
+    from glyph_forge.config import settings
+
+    writes: list[tuple[str, str, object]] = []
+    manager = mock.Mock()
+    manager.set.side_effect = lambda section, key, value: writes.append(
+        (section, key, value)
+    )
+    monkeypatch.setattr(settings, "get_config", lambda: manager)
+
+    assert configure(image={"default_width": 120}) is manager
+    assert writes == [("image", "default_width", 120)]
+
+    with pytest.raises(TypeError, match="must be a mapping"):
+        configure(image=120)  # type: ignore[arg-type]
 
 
 class TestResolveStyle:
@@ -210,14 +235,14 @@ class TestGetTerminalSize:
         assert width > 0
         assert height > 0
 
-    @mock.patch('shutil.get_terminal_size')
+    @mock.patch("shutil.get_terminal_size")
     def test_uses_shutil(self, mock_get_size) -> None:
         """Function should use shutil.get_terminal_size."""
         mock_get_size.return_value = (100, 50)
         width, height = get_terminal_size()
         mock_get_size.assert_called_once()
 
-    @mock.patch('shutil.get_terminal_size', side_effect=AttributeError)
+    @mock.patch("shutil.get_terminal_size", side_effect=AttributeError)
     def test_fallback_on_error(self, mock_get_size) -> None:
         """Function should return fallback values on error."""
         width, height = get_terminal_size()
@@ -244,7 +269,9 @@ class TestDetectTextColorSupport:
         result = detect_text_color_support()
         assert result == 3
 
-    @mock.patch.dict(os.environ, {"NO_COLOR": "", "TERM": "xterm-256color", "COLORTERM": ""})
+    @mock.patch.dict(
+        os.environ, {"NO_COLOR": "", "TERM": "xterm-256color", "COLORTERM": ""}
+    )
     def test_256_color_support(self) -> None:
         """xterm-256color should return 2."""
         result = detect_text_color_support()

@@ -6,6 +6,7 @@ A brutally efficient, surgically precise test suite that validates
 every aspect of the Glyph art conversion pipeline with zero redundancy.
 Each test serves a specific purpose with crystalline clarity.
 """
+
 import os
 import shutil
 import tempfile
@@ -25,15 +26,15 @@ def test_images() -> dict:
     test_dir = tempfile.mkdtemp()
 
     # 1. Uniform white square (100x100)
-    white_img = Image.new('L', (100, 100), 255)
-    white_path = os.path.join(test_dir, 'white.png')
+    white_img = Image.new("L", (100, 100), 255)
+    white_path = os.path.join(test_dir, "white.png")
     white_img.save(white_path)
 
     # 2. Horizontal gradient (100x100)
     gradient = np.linspace(0, 255, 100, dtype=np.uint8)
     gradient_img = np.repeat(gradient.reshape(1, 100), 100, axis=0)
     gradient_pil = Image.fromarray(gradient_img)
-    gradient_path = os.path.join(test_dir, 'gradient.png')
+    gradient_path = os.path.join(test_dir, "gradient.png")
     gradient_pil.save(gradient_path)
 
     # 3. RGB test pattern (10x10)
@@ -41,15 +42,15 @@ def test_images() -> dict:
     rgb_data[0:5, :, 0] = 255  # Red top half
     rgb_data[5:10, :, 1] = 255  # Green bottom half
     rgb_img = Image.fromarray(rgb_data)
-    rgb_path = os.path.join(test_dir, 'rgb.png')
+    rgb_path = os.path.join(test_dir, "rgb.png")
     rgb_img.save(rgb_path)
 
     # Yield test assets dictionary
     yield {
-        'dir': test_dir,
-        'white': {'img': white_img, 'path': white_path},
-        'gradient': {'img': gradient_pil, 'path': gradient_path},
-        'rgb': {'img': rgb_img, 'path': rgb_path},
+        "dir": test_dir,
+        "white": {"img": white_img, "path": white_path},
+        "gradient": {"img": gradient_pil, "path": gradient_path},
+        "rgb": {"img": rgb_img, "path": rgb_path},
     }
 
     # Destroy test resources after use
@@ -60,7 +61,7 @@ def test_images() -> dict:
 def mock_alphabet_manager() -> mock.MagicMock:
     """Mock the AlphabetManager to provide deterministic outputs."""
     with mock.patch(
-        'glyph_forge.services.image_to_glyph.AlphabetManager'
+        "glyph_forge.services.image_to_glyph.AlphabetManager"
     ) as mock_manager:
         mock_manager.list_available_alphabets.return_value = ["standard", "blocks"]
         mock_manager.get_alphabet.return_value = "$@B%8&WM"
@@ -153,22 +154,22 @@ class TestImageGlyphConverter:
     def test_load_image_from_path(self, test_images: dict) -> None:
         """📂 Verify image loading from filesystem path."""
         converter = ImageGlyphConverter()
-        img = converter._load_image(test_images['white']['path'])
+        img = converter._load_image(test_images["white"]["path"])
 
         assert isinstance(img, Image.Image)
-        assert img.mode == 'L'  # Grayscale
+        assert img.mode == "L"  # Grayscale
         assert img.size == (100, 100)
 
     def test_load_image_from_pil(self, test_images: dict) -> None:
         """🖼️ Verify image loading from PIL Image object."""
         converter = ImageGlyphConverter()
-        img = converter._load_image(test_images['white']['img'])
+        img = converter._load_image(test_images["white"]["img"])
 
         assert isinstance(img, Image.Image)
-        assert img.mode == 'L'  # Grayscale
+        assert img.mode == "L"  # Grayscale
         assert img.size == (100, 100)
 
-    @mock.patch('glyph_forge.services.image_to_glyph.shutil.get_terminal_size')
+    @mock.patch("glyph_forge.services.image_to_glyph.shutil.get_terminal_size")
     def test_terminal_scaling(self, mock_get_terminal_size: mock.MagicMock) -> None:
         """📏 Verify output auto-scales to terminal dimensions."""
         mock_get_terminal_size.return_value = os.terminal_size(
@@ -185,10 +186,10 @@ class TestImageGlyphConverter:
         """🔆 Verify brightness and contrast transforms pixel values."""
         converter = ImageGlyphConverter(brightness=1.5, contrast=1.2)
 
-        adjusted = converter._apply_image_adjustments(test_images['gradient']['img'])
+        adjusted = converter._apply_image_adjustments(test_images["gradient"]["img"])
 
         # Sample points must differ after adjustment
-        original_mid = np.array(test_images['gradient']['img'])[50, 50]
+        original_mid = np.array(test_images["gradient"]["img"])[50, 50]
         adjusted_mid = np.array(adjusted)[50, 50]
 
         assert original_mid != adjusted_mid
@@ -204,7 +205,7 @@ class TestImageGlyphConverter:
         converter.charset = "@"
         converter.density_map = {i: "@" for i in range(256)}
 
-        result = converter.convert(test_images['white']['path'])
+        result = converter.convert(test_images["white"]["path"])
         expected = "\n".join(["@" * 10] * 5)
 
         assert result == expected
@@ -213,13 +214,13 @@ class TestImageGlyphConverter:
         """⚙️ Verify dimension calculations in processing pipeline."""
         converter = ImageGlyphConverter(width=20, height=10, auto_scale=False)
 
-        result = converter._process_image(test_images['gradient']['img'])
-        lines = result.strip().split('\n')
+        result = converter._process_image(test_images["gradient"]["img"])
+        lines = result.strip().split("\n")
 
         assert len(lines) == 10  # Output height matches specification
         assert len(lines[0]) >= 18  # Allow minor variation in width
 
-    @mock.patch('glyph_forge.services.image_to_glyph.ThreadPoolExecutor')
+    @mock.patch("glyph_forge.services.image_to_glyph.ThreadPoolExecutor")
     def test_parallel_conversion(self, mock_executor: mock.MagicMock) -> None:
         """⚡ Verify multi-threaded processing for large images."""
         mock_map = mock.MagicMock()
@@ -246,12 +247,12 @@ class TestImageGlyphConverter:
             converter._save_to_file(test_content, output_path)
 
             assert os.path.exists(output_path)
-            with open(output_path, 'r', encoding='utf-8') as f:
+            with open(output_path, "r", encoding="utf-8") as f:
                 content = f.read()
             assert content == test_content
 
-    @mock.patch('builtins.open', new_callable=mock.mock_open)
-    @mock.patch('os.makedirs')
+    @mock.patch("builtins.open", new_callable=mock.mock_open)
+    @mock.patch("os.makedirs")
     def test_save_creates_directory(
         self, mock_makedirs: mock.MagicMock, mock_open: mock.MagicMock
     ) -> None:
@@ -263,7 +264,7 @@ class TestImageGlyphConverter:
         converter._save_to_file(test_content, output_path)
 
         mock_makedirs.assert_called_once()
-        mock_open.assert_called_once_with(output_path, 'w', encoding='utf-8')
+        mock_open.assert_called_once_with(output_path, "w", encoding="utf-8")
 
     # ──── Configuration Modification Tests ────────────────────────────────
 
@@ -307,7 +308,7 @@ class TestImageGlyphConverter:
         converter.density_map = {i: "#" for i in range(256)}
 
         result = converter.convert_color(
-            test_images['rgb']['img'], color_mode=ColorMode.ANSI
+            test_images["rgb"]["img"], color_mode=ColorMode.ANSI
         )
 
         # ANSI color codes must be present
@@ -323,7 +324,7 @@ class TestImageGlyphConverter:
         converter.density_map = {i: "#" for i in range(256)}
 
         result = converter.convert_color(
-            test_images['rgb']['img'], color_mode=ColorMode.HTML
+            test_images["rgb"]["img"], color_mode=ColorMode.HTML
         )
 
         # HTML formatting must be present
@@ -336,11 +337,11 @@ class TestImageGlyphConverter:
         """⚪ Verify grayscale fallback for 'none' color mode."""
         converter = ImageGlyphConverter(width=5, height=5, auto_scale=False)
 
-        with mock.patch.object(converter, 'convert') as mock_convert:
+        with mock.patch.object(converter, "convert") as mock_convert:
             mock_convert.return_value = "standard conversion"
 
             result = converter.convert_color(
-                test_images['rgb']['img'], color_mode=ColorMode.NONE
+                test_images["rgb"]["img"], color_mode=ColorMode.NONE
             )
 
             mock_convert.assert_called_once()
@@ -348,12 +349,12 @@ class TestImageGlyphConverter:
 
     # ──── Error Handling Tests ──────────────────────────────────────────────
 
-    @mock.patch('builtins.open', side_effect=IOError("Simulated IO error"))
+    @mock.patch("builtins.open", side_effect=IOError("Simulated IO error"))
     def test_save_error_handling(self, mock_open: mock.MagicMock) -> None:
         """❌ Verify appropriate error propagation on file save failure."""
         converter = ImageGlyphConverter()
 
-        with pytest.raises(Exception):
+        with pytest.raises(OSError, match="Simulated IO error"):
             converter._save_to_file("content", "test_path")
 
     def test_error_handling_invalid_image_path(self) -> None:
@@ -367,7 +368,7 @@ class TestImageGlyphConverter:
             or "cannot identify image file" in result
         )
 
-    @mock.patch('PIL.Image.open', side_effect=IOError("Simulated IO error"))
+    @mock.patch("PIL.Image.open", side_effect=IOError("Simulated IO error"))
     def test_convert_error_handling(self, mock_open: mock.MagicMock) -> None:
         """🛡️ Verify conversion failures produce informative messages."""
         converter = ImageGlyphConverter()

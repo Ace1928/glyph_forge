@@ -13,6 +13,13 @@ from .capture import (
     create_frame_source,
     create_screen_source,
 )
+from .edges import EdgeAlgorithm, EdgeMap, detect_edges, directional_glyphs
+from .network import (
+    NetworkSourceError,
+    ResolvedNetworkSource,
+    is_network_url,
+    resolve_network_source,
+)
 from .renderers import (
     ColorOutput,
     FrameRenderer,
@@ -34,12 +41,15 @@ from .video import (
     find_monospace_font,
     glyph_atlas,
 )
+from .virtual import VirtualDisplayError, VirtualDisplaySession, virtual_display
 
 __all__ = [
     "CaptureError",
     "CaptureBackendUnavailable",
     "CapturedFrame",
     "ColorOutput",
+    "EdgeAlgorithm",
+    "EdgeMap",
     "FrameSource",
     "FrameRenderer",
     "GlyphVideoRenderer",
@@ -48,22 +58,31 @@ __all__ = [
     "LiveSessionStats",
     "MSSScreenSource",
     "MissingMediaDependency",
+    "NetworkSourceError",
     "OpenCVFrameSource",
     "PillowScreenSource",
     "RenderConfig",
     "RenderMode",
     "RenderResult",
+    "ResolvedNetworkSource",
     "TerminalSessionConfig",
     "VideoExportConfig",
     "VideoExportError",
     "VideoExportProgress",
     "VideoExportResult",
+    "VirtualDisplayError",
+    "VirtualDisplaySession",
     "build_ffmpeg_command",
     "create_frame_source",
     "create_screen_source",
+    "detect_edges",
+    "directional_glyphs",
     "export_glyph_video",
     "find_monospace_font",
     "glyph_atlas",
+    "is_network_url",
     "render_svg",
+    "resolve_network_source",
     "run_terminal_session",
+    "virtual_display",
 ]

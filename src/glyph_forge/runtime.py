@@ -74,6 +74,18 @@ _PYTHON_CAPABILITIES: tuple[tuple[str, str, str, str | None], ...] = (
     ("textual", "Textual", "terminal UI", "pip install 'glyph-forge[tui]'"),
     ("cv2", "OpenCV", "video and webcam capture", "pip install 'glyph-forge[media]'"),
     ("mss", "MSS", "cross-platform screen capture", "pip install 'glyph-forge[media]'"),
+    (
+        "yt_dlp",
+        "yt-dlp",
+        "video-site URL resolution",
+        "pip install 'glyph-forge[network]'",
+    ),
+    (
+        "pyvirtualdisplay",
+        "PyVirtualDisplay",
+        "isolated X11 application displays",
+        "pip install 'glyph-forge[virtual]' and install Xvfb",
+    ),
 )
 
 _TOOL_CAPABILITIES: tuple[tuple[str, str, str, str | None], ...] = (

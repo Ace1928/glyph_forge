@@ -6,38 +6,35 @@ across multiple components of Glyph Forge.
 """
 
 import os
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from glyph_forge.api import get_api, GlyphForgeAPI
+from glyph_forge.api import get_api
+from glyph_forge.core.banner_generator import BannerGenerator
+from glyph_forge.core.style_manager import apply_style
+from glyph_forge.renderers import (
+    HTMLRenderer,
+    SVGRenderer,
+    TextRenderer,
+)
 from glyph_forge.services import (
     text_to_banner,
     text_to_glyph,
     video_to_glyph_frames,
 )
 from glyph_forge.services.image_to_glyph import (
-    ImageGlyphConverter,
     ColorMode,
+    ImageGlyphConverter,
     image_to_glyph,
 )
-from glyph_forge.core.banner_generator import BannerGenerator
-from glyph_forge.core.style_manager import apply_style
 from glyph_forge.transformers import (
-    ImageTransformer,
     ColorMapper,
-    DepthAnalyzer,
     EdgeDetector,
-)
-from glyph_forge.renderers import (
-    TextRenderer,
-    HTMLRenderer,
-    SVGRenderer,
-    ANSIRenderer,
+    ImageTransformer,
 )
 
 
@@ -50,8 +47,8 @@ def test_assets() -> dict:
     # 1. Simple gradient (100x100)
     gradient = np.linspace(0, 255, 100, dtype=np.uint8)
     gradient_img = np.repeat(gradient.reshape(1, 100), 100, axis=0)
-    gradient_pil = Image.fromarray(gradient_img, mode='L')
-    gradient_path = os.path.join(test_dir, 'gradient.png')
+    gradient_pil = Image.fromarray(gradient_img, mode="L")
+    gradient_path = os.path.join(test_dir, "gradient.png")
     gradient_pil.save(gradient_path)
 
     # 2. RGB test pattern (100x100)
@@ -60,34 +57,30 @@ def test_assets() -> dict:
     rgb_data[0:50, 50:100, 1] = 255  # Green top-right
     rgb_data[50:100, 0:50, 2] = 255  # Blue bottom-left
     rgb_data[50:100, 50:100] = 255  # White bottom-right
-    rgb_pil = Image.fromarray(rgb_data, mode='RGB')
-    rgb_path = os.path.join(test_dir, 'rgb.png')
+    rgb_pil = Image.fromarray(rgb_data, mode="RGB")
+    rgb_path = os.path.join(test_dir, "rgb.png")
     rgb_pil.save(rgb_path)
 
     # 3. Create a simple GIF animation
     frames = []
     for i in range(5):
-        frame = Image.new('L', (50, 50), color=i * 50)
+        frame = Image.new("L", (50, 50), color=i * 50)
         frames.append(frame)
-    gif_path = os.path.join(test_dir, 'animation.gif')
+    gif_path = os.path.join(test_dir, "animation.gif")
     frames[0].save(
-        gif_path,
-        save_all=True,
-        append_images=frames[1:],
-        duration=100,
-        loop=0
+        gif_path, save_all=True, append_images=frames[1:], duration=100, loop=0
     )
 
     # Output directory for saved files
-    output_dir = os.path.join(test_dir, 'output')
+    output_dir = os.path.join(test_dir, "output")
     os.makedirs(output_dir)
 
     yield {
-        'dir': test_dir,
-        'gradient': gradient_path,
-        'rgb': rgb_path,
-        'gif': gif_path,
-        'output_dir': output_dir,
+        "dir": test_dir,
+        "gradient": gradient_path,
+        "rgb": rgb_path,
+        "gif": gif_path,
+        "output_dir": output_dir,
     }
 
     # Cleanup
@@ -98,15 +91,13 @@ def test_assets() -> dict:
 class TestAPIWorkflows:
     """Integration tests for API-based workflows."""
 
-    def test_complete_image_conversion_workflow(
-        self, test_assets: dict
-    ) -> None:
+    def test_complete_image_conversion_workflow(self, test_assets: dict) -> None:
         """Test complete workflow: load → convert → save."""
         api = get_api()
 
         # Convert image
         result = api.image_to_Glyph(
-            test_assets['gradient'],
+            test_assets["gradient"],
             width=50,
             charset="blocks",
         )
@@ -119,15 +110,13 @@ class TestAPIWorkflows:
         assert any(c in result for c in "░▒▓█")
 
         # Save to file
-        output_path = os.path.join(
-            test_assets['output_dir'], 'api_conversion.txt'
-        )
+        output_path = os.path.join(test_assets["output_dir"], "api_conversion.txt")
         success = api.save_to_file(result, output_path)
         assert success
         assert os.path.exists(output_path)
 
         # Verify file content
-        with open(output_path, 'r', encoding='utf-8') as f:
+        with open(output_path, "r", encoding="utf-8") as f:
             saved_content = f.read()
         assert saved_content == result
 
@@ -155,7 +144,7 @@ class TestAPIWorkflows:
 
         # Convert with color
         result = api.image_to_Glyph(
-            test_assets['rgb'],
+            test_assets["rgb"],
             width=30,
             color_mode="ansi",
         )
@@ -170,7 +159,7 @@ class TestAPIWorkflows:
 
         # Convert with HTML color
         result = api.image_to_Glyph(
-            test_assets['rgb'],
+            test_assets["rgb"],
             width=30,
             color_mode="html",
         )
@@ -189,13 +178,13 @@ class TestServiceWorkflows:
     def test_image_to_glyph_service(self, test_assets: dict) -> None:
         """Test high-level image conversion service."""
         result = image_to_glyph(
-            test_assets['gradient'],
+            test_assets["gradient"],
             width=40,
             charset="minimal",
         )
 
         assert isinstance(result, str)
-        lines = result.strip().split('\n')
+        lines = result.strip().split("\n")
         assert len(lines) > 0
 
     def test_text_to_banner_service(self) -> None:
@@ -218,7 +207,7 @@ class TestServiceWorkflows:
     def test_video_to_frames_service(self, test_assets: dict) -> None:
         """Test video frame extraction and conversion."""
         frames = video_to_glyph_frames(
-            test_assets['gif'],
+            test_assets["gif"],
             width=20,
             max_frames=3,
         )
@@ -240,10 +229,10 @@ class TestConverterWorkflows:
             auto_scale=False,
         )
 
-        result = converter.convert(test_assets['gradient'])
+        result = converter.convert(test_assets["gradient"])
 
         assert isinstance(result, str)
-        lines = result.strip().split('\n')
+        lines = result.strip().split("\n")
         # Lines may vary slightly due to aspect ratio calculation
         assert len(lines) > 0
         assert all(len(line) > 0 for line in lines if line)
@@ -257,7 +246,7 @@ class TestConverterWorkflows:
         )
 
         result = converter.convert_color(
-            test_assets['rgb'],
+            test_assets["rgb"],
             color_mode=ColorMode.ANSI,
         )
 
@@ -272,7 +261,7 @@ class TestConverterWorkflows:
             auto_scale=False,
         )
 
-        result = converter.convert(test_assets['gradient'])
+        result = converter.convert(test_assets["gradient"])
         assert isinstance(result, str)
 
     def test_converter_dithering_workflow(self, test_assets: dict) -> None:
@@ -283,23 +272,21 @@ class TestConverterWorkflows:
             auto_scale=False,
         )
 
-        result = converter.convert(test_assets['gradient'])
+        result = converter.convert(test_assets["gradient"])
         assert isinstance(result, str)
 
     def test_converter_file_save_workflow(self, test_assets: dict) -> None:
         """Test converter with file saving."""
-        output_path = os.path.join(
-            test_assets['output_dir'], 'converter_output.txt'
-        )
+        output_path = os.path.join(test_assets["output_dir"], "converter_output.txt")
 
         converter = ImageGlyphConverter(width=40, auto_scale=False)
         result = converter.convert(
-            test_assets['gradient'],
+            test_assets["gradient"],
             output_path=output_path,
         )
 
         assert os.path.exists(output_path)
-        with open(output_path, 'r', encoding='utf-8') as f:
+        with open(output_path, "r", encoding="utf-8") as f:
             saved = f.read()
         assert saved == result
 
@@ -369,7 +356,7 @@ class TestTransformerWorkflows:
     def test_transformer_pipeline(self, test_assets: dict) -> None:
         """Test chained transformer operations."""
         # Load image
-        img = Image.open(test_assets['gradient'])
+        img = Image.open(test_assets["gradient"])
 
         # Transform with ImageTransformer
         transformer = ImageTransformer(charset=" .:+#")
@@ -385,12 +372,12 @@ class TestTransformerWorkflows:
 
         # Verify output
         assert isinstance(result, str)
-        lines = result.split('\n')
+        lines = result.split("\n")
         assert len(lines) == 15
 
     def test_color_mapper_to_html(self, test_assets: dict) -> None:
         """Test ColorMapper with HTML renderer."""
-        img = Image.open(test_assets['rgb'])
+        img = Image.open(test_assets["rgb"])
 
         # Transform with ColorMapper
         mapper = ColorMapper(charset=" .:#")
@@ -406,7 +393,7 @@ class TestTransformerWorkflows:
 
     def test_edge_detector_workflow(self, test_assets: dict) -> None:
         """Test EdgeDetector transformation."""
-        img = Image.open(test_assets['gradient'])
+        img = Image.open(test_assets["gradient"])
 
         # Transform with EdgeDetector
         detector = EdgeDetector(charset=" .-+#@")
@@ -459,7 +446,7 @@ class TestRendererWorkflows:
 
     def test_text_renderer_output(self) -> None:
         """Test TextRenderer produces valid output."""
-        matrix = [['A', 'B', 'C'], ['D', 'E', 'F']]
+        matrix = [["A", "B", "C"], ["D", "E", "F"]]
         renderer = TextRenderer()
         result = renderer.render(matrix)
 
@@ -467,23 +454,30 @@ class TestRendererWorkflows:
 
     def test_html_renderer_output(self) -> None:
         """Test HTMLRenderer produces valid HTML."""
-        matrix = [['A', 'B'], ['C', 'D']]
+        matrix = [["<", "B"], ["C", "D"]]
         renderer = HTMLRenderer()
         result = renderer.render(matrix)
 
         assert "<pre" in result
-        assert "AB" in result
+        assert "&lt;B" in result
+        assert "<B" not in result
         assert "</pre>" in result
 
     def test_svg_renderer_output(self) -> None:
         """Test SVGRenderer produces valid SVG."""
-        matrix = [['X', 'Y'], ['Z', 'W']]
+        matrix = [["X", "Y"], ["Z", "W"]]
         renderer = SVGRenderer()
         result = renderer.render(matrix)
 
         assert "<svg" in result
         assert "</svg>" in result
         assert "<text" in result
+
+    def test_svg_renderer_handles_empty_matrix(self) -> None:
+        result = SVGRenderer().render([])
+
+        assert 'width="0.0"' in result
+        assert "<svg" in result
 
 
 @pytest.mark.integration
@@ -496,20 +490,18 @@ class TestEndToEndWorkflows:
 
         # Convert to HTML
         html_result = api.image_to_Glyph(
-            test_assets['rgb'],
+            test_assets["rgb"],
             width=30,
             color_mode="html",
         )
 
         # Save to file
-        output_path = os.path.join(
-            test_assets['output_dir'], 'output.html'
-        )
+        output_path = os.path.join(test_assets["output_dir"], "output.html")
         api.save_to_file(html_result, output_path)
 
         # Verify file
         assert os.path.exists(output_path)
-        with open(output_path, 'r', encoding='utf-8') as f:
+        with open(output_path, "r", encoding="utf-8") as f:
             content = f.read()
         assert "<pre" in content
         assert "<span" in content
@@ -537,20 +529,20 @@ class TestEndToEndWorkflows:
         )
 
         # Grayscale
-        gray = converter.convert(test_assets['gradient'])
+        gray = converter.convert(test_assets["gradient"])
         assert isinstance(gray, str)
         assert "\033[" not in gray
 
         # ANSI color
         ansi = converter.convert_color(
-            test_assets['rgb'],
+            test_assets["rgb"],
             color_mode=ColorMode.ANSI,
         )
         assert "\033[" in ansi
 
         # HTML color
         html = converter.convert_color(
-            test_assets['rgb'],
+            test_assets["rgb"],
             color_mode=ColorMode.HTML,
         )
         assert "<span" in html
@@ -560,8 +552,8 @@ class TestEndToEndWorkflows:
         api = get_api()
 
         images = [
-            test_assets['gradient'],
-            test_assets['rgb'],
+            test_assets["gradient"],
+            test_assets["rgb"],
         ]
 
         results = []

@@ -26,10 +26,14 @@ ENV/
 
 # Testing artifacts
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
 
 # Misc
 *.log
 .cache/
-
+.DS_Store
+Thumbs.db

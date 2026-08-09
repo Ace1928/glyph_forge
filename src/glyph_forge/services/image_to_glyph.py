@@ -14,7 +14,7 @@ from ..utils.alphabet_manager import AlphabetManager
 # Type definitions for clarity and precision
 PixelArray: TypeAlias = NDArray[np.uint8]  # Type for grayscale/RGB pixel arrays
 Shape = Tuple[int, ...]  # Array dimensions
-T = TypeVar('T')  # Generic type for flexible functions
+T = TypeVar("T")  # Generic type for flexible functions
 GlyphRow = List[str]  # Type for rows of Glyph characters
 GlyphArt = List[str]  # Type for complete Glyph art (list of strings)
 
@@ -138,11 +138,11 @@ class ImageGlyphConverter:
     def _load_image(self, image_path: Union[str, Image.Image]) -> Image.Image:
         """Load and prepare image for processing."""
         if isinstance(image_path, str):
-            img = Image.open(image_path).convert('L')
+            img = Image.open(image_path).convert("L")
             self.logger.info(f"Image loaded: {image_path} [{img.width}x{img.height}]")
         else:
             # Already a PIL Image
-            img = image_path.convert('L')
+            img = image_path.convert("L")
             self.logger.info(f"Using provided PIL image [{img.width}x{img.height}]")
 
         return img
@@ -174,8 +174,8 @@ class ImageGlyphConverter:
 
         # Apply dithering if enabled
         if self.dithering:
-            img = img.convert('1', dither=Image.Dither.FLOYDSTEINBERG)
-            img = img.convert('L')  # Convert back to grayscale
+            img = img.convert("1", dither=Image.Dither.FLOYDSTEINBERG)
+            img = img.convert("L")  # Convert back to grayscale
 
         # Convert to numpy array for faster processing
         pixels = np.array(img)
@@ -292,13 +292,13 @@ class ImageGlyphConverter:
                 os.makedirs(dirname, exist_ok=True)
 
             # Write with UTF-8 encoding for maximum compatibility
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(Glyph_art)
 
             self.logger.debug(f"Saved output to {output_path}")
         except Exception as e:
             self.logger.error(f"Failed to save output: {e}")
-            raise IOError(f"Failed to save output: {str(e)}")
+            raise OSError(f"Failed to save output: {str(e)}") from e
 
     def set_charset(self, charset: str, invert: bool = False) -> None:
         """
@@ -380,11 +380,9 @@ class ImageGlyphConverter:
         try:
             # Load image
             if isinstance(image_path, str):
-                img = Image.open(image_path).convert('RGB')
-            elif hasattr(image_path, 'convert') and callable(
-                getattr(image_path, 'convert')
-            ):
-                img = image_path.convert('RGB')
+                img = Image.open(image_path).convert("RGB")
+            elif hasattr(image_path, "convert") and callable(image_path.convert):
+                img = image_path.convert("RGB")
             else:
                 return "Error: image_path must be a string path or PIL Image object"
 
@@ -411,7 +409,7 @@ class ImageGlyphConverter:
             img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
             # Convert to grayscale for character selection
-            gray_img = img.convert('L')
+            gray_img = img.convert("L")
 
             # Get both color and grayscale pixels
             pixels_rgb = np.array(img)

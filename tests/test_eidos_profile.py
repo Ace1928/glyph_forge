@@ -1,10 +1,13 @@
-"""Eidosian test suite for the profile loader."""
+"""Tests for the bundled design-profile loader."""
 
-from pathlib import Path
-import tempfile
 import shutil
+from pathlib import Path
 
-from glyph_forge.eidos_profile import load_profile, update_profile
+from glyph_forge.eidos_profile import (
+    BUNDLED_PROFILE_PATH,
+    load_profile,
+    update_profile,
+)
 
 
 def test_load_profile():
@@ -15,7 +18,7 @@ def test_load_profile():
 
 def test_update_profile(tmp_path: Path):
     temp_profile = tmp_path / "profile.yml"
-    shutil.copy(Path(__file__).parents[1] / "eidos_profile.yml", temp_profile)
+    shutil.copy(BUNDLED_PROFILE_PATH, temp_profile)
 
     data = {"values": ["adaptability"]}
     updated = update_profile(data, path=temp_profile)
@@ -23,3 +26,17 @@ def test_update_profile(tmp_path: Path):
 
     assert "adaptability" in reloaded["values"]
     assert updated == reloaded
+
+
+def test_default_profile_is_portable_and_user_writable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    destination = tmp_path / "profile.yml"
+    monkeypatch.setenv("GLYPH_FORGE_EIDOS_PROFILE", str(destination))
+
+    bundled = load_profile()
+    updated = update_profile({"identity": {"alias": "portable"}})
+
+    assert bundled["identity"]["official_name"] == "Eidos"
+    assert updated["identity"]["alias"] == "portable"
+    assert destination.is_file()

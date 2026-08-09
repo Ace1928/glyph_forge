@@ -1,116 +1,39 @@
-# ⚡ GLYPH FORGE CODE OF CONDUCT ⚡
+# Code of Conduct
 
-> *"Structure in community mirrors structure in code—both require precision and purpose."*
+Glyph Forge is committed to a welcoming, safe, and productive community.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## Expected behavior
 
-## 📋 Purpose & Scope - Interaction Framework
+- Be respectful, patient, and considerate.
+- Welcome people with different backgrounds, identities, experience levels,
+  communication styles, and technical preferences.
+- Give feedback that is specific, factual, and focused on the work.
+- Accept correction, acknowledge mistakes, and help repair harm.
+- Protect private information and respect reasonable boundaries.
+- Prioritize community safety over winning an argument.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## Unacceptable behavior
 
-This code establishes precise parameters for Glyph Forge ecosystem interactions. It applies universally across all project vectors: repositories, issue trackers, documentation, and communication channels. Like well-crafted functions, these standards have clear inputs, processes, and outputs—with zero ambiguity.
+- Harassment, threats, stalking, intimidation, or sustained disruption.
+- Discriminatory or demeaning language, imagery, jokes, or unwanted attention.
+- Sexualized language or conduct in project spaces.
+- Publishing another person's private information without permission.
+- Retaliation against someone who raises a concern in good faith.
+- Any conduct that would be inappropriate in a professional community.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## Scope and enforcement
 
-## 🧬 Core Principles - Structural DNA
+This policy applies in repository discussions, issues, reviews, project events,
+and public interactions where someone is representing Glyph Forge.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Report concerns privately to <lloyd.handyside@neuroforge.io>. Maintainers will
+protect the reporter's privacy as far as practical, investigate in context, and
+may remove content, issue a warning, temporarily restrict participation, or ban
+a participant. A maintainer involved in a report should recuse themselves from
+the decision.
 
-- **Contextual Integrity** — Each contribution serves exactly one purpose, completely
-- **Structure as Control** — Organization itself enforces functional boundaries
-- **Exhaustive But Concise** — Everything necessary, nothing more
-- **Humor as Cognitive Leverage** — Wit that illuminates rather than distracts
-- **Self-Awareness as Foundation** — Continuous improvement through reflection
+Good-faith reports will not be punished. Deliberately false or weaponized
+reports may themselves violate this policy.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## ✅ Expected Behaviors - Operational Parameters
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-### 🛠️ Technical Excellence
-
-- Write code where every character earns its place—no excess, no waste
-- Document with structural precision—future-you has memory allocation issues
-- Test edge cases systematically—bugs appear exactly when ignored
-- Review code like a compiler with empathy—specific, factual, actionable
-
-### 🔄 Collaborative Dynamics
-
-- Provide context with surgical precision—ambiguity wastes cycles
-- Respect time complexity—O(1) is the only acceptable value for meetings
-- Pattern-match knowledge for reuse—solve problems once, apply solutions everywhere
-- Process feedback systematically—transform critique into improvement
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## ❌ Unacceptable Patterns - Exception Conditions
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- **Signal Degradation** — Adding words without meaning (the human equivalent of dead code)
-- **Access Violations** — Creating artificial hierarchies in an open-source ecosystem
-- **Resource Exhaustion** — Consuming attention without purpose (the meetings that should be pull requests)
-- **Integrity Breaches** — Undermining structural coherence through inconsistent standards
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 📣 Issue Resolution - Correction Pipeline
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. **🔍 Detection** — Log violation with ISO 8601 timestamp precision
-2. **📝 Documentation** — Record with sufficient detail for perfect reproduction
-3. **📤 Reporting** — Submit through appropriate channels with integrity verification
-4. **🔧 Resolution** — Execute appropriate response with minimal latency
-
-Report violations to: <lloyd.handyside@neuroforge.io> or <syntheticeidos@gmail.com>
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 🛡️ Enforcement Matrix - Response Framework
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-| Severity | Initial Response | Repeated Pattern | Recovery Path |
-|----------|-----------------|------------------|---------------|
-| 🟢 Minor | Private correction | Temporary access limitation | Immediate upon acknowledgment |
-| 🟠 Moderate | Formal warning | Extended participation restriction | Requires verification steps |
-| 🔴 Critical | Immediate restriction | Permanent removal | Appeal process with strict criteria |
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 👁️ Maintainer Protocol - Oversight Engine
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Maintainers execute these responsibilities:
-
-- Respond to reports within 48 hours (24h for severity:critical)
-- Recuse from cases with conflict-of-interest flags set to TRUE
-- Protect reporter privacy with end-to-end encryption
-- Apply standards with algorithmic consistency across all project vectors
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 🌐 Attribution & Evolution - Structural Adaptation
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-This Code adapts elements from the [Contributor Covenant](https://www.contributor-covenant.org) (v2.1), transformed through Eidosian principles of contextual integrity and structural precision.
-
-The Code evolves through systematic iteration—never through randomization. Modifications require structural consensus and contextual justification.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 📮 Contact Vector - Communication Interface
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- Lloyd Handyside <ace1928@gmail.com> — Implementation Lead
-- Eidos <syntheticeidos@gmail.com> — Architectural Principles
-- Neuroforge <lloyd.handyside@neuroforge.io> — Organizational Framework
-
----
-
-*"A community's exceptions reveal more than its default behaviors."* — Eidos
+This policy is informed by the [Contributor Covenant
+2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct.html).

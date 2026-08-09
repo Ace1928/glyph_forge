@@ -28,8 +28,8 @@ class GlyphForgeAPI:
     def _initialize_components(self) -> None:
         """Initialize core components with optimal laziness."""
         # Default banner generator
-        default_font = self.config.get('banner', 'default_font', 'slant')
-        default_width = self.config.get('banner', 'default_width', 80)
+        default_font = self.config.get("banner", "default_font", "slant")
+        default_width = self.config.get("banner", "default_width", 80)
         self._banner_generator = BannerGenerator(font=default_font, width=default_width)
 
         # Image converter will be initialized on first use (lazy loading)
@@ -43,8 +43,8 @@ class GlyphForgeAPI:
         """Get or lazily initialize image converter."""
         if self._image_converter is None:
             # Default image converter settings
-            default_charset = self.config.get('image', 'default_charset', 'general')
-            default_width = self.config.get('image', 'default_width', 100)
+            default_charset = self.config.get("image", "default_charset", "general")
+            default_width = self.config.get("image", "default_width", 100)
             self._image_converter = ImageGlyphConverter(
                 charset=default_charset, width=default_width
             )
@@ -80,7 +80,7 @@ class GlyphForgeAPI:
         """
         # Use defaults from config if not specified
         if style is None:
-            style = self.config.get('banner', 'default_style', 'minimal')
+            style = self.config.get("banner", "default_style", "minimal")
 
         # Regenerate banner generator if font or width changed
         if font is not None or width is not None:
@@ -209,7 +209,7 @@ class GlyphForgeAPI:
             os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
 
             # Write file with UTF-8 encoding for maximum compatibility
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(Glyph_art)
 
             logger.debug(f"Saved Glyph art to {file_path}")

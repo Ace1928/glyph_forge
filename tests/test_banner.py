@@ -26,16 +26,16 @@ class TestBannerGenerator(unittest.TestCase):
         """Verify style presets are correctly applied to banners."""
         # Test boxed style
         boxed = self.generator.generate("Test", style="boxed")
-        self.assertIn('┌', boxed)  # Has border
-        self.assertIn('└', boxed)
+        self.assertIn("┌", boxed)  # Has border
+        self.assertIn("└", boxed)
 
         # Test eidosian style
         eidosian = self.generator.generate("Test", style=BannerStyle.EIDOSIAN.value)
-        self.assertIn('┏', eidosian)  # Has heavy border
+        self.assertIn("┏", eidosian)  # Has heavy border
 
         # Test minimal style
         minimal = self.generator.generate("Test", style="minimal")
-        self.assertNotIn('┌', minimal)  # No border
+        self.assertNotIn("┌", minimal)  # No border
 
     def test_custom_parameters(self):
         """Verify custom style parameters override defaults."""
@@ -43,29 +43,29 @@ class TestBannerGenerator(unittest.TestCase):
         custom_border = self.generator.generate(
             "Test", style="minimal", border="double"
         )
-        self.assertIn('╔', custom_border)
+        self.assertIn("╔", custom_border)
 
         # Custom padding
         padding = self.generator.generate("Test", style="minimal", padding=(2, 3))
-        lines = padding.split('\n')
+        lines = padding.split("\n")
         self.assertTrue(len(lines) > 4)  # Should have padding lines
 
         # Custom alignment
         right_aligned = self.generator.generate(
             "Test", style="minimal", alignment="right"
         )
-        lines = right_aligned.split('\n')
+        lines = right_aligned.split("\n")
         non_empty = [line for line in lines if line.strip()]
         if non_empty:
             self.assertTrue(
-                non_empty[0].startswith(' ')
+                non_empty[0].startswith(" ")
             )  # Right alignment adds spaces on left
 
     def test_effects_application(self):
         """Verify special effects are correctly applied."""
         # Shadow effect
         shadow = self.generator.generate("X", style="minimal", effects=["shadow"])
-        self.assertIn('░', shadow)  # Contains shadow character
+        self.assertIn("░", shadow)  # Contains shadow character
 
         # Glow effect
         glow = self.generator.generate("X", style="minimal", effects=["glow"])
@@ -100,12 +100,12 @@ class TestBannerGenerator(unittest.TestCase):
     def test_color_support(self):
         """Verify ANSI color application."""
         colored = self.generator.generate("Test", style="minimal", color=True)
-        self.assertIn('\033[', colored)  # Contains ANSI color codes
+        self.assertIn("\033[", colored)  # Contains ANSI color codes
 
     def test_unicode_detection(self):
         """Verify Unicode support detection."""
         # Mock os.devnull to simulate Unicode support
-        with mock.patch('builtins.open') as mock_open:
+        with mock.patch("builtins.open") as mock_open:
             mock_file = mock.MagicMock()
             mock_open.return_value.__enter__.return_value = mock_file
 
@@ -114,9 +114,9 @@ class TestBannerGenerator(unittest.TestCase):
             self.assertTrue(gen._unicode_supported)
 
         # Mock exception to simulate lack of Unicode support
-        with mock.patch('builtins.open') as mock_open:
+        with mock.patch("builtins.open") as mock_open:
             mock_open.side_effect = UnicodeEncodeError(
-                'utf-8', 'test', 0, 1, 'test error'
+                "utf-8", "test", 0, 1, "test error"
             )
 
             # Recreate generator to trigger Unicode detection
@@ -148,5 +148,5 @@ class TestBannerGenerator(unittest.TestCase):
         self.assertEqual(len(self.generator.cache), 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -104,11 +104,13 @@ class OpenCVFrameSource:
         height: int | None = None,
         fps: float | None = None,
         loop: bool = False,
+        label: str | None = None,
     ) -> None:
         self._cv2 = _load_opencv()
         self._source = source
         self._camera = isinstance(source, int)
         self._loop = loop and not self._camera
+        self._label = label
         self._closed = False
         self._lock = threading.Lock()
         native_source: int | str = source if isinstance(source, int) else str(source)
@@ -133,6 +135,8 @@ class OpenCVFrameSource:
 
     @property
     def name(self) -> str:
+        if self._label:
+            return self._label
         if self._camera:
             return f"camera:{self._source}"
         return str(self._source)
@@ -326,7 +330,7 @@ def create_frame_source(
     loop: bool = False,
     screen_backend: str = "auto",
 ) -> FrameSource:
-    """Resolve ``camera:N``, ``screen:N``, or a video path."""
+    """Resolve a camera, screen, local video, or optional network source."""
 
     kind, separator, value = specification.partition(":")
     normalized = kind.casefold()
@@ -342,12 +346,33 @@ def create_frame_source(
         except ValueError as exc:
             raise ValueError("Screen source must look like screen:1") from exc
         return create_screen_source(monitor, fps=fps, backend=screen_backend)
+    network_value = (
+        value if separator and normalized in {"url", "network"} else specification
+    )
+    from .network import is_network_url
+
+    if is_network_url(network_value):
+        from .network import NetworkSourceError, resolve_network_source
+
+        try:
+            resolved = resolve_network_source(
+                network_value,
+                max_height=max(1, height or 720),
+            )
+        except NetworkSourceError as exc:
+            raise CaptureError(str(exc)) from exc
+        return OpenCVFrameSource(
+            resolved.url,
+            fps=fps,
+            loop=False,
+            label=resolved.title,
+        )
 
     source = Path(specification).expanduser()
     if not source.is_file():
         raise CaptureError(
             f"Unknown live source {specification!r}; use camera:0, screen:1, "
-            "or a video path"
+            "url:https://…, or a video path"
         )
     return OpenCVFrameSource(source, fps=fps, loop=loop)
 
