@@ -1,95 +1,30 @@
-# ⚡ GLYPH FORGE MANIFEST ⚡
-# ~~~~~~~~~~~~~~~~~~~~~~~~
-# Package inclusion specification - precise file selection matrix.
-# Every path serves purpose - structural integrity maintained at each level.
+# Source distribution contents. Package modules are discovered from ``src`` by
+# setuptools; this file lists only supporting files that are intentionally
+# shipped. Explicit script names prevent local experiments entering releases.
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📜 Core Project Files - System identity and definition
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-include LICENSE           # Legal framework - operation boundaries
-include README.md         # Entry vector - first interaction surface
-include CONTRIBUTING.md   # Collaboration protocol - contribution pathways
-include SECURITY.md       # Protection matrix - vulnerability handling
-include pyproject.toml    # Build system core - package definition
-include setup.py          # Legacy bridge - backwards compatibility
-include requirements.txt  # Dependency graph - external connections
-include project_structure.md # Architecture map - system topology
-include project_scope.md  # Domain definition - functional boundaries
+include LICENSE
+include README.md
+include ROADMAP.md
+include CHANGELOG.md
+include CODE_OF_CONDUCT.md
+include CONTRIBUTING.md
+include SECURITY.md
+include pyproject.toml
+include setup.py
+include requirements.txt
+include src/glyph_forge/py.typed
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🎭 Examples & Templates - Implementation patterns
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# glyph without examples is like a function without a return value - technically complete but practically useless
-recursive-include examples *.py *.txt *.md *.jpg *.png  # Usage demonstrations
-recursive-include src/glyph_forge/config *.json *.yaml *.yml *.toml  # Control parameters
-recursive-include src/glyph_forge/resources *.txt *.json *.dat  # Asset library
+recursive-include examples *.py
+recursive-include tests *.py
+recursive-include src/glyph_forge/ui *.css *.html *.js
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🧪 Test Framework - Verification matrix
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Untested code is assumed buggy; untested glyph is just hopeful pixels
-recursive-include tests *.py                          # Test suite
-recursive-include tests/fixtures *.json *.yaml *.yml  # Test parameters
-recursive-include tests/test_images *.jpg *.png *.gif *.bmp *.webp  # Visual targets
+prune scripts
+include scripts/__init__.py
+include scripts/demo.py
+include scripts/run_tests.py
+include scripts/update_glossary.py
+include scripts/verify_install.py
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📚 Documentation - Knowledge crystallization
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Well-crafted documentation is like precise glyph art - structure itself conveys meaning
-recursive-include docs *.md *.py *.rst *.txt          # Core documentation
-recursive-include docs/_static *.css *.js *.png *.jpg *.svg  # Visual elements
-recursive-include docs/_templates *.html *.rst        # Structure patterns
-recursive-include docs/examples *.py *.txt *.md       # Usage demonstrations
-recursive-include docs/user_docs *.md *.rst           # Human interface
-recursive-include docs/auto_docs *.md *.rst           # Generated reference
-recursive-include docs/ai_docs *.md *.rst             # Enhanced content
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🛠️ Build & Development - Environment construction
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-include .gitignore       # Exclusion patterns - signal preservation
-include .editorconfig    # Editor standards - consistency enforcement
-include src/glyph_forge/py.typed  # Type hint marker - static analysis enabler
-recursive-include scripts *.py *.sh  # Automation tools - workflow accelerators
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🔧 Configuration - Parameter system
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Configuration files: where intent meets implementation through structured parameters
-recursive-include config *.json *.yml *.toml  # External configuration
-include .pre-commit-config.yaml              # Pre-commit hooks - quality gateway
-include setup.cfg                            # Backward support - legacy settings
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📊 Benchmarks - Performance analysis
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# If you can't measure it, you can't improve it - precise metrics enable precise improvements
-recursive-include benchmarks *.py *.json     # Performance test suite
-recursive-include benchmarks/data *.jpg *.png *.txt  # Benchmark samples
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🔍 Explicit exclusions - Signal focus
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# In both code and glyph art, what you omit is as important as what you include
-global-exclude .DS_Store *.pyc *.pyo __pycache__ *.so .*.swp  # System artifacts
-global-exclude *.egg-info* *.egg .coverage .pytest_cache .tox  # Build artifacts
-prune .github            # CI workflow configuration
-prune .vscode            # Editor settings
-prune .idea              # IDE metadata
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📦 Package Distribution - Deployment configuration
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Distribution integrity starts with manifest completeness
-include MANIFEST.in      # Distribution definition - self-reference
-include tox.ini          # Isolation matrix - test environments
-include .readthedocs.yml # Reference compilation - documentation building
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🧠 Project Authorship - Mind behind matrix
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Maintained by:
-# Lloyd Handyside <ace1928@gmail.com> & <lloyd.handyside@neuroforge.io>
-# Eidos <syntheticeidos@gmail.com>
-# 
-# "Structure without purpose is just visual noise; precision without insight is mere calculation."
+global-exclude .DS_Store *.py[cod] __pycache__ *.so .*.swp
+prune .github
+prune .vscode

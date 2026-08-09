@@ -1,0 +1,257 @@
+"""Portable runtime discovery and adaptive performance defaults.
+
+This module intentionally depends only on the Python standard library.  It can
+therefore power ``glyph-forge doctor`` and choose safe defaults even when an
+optional interface or media backend is not installed.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import os
+import platform
+import shutil
+from dataclasses import asdict, dataclass
+from enum import Enum
+from importlib import metadata
+from typing import Any, Iterable
+
+
+class PerformanceTier(str, Enum):
+    """Named performance envelopes used throughout Glyph Forge."""
+
+    ECO = "eco"
+    BALANCED = "balanced"
+    WORKSTATION = "workstation"
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeProfile:
+    """Hardware-aware defaults that remain predictable and overridable."""
+
+    tier: PerformanceTier
+    cpu_count: int
+    memory_bytes: int | None
+    workers: int
+    image_width: int
+    stream_width: int
+    target_fps: int
+    resample: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable representation."""
+
+        result = asdict(self)
+        result["tier"] = self.tier.value
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class Capability:
+    """Availability and installation guidance for one feature dependency."""
+
+    key: str
+    label: str
+    available: bool
+    kind: str
+    purpose: str
+    install_hint: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable representation."""
+
+        return asdict(self)
+
+
+_PYTHON_CAPABILITIES: tuple[tuple[str, str, str, str | None], ...] = (
+    ("PIL", "Pillow", "image conversion", "pip install glyph-forge"),
+    ("numpy", "NumPy", "accelerated pixel mapping", "pip install glyph-forge"),
+    ("pyfiglet", "pyfiglet", "text banners", "pip install glyph-forge"),
+    ("rich", "Rich", "styled CLI output", "pip install glyph-forge"),
+    ("typer", "Typer", "command-line interface", "pip install glyph-forge"),
+    ("textual", "Textual", "terminal UI", "pip install 'glyph-forge[tui]'"),
+    ("cv2", "OpenCV", "video and webcam capture", "pip install 'glyph-forge[media]'"),
+    ("mss", "MSS", "cross-platform screen capture", "pip install 'glyph-forge[media]'"),
+)
+
+_TOOL_CAPABILITIES: tuple[tuple[str, str, str, str | None], ...] = (
+    (
+        "ffmpeg",
+        "FFmpeg",
+        "video encoding and audio muxing",
+        "Install FFmpeg with your OS package manager",
+    ),
+    (
+        "ffprobe",
+        "ffprobe",
+        "video metadata inspection",
+        "Install FFmpeg with your OS package manager",
+    ),
+)
+
+
+def _module_available(module_name: str) -> bool:
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ImportError, AttributeError, ValueError):
+        return False
+
+
+def _physical_memory() -> int | None:
+    """Best-effort physical-memory detection without a required dependency."""
+
+    try:
+        import psutil  # type: ignore[import-untyped]
+
+        return int(psutil.virtual_memory().total)
+    except (ImportError, AttributeError, OSError):
+        pass
+
+    if hasattr(os, "sysconf"):
+        try:
+            pages = int(os.sysconf("SC_PHYS_PAGES"))
+            page_size = int(os.sysconf("SC_PAGE_SIZE"))
+            if pages > 0 and page_size > 0:
+                return pages * page_size
+        except (OSError, TypeError, ValueError):
+            pass
+    return None
+
+
+def _normalize_preference(
+    preference: str | PerformanceTier | None,
+) -> PerformanceTier | None:
+    if isinstance(preference, PerformanceTier):
+        return preference
+    value = (preference or os.environ.get("GLYPH_FORGE_PERFORMANCE", "auto")).lower()
+    aliases = {
+        "low": PerformanceTier.ECO,
+        "modest": PerformanceTier.ECO,
+        "fast": PerformanceTier.ECO,
+        "normal": PerformanceTier.BALANCED,
+        "quality": PerformanceTier.WORKSTATION,
+        "high": PerformanceTier.WORKSTATION,
+    }
+    if value in aliases:
+        return aliases[value]
+    if value == "auto":
+        return None
+    try:
+        return PerformanceTier(value)
+    except ValueError as exc:
+        choices = "auto, eco, balanced, workstation"
+        raise ValueError(
+            f"Unknown performance mode {value!r}; choose {choices}"
+        ) from exc
+
+
+def detect_runtime_profile(
+    preference: str | PerformanceTier | None = None,
+    *,
+    cpu_count: int | None = None,
+    memory_bytes: int | None = None,
+) -> RuntimeProfile:
+    """Choose conservative defaults for the detected machine.
+
+    Explicit ``cpu_count`` and ``memory_bytes`` values exist primarily for
+    deterministic callers and tests.  Every returned value is a default rather
+    than a hard limit; individual commands may override it.
+    """
+
+    cpus = max(1, int(cpu_count if cpu_count is not None else (os.cpu_count() or 1)))
+    memory = memory_bytes if memory_bytes is not None else _physical_memory()
+    requested = _normalize_preference(preference)
+
+    if requested is None:
+        gib = memory / (1024**3) if memory is not None else None
+        if cpus <= 2 or (gib is not None and gib < 3):
+            tier = PerformanceTier.ECO
+        elif cpus >= 12 and (gib is None or gib >= 12):
+            tier = PerformanceTier.WORKSTATION
+        else:
+            tier = PerformanceTier.BALANCED
+    else:
+        tier = requested
+
+    if tier is PerformanceTier.ECO:
+        return RuntimeProfile(tier, cpus, memory, 1, 72, 64, 12, "bilinear")
+    if tier is PerformanceTier.WORKSTATION:
+        return RuntimeProfile(
+            tier,
+            cpus,
+            memory,
+            min(16, cpus),
+            160,
+            160,
+            30,
+            "lanczos",
+        )
+    return RuntimeProfile(
+        tier,
+        cpus,
+        memory,
+        min(4, cpus),
+        100,
+        100,
+        20,
+        "bicubic",
+    )
+
+
+def iter_capabilities() -> Iterable[Capability]:
+    """Yield all optional and required runtime capability checks."""
+
+    for module, label, purpose, hint in _PYTHON_CAPABILITIES:
+        yield Capability(
+            key=module,
+            label=label,
+            available=_module_available(module),
+            kind="python",
+            purpose=purpose,
+            install_hint=hint,
+        )
+    for command, label, purpose, hint in _TOOL_CAPABILITIES:
+        yield Capability(
+            key=command,
+            label=label,
+            available=shutil.which(command) is not None,
+            kind="tool",
+            purpose=purpose,
+            install_hint=hint,
+        )
+
+
+def package_version() -> str:
+    """Return the installed distribution version without importing the package."""
+
+    try:
+        return metadata.version("glyph-forge")
+    except metadata.PackageNotFoundError:
+        return "0.2.0.dev0"
+
+
+def runtime_report(preference: str | PerformanceTier | None = None) -> dict[str, Any]:
+    """Collect a stable, JSON-ready diagnostics report."""
+
+    profile = detect_runtime_profile(preference)
+    return {
+        "glyph_forge": package_version(),
+        "python": platform.python_version(),
+        "implementation": platform.python_implementation(),
+        "platform": platform.platform(),
+        "system": platform.system() or os.name,
+        "machine": platform.machine() or "unknown",
+        "profile": profile.to_dict(),
+        "capabilities": [capability.to_dict() for capability in iter_capabilities()],
+    }
+
+
+__all__ = [
+    "Capability",
+    "PerformanceTier",
+    "RuntimeProfile",
+    "detect_runtime_profile",
+    "iter_capabilities",
+    "package_version",
+    "runtime_report",
+]

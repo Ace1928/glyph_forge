@@ -2,13 +2,16 @@
 
 > *"Where characters and pixels merge with structural integrity."*
 
-A zero-compromise glyph art transformation toolkit built on Eidosian principles. Transform images, text, and video into stunning glyph art with precision-engineered algorithms.
+A fast, portable toolkit for turning images, text, video, cameras, and screens
+into expressive character art. Glyph Forge scales its defaults to the machine
+it is running on and offers focused CLI commands today, with live media and
+desktop-mirror experiences on the [product roadmap](ROADMAP.md).
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Status](https://img.shields.io/badge/status-beta-purple.svg)
-![Tests](https://img.shields.io/badge/tests-63%20passed-green.svg)
+![Tests](https://img.shields.io/badge/tests-179%20passed-green.svg)
 
 ## 📋 Table of Contents
 
@@ -65,6 +68,12 @@ pip install -e .
 # Install with development dependencies
 pip install -e ".[dev]"
 
+# Add the full-screen terminal UI
+pip install -e ".[tui]"
+
+# Add video, webcam, and screen-capture backends
+pip install -e ".[media]"
+
 # Install with documentation tools
 pip install -e ".[docs]"
 ```
@@ -73,7 +82,8 @@ pip install -e ".[docs]"
 
 - **Python**: 3.10 or higher
 - **Dependencies**: PIL/Pillow, NumPy, PyFiglet, Colorama, Rich, Typer
-- **Optional**: OpenCV (cv2) for video processing
+- **Optional interfaces**: Textual for the TUI
+- **Optional media**: OpenCV and MSS for video, webcam, and screen capture
 
 ## 🚀 Quick Start
 
@@ -103,15 +113,24 @@ print(glyph_art)
 ### Command Line Interface
 
 ```bash
-# Convert an image to glyph art
-glyph-forge imagize image.jpg --width 80
+# Convert, preview, and optionally save an image
+glyph-forge image image.jpg --width 80
+glyph-forge image image.jpg --color ansi --output portrait.ansi
 
 # Create a styled text banner
-glyph-forge bannerize "GLYPH FORGE" --font slant --style boxed
+glyph-forge text "GLYPH FORGE" --font slant --style boxed
+
+# Browse styles, choose an interface, or inspect optional features
+glyph-forge styles --preview
+glyph-forge launch tui
+glyph-forge doctor
 
 # Show available options
 glyph-forge --help
 ```
+
+The previous `imagize`, `bannerize`, and `glyphfy` entry points remain available
+for compatibility.
 
 ## ✨ Features
 

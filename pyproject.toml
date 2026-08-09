@@ -8,7 +8,7 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [build-system]
 requires = [
-    "setuptools>=61.0",
+    "setuptools>=77.0",
     "wheel",
 ] # Solid foundations prevent shaky castles
 build-backend = "setuptools.build_meta"
@@ -18,11 +18,12 @@ build-backend = "setuptools.build_meta"
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [project]
 name = "glyph-forge"
-version = "0.1.0" # Genesis point - expansion begins here
-description = "Hyper-optimized text, image and video-to-glyph art converter with Eidosian principles"
+version = "0.2.0"
+description = "Fast, portable image, text, and video-to-glyph art toolkit"
 readme = "README.md"
 requires-python = ">=3.10" # Python 3.10+ supported
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Lloyd Handyside", email = "ace1928@gmail.com" }]
 maintainers = [
     { name = "Lloyd Handyside", email = "lloyd.handyside@neuroforge.io" },
@@ -30,9 +31,14 @@ maintainers = [
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Artistic Software",
     "Topic :: Multimedia :: Graphics :: Graphics Conversion",
     "Topic :: Utilities",
@@ -45,12 +51,20 @@ dependencies = [
     "colorama>=0.4.6", # Cross-platform color support
     "rich>=13.7.0",    # Advanced terminal rendering
     "typer>=0.9.0",    # CLI interface with elegance
+    "PyYAML>=6.0",     # Portable profile serialization
 ]
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🧩 Optional Dependencies - Specialized toolkits
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [project.optional-dependencies]
+tui = [
+    "textual>=0.80.0",
+]
+media = [
+    "opencv-python>=4.8.0",
+    "mss>=9.0.1",
+]
 # Developer arsenal - weapons of code perfection
 dev = [
     "black>=22.0.0",      # Code formatting with structural integrity
@@ -85,6 +99,11 @@ docs = [
     "sphinx-autobuild>=2024.10.3",     # Live preview during editing
     "sphinx-design>=0.6.1",            # Enhanced design components
 ]
+all = [
+    "textual>=0.80.0",
+    "opencv-python>=4.8.0",
+    "mss>=9.0.1",
+]
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🎮 CLI Entry Points - Command interface
@@ -94,6 +113,7 @@ glyphfy = "glyph_forge.cli.glyphfy:main"     # Image/video transformer
 imagize = "glyph_forge.cli.imagize:main"    # Image optimization tool
 bannerize = "glyph_forge.cli.bannerize:main" # Text banner generator
 glyph-forge = "glyph_forge.cli:main"        # Unified command interface
+glyphforge = "glyph_forge.cli:main"         # Shell-friendly compact alias
 glyph_forge = "glyph_forge.cli:main"        # Alias with underscore
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -113,7 +133,13 @@ where = ["src"]
 include = ["glyph_forge*"]
 
 [tool.setuptools.package-data]
-glyph_forge = ["py.typed", "config/*.json", "resources/*.txt"]
+glyph_forge = [
+    "py.typed",
+    "config/*.json",
+    "resources/*.txt",
+    "ui/*.css",
+    "ui/web/*",
+]
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🧪 Testing Configuration - Validation framework
@@ -147,14 +173,14 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "pass",
 ]
-required_percentage = 85 # Excellence has a threshold
+fail_under = 85
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🎨 Code Style - Aesthetic standards
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [tool.black]
 line-length = 88 # Perfect balance between readability and space
-target-version = ["py312"]
+target-version = ["py310", "py311", "py312", "py313"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -184,7 +210,7 @@ ensure_newline_before_comments = true
 # 🔍 Type Checking - Structural integrity
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.10"
 warn_return_any = true             # Type precision is not optional
 warn_unused_configs = true
 disallow_untyped_defs = true
