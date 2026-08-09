@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +47,7 @@ def _run_source(
     max_frames: int | None,
     performance: str,
     redraw: str = "auto",
+    fit_terminal: bool = True,
     loop: bool = False,
     screen_backend: str = "auto",
     stop_when: Callable[[], bool] | None = None,
@@ -71,8 +71,7 @@ def _run_source(
                 "--control -- COMMAND' for a safely isolated desktop or app"
             )
         profile = detect_runtime_profile(performance)
-        terminal = shutil.get_terminal_size((profile.stream_width, 30))
-        render_width = width or min(profile.stream_width, max(20, terminal.columns))
+        render_width = width or profile.stream_width
         selected_color = color.casefold()
         if selected_color == "auto":
             selected_color = "truecolor" if mode == "half-block" else "ansi256"
@@ -123,6 +122,7 @@ def _run_source(
             alternate_screen=True,
             show_stats=True,
             redraw=redraw,
+            fit_terminal=fit_terminal,
         ).validated()
     except (CaptureError, InputRoutingError, ValueError) as exc:
         if source is not None:
@@ -140,7 +140,7 @@ def _run_source(
 
     console.print(
         f"[cyan]{source.name}[/cyan] · {renderer.mode.value} · "
-        f"{renderer.config.width} columns · {target_fps:g} FPS · "
+        f"up to {renderer.config.width} columns · {target_fps:g} FPS · "
         + ("CONTROL ACTIVE · Ctrl+] to stop" if control else "Ctrl+C to stop")
     )
     try:
@@ -185,6 +185,11 @@ def camera_command(
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
+    fit_terminal: bool = typer.Option(
+        True,
+        "--fit/--no-fit",
+        help="Fit output inside the live terminal while preserving aspect ratio",
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Render a webcam as responsive terminal glyph art."""
@@ -205,6 +210,7 @@ def camera_command(
         max_frames=frames,
         performance=performance,
         redraw=redraw,
+        fit_terminal=fit_terminal,
     )
 
 
@@ -246,6 +252,11 @@ def screen_command(
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
+    fit_terminal: bool = typer.Option(
+        True,
+        "--fit/--no-fit",
+        help="Fit output inside the live terminal while preserving aspect ratio",
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Mirror a desktop through high-fidelity terminal glyph rendering."""
@@ -266,6 +277,7 @@ def screen_command(
         max_frames=frames,
         performance=performance,
         redraw=redraw,
+        fit_terminal=fit_terminal,
         screen_backend=backend,
         control=control,
         input_backend=input_backend,
@@ -302,6 +314,11 @@ def video_command(
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
+    fit_terminal: bool = typer.Option(
+        True,
+        "--fit/--no-fit",
+        help="Fit output inside the live terminal while preserving aspect ratio",
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Play a video directly in the terminal without preloading its frames."""
@@ -322,6 +339,7 @@ def video_command(
         max_frames=frames,
         performance=performance,
         redraw=redraw,
+        fit_terminal=fit_terminal,
         loop=loop,
     )
 
@@ -348,6 +366,11 @@ def url_command(
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
     ),
+    fit_terminal: bool = typer.Option(
+        True,
+        "--fit/--no-fit",
+        help="Fit output inside the live terminal while preserving aspect ratio",
+    ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
     """Play a supported video-site URL without downloading it first."""
@@ -368,6 +391,7 @@ def url_command(
         max_frames=frames,
         performance=performance,
         redraw=redraw,
+        fit_terminal=fit_terminal,
     )
 
 
@@ -397,6 +421,11 @@ def launch_command(
     ),
     redraw: str = typer.Option(
         "auto", "--redraw", help="Terminal updates: auto, delta, or full"
+    ),
+    fit_terminal: bool = typer.Option(
+        True,
+        "--fit/--no-fit",
+        help="Fit output inside the live terminal while preserving aspect ratio",
     ),
     performance: str = typer.Option("auto", "--performance"),
 ) -> None:
@@ -428,6 +457,7 @@ def launch_command(
                 max_frames=None,
                 performance=performance,
                 redraw=redraw,
+                fit_terminal=fit_terminal,
                 screen_backend="mss",
                 stop_when=lambda: process.poll() is not None,
                 control=control,

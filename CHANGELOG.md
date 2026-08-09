@@ -18,6 +18,8 @@ the project uses semantic versioning.
   mapping, and Ctrl+] emergency release
 - Adaptive terminal presentation with `auto`, `delta`, and `full` redraw modes,
   exact output-byte accounting, resize fallback, and public presenter contracts
+- Aspect-preserving live viewport fitting across every glyph mode, with
+  immediate terminal-resize adaptation and an explicit `--no-fit` override
 
 ### Performance
 
@@ -25,6 +27,8 @@ the project uses semantic versioning.
   removing per-cell NumPy allocations and redundant ANSI256 colour sequences
 - Changed-row terminal updates which automatically fall back to complete frames
   when cursor-addressed output would be larger
+- Per-frame viewport constraints are applied before image resampling, avoiding
+  wasted rendering work for pixels that cannot fit on the terminal surface
 
 ### Security
 

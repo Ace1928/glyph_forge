@@ -140,6 +140,13 @@ are unchanged. `--redraw delta` forces row updates and `--redraw full` provides
 a compatibility fallback; redirected output always stays full-frame and
 line-oriented.
 
+Interactive views also fit every frame inside the current terminal viewport,
+preserve the source aspect ratio, reserve space for the status line, and adapt
+immediately when the window is resized. `--width` remains the maximum detail
+level; use `--no-fit` when an exact surface is more important than avoiding
+terminal clipping. Pipes and redirected files retain the explicitly requested
+dimensions and are never resized from terminal state.
+
 `desktop` is a high-fidelity host-screen viewer. The original desktop remains
 interactive through its normal display. Glyph Forge intentionally refuses to
 inject events from a terminal back into that same host display because a
@@ -309,7 +316,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite contains 288 tests and measures at least 70% branch-aware
+The current suite contains 299 tests and measures at least 70% branch-aware
 coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource

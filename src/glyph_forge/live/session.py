@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
 import time
 from collections.abc import Callable
@@ -44,6 +45,7 @@ class TerminalSessionConfig:
     alternate_screen: bool = True
     show_stats: bool = True
     redraw: TerminalRedraw | str = TerminalRedraw.AUTO
+    fit_terminal: bool = True
 
     def validated(self) -> "TerminalSessionConfig":
         if self.target_fps <= 0:
@@ -274,14 +276,28 @@ def run_terminal_session(
 
             dropped += max(0, frame.sequence - sequence - 1)
             sequence = frame.sequence
-            result = renderer.render(frame.pixels)
+            max_width = None
+            max_height = None
+            if use_alternate_screen and selected.fit_terminal:
+                terminal = shutil.get_terminal_size(
+                    (renderer.config.width + 1, 30),
+                )
+                # Reserving the final column avoids automatic line wrapping in
+                # terminals which enter wrap-pending state at the right margin.
+                max_width = max(1, terminal.columns - 1)
+                max_height = max(1, terminal.lines - int(selected.show_stats))
+            result = renderer.render(
+                frame.pixels,
+                max_width=max_width,
+                max_height=max_height,
+            )
             if input_router is not None:
                 input_router.update_viewport(result.width, result.height)
             elapsed = time.monotonic() - started
             footer = None
             if selected.show_stats:
-                footer = (
-                    f"\x1b[2m{source.name} · {result.mode.value} · "
+                stats_text = (
+                    f"{source.name} · {result.mode.value} · "
                     f"{presented + 1} frames · {elapsed:.1f}s · "
                     f"{dropped} dropped"
                     + (
@@ -289,8 +305,14 @@ def run_terminal_session(
                         if input_router is not None
                         else ""
                     )
-                    + "\x1b[0m"
                 )
+                if max_width is not None and len(stats_text) > max_width:
+                    stats_text = (
+                        stats_text[: max(1, max_width - 1)] + "…"
+                        if max_width > 1
+                        else stats_text[:1]
+                    )
+                footer = f"\x1b[2m{stats_text}\x1b[0m"
             presenter.present(result, footer)
             presented += 1
             next_presentation = max(

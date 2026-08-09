@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import io
+import os
 import sys
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -17,6 +19,7 @@ from typer.testing import CliRunner
 from glyph_forge.cli import app
 from glyph_forge.cli import live as live_cli
 from glyph_forge.live import capture
+from glyph_forge.live import session as session_module
 from glyph_forge.live.capture import (
     CaptureBackendUnavailable,
     CaptureError,
@@ -120,6 +123,34 @@ def test_terminal_session_renders_and_returns_metrics() -> None:
     assert stats.full_redraws == 1
 
 
+def test_terminal_session_keeps_explicit_size_when_redirected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_terminal_probe(_fallback: tuple[int, int]) -> os.terminal_size:
+        raise AssertionError("redirected output must not depend on a terminal viewport")
+
+    monkeypatch.setattr(
+        session_module.shutil,
+        "get_terminal_size",
+        unexpected_terminal_probe,
+    )
+    output = io.StringIO()
+    renderer = FrameRenderer(
+        RenderConfig(width=20, height=4, mode="glyph", color="none", charset="@")
+    )
+
+    run_terminal_session(
+        IterableFrameSource([np.zeros((10, 20, 3), dtype=np.uint8)]),
+        renderer,
+        TerminalSessionConfig(max_frames=1, show_stats=False, fit_terminal=True),
+        output=output,
+    )
+
+    rows = output.getvalue().splitlines()
+    assert len(rows) == 4
+    assert all(len(row) == 20 for row in rows)
+
+
 class _TTYBuffer(io.StringIO):
     def isatty(self) -> bool:
         return True
@@ -139,6 +170,121 @@ def test_terminal_session_restores_the_terminal_surface() -> None:
     text = output.getvalue()
     assert text.startswith("\x1b[?1049h\x1b[?25l")
     assert text.endswith("\x1b[0m\x1b[?25h\x1b[?1049l")
+
+
+def test_terminal_session_fits_current_viewport_and_truncates_footer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RecordingRenderer(FrameRenderer):
+        result: RenderResult | None = None
+        limits: tuple[int | None, int | None] | None = None
+
+        def render(
+            self,
+            frame: np.ndarray,
+            *,
+            max_width: int | None = None,
+            max_height: int | None = None,
+        ) -> RenderResult:
+            self.limits = (max_width, max_height)
+            self.result = super().render(
+                frame,
+                max_width=max_width,
+                max_height=max_height,
+            )
+            return self.result
+
+    monkeypatch.setattr(
+        session_module.shutil,
+        "get_terminal_size",
+        lambda _fallback: os.terminal_size((41, 12)),
+    )
+    output = _TTYBuffer()
+    renderer = RecordingRenderer(RenderConfig(width=100, charset="@"))
+
+    run_terminal_session(
+        IterableFrameSource(
+            [np.zeros((90, 160, 3), dtype=np.uint8)],
+            name="a-source-name-that-is-deliberately-longer-than-the-terminal",
+        ),
+        renderer,
+        TerminalSessionConfig(max_frames=1),
+        output=output,
+    )
+
+    assert renderer.limits == (40, 11)
+    assert renderer.result is not None
+    assert (renderer.result.width, renderer.result.height) == (39, 11)
+    assert "…" in output.getvalue()
+
+
+def test_terminal_session_rechecks_viewport_after_resize(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_presented = threading.Event()
+
+    class ResizeSource:
+        name = "resize-source"
+
+        def __init__(self) -> None:
+            self.index = 0
+
+        def read(self) -> np.ndarray | None:
+            if self.index == 0:
+                self.index += 1
+                return np.zeros((90, 160, 3), dtype=np.uint8)
+            if self.index == 1:
+                first_presented.wait(timeout=1)
+                self.index += 1
+                return np.ones((90, 160, 3), dtype=np.uint8)
+            return None
+
+        def close(self) -> None:
+            first_presented.set()
+
+    class RecordingRenderer(FrameRenderer):
+        results: list[RenderResult]
+
+        def __init__(self) -> None:
+            super().__init__(RenderConfig(width=100, charset="@"))
+            self.results = []
+
+        def render(
+            self,
+            frame: np.ndarray,
+            *,
+            max_width: int | None = None,
+            max_height: int | None = None,
+        ) -> RenderResult:
+            result = super().render(
+                frame,
+                max_width=max_width,
+                max_height=max_height,
+            )
+            self.results.append(result)
+            first_presented.set()
+            return result
+
+    sizes = iter([os.terminal_size((81, 30)), os.terminal_size((41, 12))])
+    monkeypatch.setattr(
+        session_module.shutil,
+        "get_terminal_size",
+        lambda _fallback: next(sizes),
+    )
+    renderer = RecordingRenderer()
+
+    stats = run_terminal_session(
+        ResizeSource(),
+        renderer,
+        TerminalSessionConfig(target_fps=120, max_frames=2),
+        output=_TTYBuffer(),
+    )
+
+    assert [(result.width, result.height) for result in renderer.results] == [
+        (80, 22),
+        (39, 11),
+    ]
+    assert stats.full_redraws == 2
 
 
 def test_terminal_presenter_emits_exact_changed_row_delta() -> None:
@@ -367,6 +513,7 @@ def test_live_commands_expose_adaptive_redraw_control() -> None:
 
     assert result.exit_code == 0, result.output
     assert "--redraw" in plain_output
+    assert "--fit" in plain_output
     assert "Terminal updates" in plain_output
 
 

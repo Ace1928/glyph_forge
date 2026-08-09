@@ -160,6 +160,52 @@ def test_renderers_reduce_large_sources_before_text_generation(
     assert len(result.text.splitlines()) == 8
 
 
+@pytest.mark.parametrize("mode", list(RenderMode))
+def test_every_renderer_fits_bounded_surface_without_distortion(
+    mode: RenderMode,
+) -> None:
+    frame = np.zeros((90, 160, 3), dtype=np.uint8)
+    color = "ansi256" if mode is RenderMode.HALF_BLOCK else "none"
+    renderer = FrameRenderer(RenderConfig(width=80, height=40, mode=mode, color=color))
+
+    result = renderer.render(frame, max_width=50, max_height=10)
+
+    assert (result.width, result.height) == (20, 10)
+    assert len(result.text.splitlines()) == 10
+
+
+def test_natural_landscape_and_portrait_surfaces_fit_both_axes() -> None:
+    renderer = FrameRenderer(RenderConfig(width=100, charset="@"))
+
+    landscape = renderer.render(
+        np.zeros((90, 160, 3), dtype=np.uint8),
+        max_width=80,
+        max_height=14,
+    )
+    portrait = renderer.render(
+        np.zeros((160, 90, 3), dtype=np.uint8),
+        max_width=60,
+        max_height=20,
+    )
+
+    assert (landscape.width, landscape.height) == (50, 14)
+    assert (portrait.width, portrait.height) == (22, 20)
+
+
+@pytest.mark.parametrize(
+    ("bounds", "message"),
+    [({"max_width": 0}, "max_width"), ({"max_height": 0}, "max_height")],
+)
+def test_renderer_rejects_invalid_surface_bounds(
+    bounds: dict[str, int],
+    message: str,
+) -> None:
+    renderer = FrameRenderer(RenderConfig(width=10, height=5))
+
+    with pytest.raises(ValueError, match=message):
+        renderer.render(np.zeros((5, 10, 3), dtype=np.uint8), **bounds)
+
+
 @pytest.mark.parametrize(
     ("config", "message"),
     [

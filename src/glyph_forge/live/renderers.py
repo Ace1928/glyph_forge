@@ -182,6 +182,30 @@ def _cell_height(frame: RGBFrame, config: RenderConfig) -> int:
     return max(1, int(round(calculated)))
 
 
+def _cell_dimensions(
+    frame: RGBFrame,
+    config: RenderConfig,
+    *,
+    max_width: int | None = None,
+    max_height: int | None = None,
+) -> tuple[int, int]:
+    """Fit the requested cell surface inside optional bounds without distortion."""
+
+    if max_width is not None and max_width < 1:
+        raise ValueError("max_width must be positive")
+    if max_height is not None and max_height < 1:
+        raise ValueError("max_height must be positive")
+
+    width = config.width
+    height = _cell_height(frame, config)
+    width_scale = max_width / width if max_width is not None else 1.0
+    height_scale = max_height / height if max_height is not None else 1.0
+    scale = min(1.0, width_scale, height_scale)
+    if scale >= 1.0:
+        return width, height
+    return max(1, int(width * scale)), max(1, int(height * scale))
+
+
 def _ansi256(rgb: NDArray[np.uint8]) -> NDArray[np.uint16]:
     # Integer arithmetic is both faster and exactly equivalent to rounding an
     # 8-bit channel onto the six-level xterm colour cube.  Ellipsis keeps the
@@ -344,23 +368,34 @@ class FrameRenderer:
             self.charset = self.charset[::-1]
         self._glyphs = np.asarray(tuple(self.charset), dtype="<U1")
 
-    def render(self, frame: NDArray[Any]) -> RenderResult:
-        """Render one RGB-like frame with the configured spatial encoding."""
+    def render(
+        self,
+        frame: NDArray[Any],
+        *,
+        max_width: int | None = None,
+        max_height: int | None = None,
+    ) -> RenderResult:
+        """Render a frame, optionally fitting it inside a terminal cell surface."""
 
         normalized = _normalize_frame(frame)
+        width, height = _cell_dimensions(
+            normalized,
+            self.config,
+            max_width=max_width,
+            max_height=max_height,
+        )
         if self.mode is RenderMode.BRAILLE:
-            return self._render_braille(normalized)
+            return self._render_braille(normalized, width, height)
         if self.mode is RenderMode.EDGE:
-            return self._render_edge(normalized)
+            return self._render_edge(normalized, width, height)
         if self.mode is RenderMode.HALF_BLOCK:
-            return self._render_half_block(normalized)
+            return self._render_half_block(normalized, width, height)
         if self.mode is RenderMode.QUADRANT:
-            return self._render_quadrant(normalized)
-        return self._render_glyph(normalized)
+            return self._render_quadrant(normalized, width, height)
+        return self._render_glyph(normalized, width, height)
 
-    def _render_glyph(self, frame: RGBFrame) -> RenderResult:
-        height = _cell_height(frame, self.config)
-        resized = _resize(frame, self.config.width, height, self.config.resample)
+    def _render_glyph(self, frame: RGBFrame, width: int, height: int) -> RenderResult:
+        resized = _resize(frame, width, height, self.config.resample)
         gray = _grayscale(resized)
         indices = (gray.astype(np.uint16) * len(self._glyphs) // 256).clip(
             max=len(self._glyphs) - 1
@@ -368,11 +403,10 @@ class FrameRenderer:
         mapped = self._glyphs[indices]
         rows = ["".join(row) for row in mapped.tolist()]
         text = _colorize_rows(rows, resized, self.color)
-        return RenderResult(text, self.config.width, height, self.mode)
+        return RenderResult(text, width, height, self.mode)
 
-    def _render_edge(self, frame: RGBFrame) -> RenderResult:
-        height = _cell_height(frame, self.config)
-        resized = _resize(frame, self.config.width, height, self.config.resample)
+    def _render_edge(self, frame: RGBFrame, width: int, height: int) -> RenderResult:
+        resized = _resize(frame, width, height, self.config.resample)
         gray = _grayscale(resized)
         indices = (gray.astype(np.uint16) * len(self._glyphs) // 256).clip(
             max=len(self._glyphs) - 1
@@ -387,18 +421,17 @@ class FrameRenderer:
         mapped[edge_mask] = directional_glyphs(edges)[edge_mask]
         rows = ["".join(row) for row in mapped.tolist()]
         text = _colorize_rows(rows, resized, self.color)
-        return RenderResult(text, self.config.width, height, self.mode)
+        return RenderResult(text, width, height, self.mode)
 
-    def _render_braille(self, frame: RGBFrame) -> RenderResult:
-        height = _cell_height(frame, self.config)
+    def _render_braille(self, frame: RGBFrame, width: int, height: int) -> RenderResult:
         resized = _resize(
             frame,
-            self.config.width * 2,
+            width * 2,
             height * 4,
             self.config.resample,
         )
         on = _binary_pixels(_grayscale(resized), self.config)
-        blocks = on.reshape(height, 4, self.config.width, 2)
+        blocks = on.reshape(height, 4, width, 2)
         codes = (
             blocks[:, 0, :, 0].astype(np.uint16)
             | (blocks[:, 1, :, 0].astype(np.uint16) << 1)
@@ -411,40 +444,49 @@ class FrameRenderer:
         )
         rows = ["".join(chr(0x2800 + int(code)) for code in row) for row in codes]
         colors = (
-            resized.reshape(height, 4, self.config.width, 2, 3)
+            resized.reshape(height, 4, width, 2, 3)
             .mean(axis=(1, 3), dtype=np.float32)
             .astype(np.uint8)
         )
         text = _colorize_rows(rows, colors, self.color)
-        return RenderResult(text, self.config.width, height, self.mode)
+        return RenderResult(text, width, height, self.mode)
 
-    def _render_half_block(self, frame: RGBFrame) -> RenderResult:
-        height = _cell_height(frame, self.config)
+    def _render_half_block(
+        self,
+        frame: RGBFrame,
+        width: int,
+        height: int,
+    ) -> RenderResult:
         resized = _resize(
             frame,
-            self.config.width,
+            width,
             height * 2,
             self.config.resample,
         )
         if self.color is ColorOutput.NONE:
             fallback = replace(self.config, mode=RenderMode.GLYPH)
-            return FrameRenderer(fallback).render(frame)
+            return FrameRenderer(fallback).render(
+                frame,
+                max_width=width,
+                max_height=height,
+            )
 
         upper = resized[0::2]
         lower = resized[1::2]
         lines = _half_block_lines(upper, lower, self.color)
-        return RenderResult("\n".join(lines), self.config.width, height, self.mode)
+        return RenderResult("\n".join(lines), width, height, self.mode)
 
-    def _render_quadrant(self, frame: RGBFrame) -> RenderResult:
-        height = _cell_height(frame, self.config)
+    def _render_quadrant(
+        self, frame: RGBFrame, width: int, height: int
+    ) -> RenderResult:
         resized = _resize(
             frame,
-            self.config.width * 2,
+            width * 2,
             height * 2,
             self.config.resample,
         )
         on = _binary_pixels(_grayscale(resized), self.config)
-        blocks = on.reshape(height, 2, self.config.width, 2)
+        blocks = on.reshape(height, 2, width, 2)
         masks = (
             blocks[:, 0, :, 0].astype(np.uint8)
             | (blocks[:, 0, :, 1].astype(np.uint8) << 1)
@@ -454,12 +496,12 @@ class FrameRenderer:
         symbols = np.asarray(tuple(" ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"), dtype="<U1")
         rows = ["".join(row) for row in symbols[masks].tolist()]
         colors = (
-            resized.reshape(height, 2, self.config.width, 2, 3)
+            resized.reshape(height, 2, width, 2, 3)
             .mean(axis=(1, 3), dtype=np.float32)
             .astype(np.uint8)
         )
         text = _colorize_rows(rows, colors, self.color)
-        return RenderResult(text, self.config.width, height, self.mode)
+        return RenderResult(text, width, height, self.mode)
 
 
 def render_svg(

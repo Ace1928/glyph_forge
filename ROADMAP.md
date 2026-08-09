@@ -23,7 +23,10 @@ The maintained modes are `glyph`, `edge`, `braille`, `half-block`, and
 pipeline keeps bounded buffers and favors latency over rendering every frame.
 Resolution, worker count, sampling, and FPS come from a portable runtime profile
 and remain explicitly overridable. Terminal presentation also selects between
-changed-row and complete-frame updates from their measured payload sizes.
+changed-row and complete-frame updates from their measured payload sizes. Live
+views preserve their aspect ratio inside the current terminal and re-evaluate
+the viewport on every frame, so window resizing does not require a restart or
+render detail that cannot be displayed.
 
 Benchmark automation is available now through `glyph-forge benchmark`. Future
 optimization work must use repeatable before/after measurements and retain the
