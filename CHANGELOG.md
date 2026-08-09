@@ -12,6 +12,12 @@ the project uses semantic versioning.
 
 ### Added
 
+- Browser Studio parity for density glyph, directional edge, Braille 2×4,
+  quadrant 2×2, and true-colour half-block rendering, plus local text sources
+  and a fullscreen output surface
+- One-click full-file and manually controlled live Studio recording, combining
+  the rendered canvas with available source audio on one media timeline and
+  selecting a supported WebM or MP4 encoder at runtime
 - Cross-platform PyInstaller one-directory bundles, deterministic ZIP/tar
   archives, double-build reproducibility checks, portable smoke tests, SHA-256
   manifests, and Sigstore-signed GitHub artifact provenance for tagged releases
@@ -39,6 +45,9 @@ the project uses semantic versioning.
 
 ### Performance
 
+- Compact 2D GPU glyph atlases, reusable video textures, character-correct
+  aspect ratios, and decoded-frame callbacks for high-detail Studio rendering
+  without refresh-rate duplicate work
 - File-backed sharing streams large outputs in place through the platform
   `sendfile` path when available, with a bounded portable fallback and no
   media-sized memory copy

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -282,6 +284,59 @@ def test_browser_assets_include_opt_in_publish_controls() -> None:
     assert 'id="publishButton"' in html
     assert 'fetch("/api/config"' in javascript
     assert "fetch(`/api/share?name=" in javascript
+
+
+def test_browser_assets_expose_full_fidelity_and_recording_controls() -> None:
+    with StudioServer(port=0) as server:
+        with urllib.request.urlopen(server.url, timeout=2) as response:
+            html = response.read().decode("utf-8")
+        with urllib.request.urlopen(f"{server.url}studio.js", timeout=2) as response:
+            javascript = response.read().decode("utf-8")
+
+    for mode in ("glyph", "edge", "braille", "half-block", "quadrant"):
+        assert f'value="{mode}"' in html
+    for control in (
+        "textSourceInput",
+        "audioToggle",
+        "recordButton",
+        "fullscreenButton",
+    ):
+        assert f'id="{control}"' in html
+    assert '<script type="module" src="studio.js"></script>' in html
+    assert 'from "./studio-renderers.js"' in javascript
+    assert "requestVideoFrameCallback" in javascript
+    assert "elements.canvas.captureStream(frameRate)" in javascript
+    assert (
+        "new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks])"
+        in javascript
+    )
+    assert "new MediaRecorder(stream" in javascript
+    assert "requestFullscreen" in javascript
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is unavailable")
+def test_browser_javascript_parses() -> None:
+    with StudioServer(port=0) as server:
+        assets = []
+        for name in ("studio.js", "studio-renderers.js"):
+            with urllib.request.urlopen(f"{server.url}{name}", timeout=2) as response:
+                assets.append((name, response.read()))
+
+    for name, javascript in assets:
+        completed = subprocess.run(
+            [
+                shutil.which("node") or "node",
+                "--input-type=module",
+                "--check",
+                "-",
+            ],
+            input=javascript,
+            capture_output=True,
+            check=False,
+        )
+        assert completed.returncode == 0, (
+            f"{name}: {completed.stderr.decode('utf-8', 'replace')}"
+        )
 
 
 def test_studio_cli_can_run_headlessly_for_automation() -> None:

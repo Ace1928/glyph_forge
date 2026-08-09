@@ -8,7 +8,7 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 | Track | User outcome | Status |
 |---|---|---|
 | Portable core | Install, import, diagnose, and run on small or large systems | Wheels and portable app archives complete |
-| Unified experiences | Friendly CLI, TUI, browser Studio, and compatibility launchers | Complete in 0.2 |
+| Unified experiences | Friendly CLI, TUI, multimode recording Studio, and compatibility launchers | Complete in 0.2 |
 | Live media | Stream files, cameras, screens, and URLs with bounded latency | Complete in 0.2 |
 | Desktop viewing | Render a desktop or isolated X11 app through glyph modes | Viewer complete in 0.2 |
 | Desktop control | Opt-in focused keyboard and pointer forwarding | Isolated X11 complete; native host adapters active |
@@ -19,7 +19,8 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 ## Fidelity and performance
 
 The maintained modes are `glyph`, `edge`, `braille`, `half-block`, and
-`quadrant`, plus scalable SVG still export and the Studio GPU atlas. The capture
+`quadrant`, across the terminal engine and Studio GPU atlas, plus scalable SVG
+still export and browser-native audio-synced recording. The capture
 pipeline keeps bounded buffers and favors latency over rendering every frame.
 Resolution, worker count, sampling, and FPS come from a portable runtime profile
 and remain explicitly overridable. Terminal presentation also selects between
@@ -61,6 +62,8 @@ rejected because injected input can feed back into the focused terminal.
    gains justify their maintenance and packaging cost. Portable passes removed
    per-cell half-block colour conversion and added bounded, ordered parallel
    video rendering, keeping NumPy fast enough to defer a compiled dependency.
+   The Studio reuses GPU source textures and renders video on decoded-frame
+   callbacks, avoiding redundant work at display refresh rate.
 6. ~~Define versioned plugin contracts and isolated discovery for external
    sources, renderers, transforms, and exporters.~~ Completed with lazy entry
    points, live-pipeline integration, diagnostics, and failure isolation.

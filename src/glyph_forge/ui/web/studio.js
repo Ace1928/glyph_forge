@@ -1,4 +1,12 @@
-"use strict";
+import {
+  BRAILLE_GLYPHS,
+  CanvasGlyphRenderer,
+  EDGE_GLYPHS,
+  QUADRANT_GLYPHS,
+  WebGLGlyphRenderer,
+  clamp,
+  sampleGlyphFrame,
+} from "./studio-renderers.js";
 
 const CHARSETS = Object.freeze({
   detailed: " .,:;irsXA253hMHGS#9B&@",
@@ -21,9 +29,15 @@ const elements = {
   dropOverlay: $("dropOverlay"),
   emptyState: $("emptyState"),
   emptyOpen: $("emptyOpenButton"),
+  canvasShell: $("canvasShell"),
   webcam: $("webcamButton"),
   screen: $("screenButton"),
   stop: $("stopButton"),
+  textSource: $("textSourceInput"),
+  useText: $("textSourceButton"),
+  audio: $("audioToggle"),
+  mode: $("modeSelect"),
+  charsetField: $("charsetField"),
   charset: $("charsetSelect"),
   customField: $("customCharsetField"),
   customCharset: $("customCharset"),
@@ -45,6 +59,8 @@ const elements = {
   share: $("shareButton"),
   publish: $("publishButton"),
   link: $("linkButton"),
+  record: $("recordButton"),
+  fullscreen: $("fullscreenButton"),
   sourceName: $("sourceName"),
   sourceMeta: $("sourceMeta"),
   fps: $("fpsMetric"),
@@ -62,6 +78,8 @@ const state = {
   frameTimes: [],
   renderer: null,
   dimensions: { width: 1280, height: 720, rows: 72 },
+  recording: null,
+  audioBridge: null,
   shareConfig: {
     enabled: false,
     csrfToken: null,
@@ -85,17 +103,32 @@ function escapeXml(value) {
   })[character]);
 }
 
-function activeCharset() {
+function densityCharset() {
   const selected = elements.charset.value;
   const raw = selected === "custom" ? elements.customCharset.value : CHARSETS[selected];
   const glyphs = Array.from(raw || " .#").slice(0, 128);
   return glyphs.length ? glyphs.join("") : " .#";
 }
 
+function activeCharset(mode = elements.mode.value) {
+  if (mode === "braille") return BRAILLE_GLYPHS;
+  if (mode === "quadrant") return QUADRANT_GLYPHS;
+  if (mode === "half-block") return "▀";
+  const density = densityCharset();
+  return mode === "edge" ? `${density}${EDGE_GLYPHS}` : density;
+}
+
+function isDynamicSource() {
+  return ["video", "webcam", "screen"].includes(state.sourceKind);
+}
+
 function sourceSize() {
   if (!state.source) return { width: 1280, height: 720 };
   if (state.sourceKind === "image") {
     return { width: state.source.naturalWidth, height: state.source.naturalHeight };
+  }
+  if (state.sourceKind === "text") {
+    return { width: state.source.width, height: state.source.height };
   }
   return { width: state.source.videoWidth || 1280, height: state.source.videoHeight || 720 };
 }
@@ -106,6 +139,14 @@ function adaptiveHeight() {
   if (memory >= 12 && cores >= 12) return 1080;
   if (memory <= 3 || cores <= 2) return 540;
   return 720;
+}
+
+function adaptiveColumns() {
+  const memory = navigator.deviceMemory || 4;
+  const cores = navigator.hardwareConcurrency || 4;
+  if (memory >= 12 && cores >= 12) return 240;
+  if (memory <= 3 || cores <= 2) return 96;
+  return 160;
 }
 
 function targetDimensions() {
@@ -126,7 +167,7 @@ function targetDimensions() {
     height = Math.max(180, Math.round((width / aspect) / 2) * 2);
   }
   const columns = Number(elements.columns.value);
-  const rows = Math.max(1, Math.round(columns / aspect));
+  const rows = Math.max(1, Math.round((columns * 0.5) / aspect));
   state.dimensions = { width, height, rows };
   elements.grid.textContent = `${columns}×${rows}`;
   return state.dimensions;
@@ -134,226 +175,27 @@ function targetDimensions() {
 
 function currentOptions() {
   const dimensions = targetDimensions();
+  const source = sourceSize();
+  const baseCharset = densityCharset();
   return {
     ...dimensions,
+    sourceWidth: source.width,
+    sourceHeight: source.height,
     columns: Number(elements.columns.value),
+    mode: elements.mode.value,
     charset: activeCharset(),
+    baseCharset,
+    baseGlyphCount: Array.from(baseCharset).length,
     font: elements.font.value,
     sourceColor: elements.colorMode.value === "source",
     foreground: hexToRgb(elements.foreground.value),
     background: hexToRgb(elements.background.value),
+    foregroundCss: elements.foreground.value,
+    backgroundCss: elements.background.value,
     brightness: Number(elements.brightness.value),
     contrast: Number(elements.contrast.value),
     invert: elements.invert.checked,
   };
-}
-
-class WebGLGlyphRenderer {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.gl = canvas.getContext("webgl2", {
-      alpha: false,
-      antialias: false,
-      depth: false,
-      preserveDrawingBuffer: true,
-      powerPreference: "high-performance",
-    });
-    if (!this.gl) throw new Error("WebGL2 is unavailable");
-    this.program = this.createProgram();
-    this.uniforms = {};
-    for (const name of [
-      "u_source", "u_atlas", "u_grid", "u_glyph_count", "u_background",
-      "u_foreground", "u_source_color", "u_brightness", "u_contrast", "u_invert",
-    ]) {
-      this.uniforms[name] = this.gl.getUniformLocation(this.program, name);
-    }
-    this.createGeometry();
-    this.sourceTexture = this.createTexture();
-    this.atlasTexture = this.createTexture();
-    this.atlasKey = "";
-  }
-
-  compile(type, source) {
-    const shader = this.gl.createShader(type);
-    this.gl.shaderSource(shader, source);
-    this.gl.compileShader(shader);
-    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-      throw new Error(this.gl.getShaderInfoLog(shader) || "Shader compilation failed");
-    }
-    return shader;
-  }
-
-  createProgram() {
-    const vertex = this.compile(this.gl.VERTEX_SHADER, `#version 300 es
-      in vec2 a_position;
-      out vec2 v_uv;
-      void main() {
-        v_uv = a_position * 0.5 + 0.5;
-        gl_Position = vec4(a_position, 0.0, 1.0);
-      }
-    `);
-    const fragment = this.compile(this.gl.FRAGMENT_SHADER, `#version 300 es
-      precision highp float;
-      in vec2 v_uv;
-      out vec4 out_color;
-      uniform sampler2D u_source;
-      uniform sampler2D u_atlas;
-      uniform vec2 u_grid;
-      uniform float u_glyph_count;
-      uniform vec3 u_background;
-      uniform vec3 u_foreground;
-      uniform bool u_source_color;
-      uniform float u_brightness;
-      uniform float u_contrast;
-      uniform bool u_invert;
-      void main() {
-        vec2 cell = floor(v_uv * u_grid);
-        vec2 sample_uv = (cell + 0.5) / u_grid;
-        vec3 source_color = texture(u_source, sample_uv).rgb;
-        source_color = clamp((source_color - 0.5) * u_contrast + 0.5, 0.0, 1.0);
-        source_color = clamp(source_color * u_brightness, 0.0, 1.0);
-        float luma = dot(source_color, vec3(0.299, 0.587, 0.114));
-        if (u_invert) luma = 1.0 - luma;
-        float glyph = floor(clamp(luma, 0.0, 0.99999) * u_glyph_count);
-        vec2 local = fract(v_uv * u_grid);
-        vec2 atlas_uv = vec2((glyph + local.x) / u_glyph_count, local.y);
-        float alpha = texture(u_atlas, atlas_uv).r;
-        vec3 ink = u_source_color ? source_color : u_foreground;
-        out_color = vec4(mix(u_background, ink, alpha), 1.0);
-      }
-    `);
-    const program = this.gl.createProgram();
-    this.gl.attachShader(program, vertex);
-    this.gl.attachShader(program, fragment);
-    this.gl.linkProgram(program);
-    if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
-      throw new Error(this.gl.getProgramInfoLog(program) || "Shader linking failed");
-    }
-    this.gl.deleteShader(vertex);
-    this.gl.deleteShader(fragment);
-    return program;
-  }
-
-  createGeometry() {
-    const gl = this.gl;
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const location = gl.getAttribLocation(this.program, "a_position");
-    gl.enableVertexAttribArray(location);
-    gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
-    this.vao = vao;
-  }
-
-  createTexture() {
-    const gl = this.gl;
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    return texture;
-  }
-
-  updateAtlas(options) {
-    const key = `${options.charset}|${options.font}`;
-    if (key === this.atlasKey) return;
-    const glyphs = Array.from(options.charset);
-    const cell = 48;
-    const atlas = document.createElement("canvas");
-    atlas.width = cell * glyphs.length;
-    atlas.height = cell;
-    const context = atlas.getContext("2d", { alpha: false });
-    context.fillStyle = "black";
-    context.fillRect(0, 0, atlas.width, atlas.height);
-    context.fillStyle = "white";
-    context.font = `700 ${Math.round(cell * 0.82)}px ${options.font}`;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    glyphs.forEach((glyph, index) => context.fillText(glyph, index * cell + cell / 2, cell * 0.52));
-    const gl = this.gl;
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.atlasTexture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
-    this.atlasKey = key;
-  }
-
-  draw(source, options) {
-    const gl = this.gl;
-    if (this.canvas.width !== options.width || this.canvas.height !== options.height) {
-      this.canvas.width = options.width;
-      this.canvas.height = options.height;
-    }
-    this.updateAtlas(options);
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.useProgram(this.program);
-    gl.bindVertexArray(this.vao);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.sourceTexture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
-    gl.uniform1i(this.uniforms.u_source, 0);
-    gl.uniform1i(this.uniforms.u_atlas, 1);
-    gl.uniform2f(this.uniforms.u_grid, options.columns, options.rows);
-    gl.uniform1f(this.uniforms.u_glyph_count, Array.from(options.charset).length);
-    gl.uniform3fv(this.uniforms.u_background, options.background);
-    gl.uniform3fv(this.uniforms.u_foreground, options.foreground);
-    gl.uniform1i(this.uniforms.u_source_color, options.sourceColor ? 1 : 0);
-    gl.uniform1f(this.uniforms.u_brightness, options.brightness);
-    gl.uniform1f(this.uniforms.u_contrast, options.contrast);
-    gl.uniform1i(this.uniforms.u_invert, options.invert ? 1 : 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
-}
-
-class CanvasGlyphRenderer {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.context = canvas.getContext("2d", { alpha: false });
-    this.sample = document.createElement("canvas");
-    this.sampleContext = this.sample.getContext("2d", { willReadFrequently: true });
-  }
-
-  draw(source, options) {
-    if (this.canvas.width !== options.width || this.canvas.height !== options.height) {
-      this.canvas.width = options.width;
-      this.canvas.height = options.height;
-    }
-    this.sample.width = options.columns;
-    this.sample.height = options.rows;
-    this.sampleContext.drawImage(source, 0, 0, options.columns, options.rows);
-    const pixels = this.sampleContext.getImageData(0, 0, options.columns, options.rows).data;
-    const glyphs = Array.from(options.charset);
-    const cellWidth = options.width / options.columns;
-    const cellHeight = options.height / options.rows;
-    this.context.fillStyle = elements.background.value;
-    this.context.fillRect(0, 0, options.width, options.height);
-    this.context.font = `700 ${Math.ceil(cellHeight * 0.9)}px ${options.font}`;
-    this.context.textAlign = "center";
-    this.context.textBaseline = "middle";
-    for (let row = 0; row < options.rows; row += 1) {
-      for (let column = 0; column < options.columns; column += 1) {
-        const offset = (row * options.columns + column) * 4;
-        let red = pixels[offset] / 255;
-        let green = pixels[offset + 1] / 255;
-        let blue = pixels[offset + 2] / 255;
-        red = Math.max(0, Math.min(1, ((red - 0.5) * options.contrast + 0.5) * options.brightness));
-        green = Math.max(0, Math.min(1, ((green - 0.5) * options.contrast + 0.5) * options.brightness));
-        blue = Math.max(0, Math.min(1, ((blue - 0.5) * options.contrast + 0.5) * options.brightness));
-        let luma = red * 0.299 + green * 0.587 + blue * 0.114;
-        if (options.invert) luma = 1 - luma;
-        const glyph = glyphs[Math.min(glyphs.length - 1, Math.floor(luma * glyphs.length))];
-        this.context.fillStyle = options.sourceColor
-          ? `rgb(${red * 255} ${green * 255} ${blue * 255})`
-          : elements.foreground.value;
-        this.context.fillText(glyph, (column + 0.5) * cellWidth, (row + 0.52) * cellHeight);
-      }
-    }
-  }
 }
 
 function initializeRenderer() {
@@ -372,12 +214,28 @@ function setStatus(message, isError = false) {
   elements.status.style.color = isError ? "var(--danger)" : "";
 }
 
+function recordingSupported() {
+  return Boolean(window.MediaRecorder && window.MediaStream && elements.canvas.captureStream);
+}
+
+function fullscreenSupported() {
+  return Boolean(elements.canvasShell.requestFullscreen || elements.canvasShell.webkitRequestFullscreen);
+}
+
 function enableExports(enabled) {
   for (const button of [elements.png, elements.svg, elements.text, elements.share]) {
     button.disabled = !enabled;
   }
   elements.publish.disabled = !enabled || !state.shareConfig.enabled;
   elements.stop.disabled = !enabled;
+  elements.fullscreen.disabled = !enabled || !fullscreenSupported();
+  elements.record.disabled = !enabled || !isDynamicSource() || !recordingSupported();
+}
+
+function syncAudioControl() {
+  const lockedLiveSource = ["webcam", "screen"].includes(state.sourceKind);
+  elements.audio.disabled = Boolean(state.recording) || lockedLiveSource;
+  elements.audio.title = lockedLiveSource ? "Stop this live source to change its audio permission" : "";
 }
 
 function updateMetrics(timestamp) {
@@ -405,7 +263,14 @@ function beginRenderLoop() {
   const frame = (timestamp) => {
     if (generation !== state.generation || !state.source) return;
     renderCurrent(timestamp);
-    if (state.sourceKind !== "image") requestAnimationFrame(frame);
+    if (isDynamicSource()) schedule();
+  };
+  const schedule = () => {
+    if (typeof elements.video.requestVideoFrameCallback === "function") {
+      elements.video.requestVideoFrameCallback((timestamp) => frame(timestamp));
+    } else {
+      requestAnimationFrame(frame);
+    }
   };
   requestAnimationFrame(frame);
 }
@@ -415,12 +280,17 @@ function describeSource(name) {
   elements.sourceName.textContent = name;
   elements.sourceMeta.textContent = `${size.width}×${size.height} · ${state.sourceKind}`;
   elements.emptyState.classList.add("hidden");
+  elements.record.textContent = state.sourceKind === "video"
+    ? "Render full video"
+    : (isDynamicSource() ? "Record live video" : "Record video");
   enableExports(true);
+  syncAudioControl();
   setStatus("Rendering locally. No media has been uploaded.");
 }
 
-function stopSource({ reset = true } = {}) {
+async function stopSource({ reset = true, saveRecording = true } = {}) {
   state.generation += 1;
+  await stopRecording({ save: saveRecording, resumePreview: false });
   if (elements.video.srcObject) {
     for (const track of elements.video.srcObject.getTracks()) track.stop();
     elements.video.srcObject = null;
@@ -433,6 +303,8 @@ function stopSource({ reset = true } = {}) {
   state.source = null;
   state.sourceKind = null;
   state.frameTimes = [];
+  elements.record.textContent = "Record video";
+  syncAudioControl();
   elements.fps.textContent = "0";
   if (reset) {
     elements.emptyState.classList.remove("hidden");
@@ -462,9 +334,30 @@ function waitForVideo(video) {
   });
 }
 
+function seekVideo(video, time) {
+  if (Math.abs(video.currentTime - time) < 0.01) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const complete = () => {
+      cleanup();
+      resolve();
+    };
+    const failed = () => {
+      cleanup();
+      reject(new Error("The browser could not seek this video"));
+    };
+    const cleanup = () => {
+      video.removeEventListener("seeked", complete);
+      video.removeEventListener("error", failed);
+    };
+    video.addEventListener("seeked", complete, { once: true });
+    video.addEventListener("error", failed, { once: true });
+    video.currentTime = time;
+  });
+}
+
 async function openFile(file) {
   if (!file) return;
-  stopSource({ reset: false });
+  await stopSource({ reset: false });
   try {
     state.objectUrl = URL.createObjectURL(file);
     if (file.type.startsWith("video/")) {
@@ -487,23 +380,26 @@ async function openFile(file) {
     describeSource(file.name);
     beginRenderLoop();
   } catch (error) {
-    stopSource();
+    await stopSource();
     setStatus(error.message, true);
   }
 }
 
 async function openLive(kind) {
-  stopSource({ reset: false });
+  await stopSource({ reset: false });
   try {
     let stream;
     if (kind === "screen") {
       if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Screen capture is unavailable in this browser");
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio: false });
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30, max: 60 } },
+        audio: elements.audio.checked,
+      });
     } else {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("Webcam capture is unavailable in this browser");
       stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 60 } },
-        audio: false,
+        audio: elements.audio.checked,
       });
     }
     state.sourceKind = kind;
@@ -513,43 +409,88 @@ async function openLive(kind) {
     state.source = elements.video;
     state.sourceName = kind === "screen" ? "Shared screen" : "Webcam";
     const [track] = stream.getVideoTracks();
-    if (track) track.addEventListener("ended", () => stopSource(), { once: true });
+    if (track) track.addEventListener("ended", () => void stopSource(), { once: true });
     describeSource(state.sourceName);
     beginRenderLoop();
   } catch (error) {
-    stopSource();
+    await stopSource();
     setStatus(`${kind === "screen" ? "Screen" : "Webcam"} access failed: ${error.message}`, true);
   }
 }
 
-function sampleTextFrame() {
-  if (!state.source) return { lines: [], colors: [], options: currentOptions() };
-  const options = currentOptions();
-  elements.sampler.width = options.columns;
-  elements.sampler.height = options.rows;
-  const context = elements.sampler.getContext("2d", { willReadFrequently: true });
-  context.drawImage(state.source, 0, 0, options.columns, options.rows);
-  const pixels = context.getImageData(0, 0, options.columns, options.rows).data;
-  const glyphs = Array.from(options.charset);
+function wrappedText(context, value, maximumWidth) {
+  const words = value.trim().split(/\s+/u);
   const lines = [];
-  const colors = [];
-  for (let row = 0; row < options.rows; row += 1) {
-    let line = "";
-    const rowColors = [];
-    for (let column = 0; column < options.columns; column += 1) {
-      const offset = (row * options.columns + column) * 4;
-      const red = Math.max(0, Math.min(255, ((pixels[offset] / 255 - 0.5) * options.contrast + 0.5) * options.brightness * 255));
-      const green = Math.max(0, Math.min(255, ((pixels[offset + 1] / 255 - 0.5) * options.contrast + 0.5) * options.brightness * 255));
-      const blue = Math.max(0, Math.min(255, ((pixels[offset + 2] / 255 - 0.5) * options.contrast + 0.5) * options.brightness * 255));
-      let luma = (red * 0.299 + green * 0.587 + blue * 0.114) / 255;
-      if (options.invert) luma = 1 - luma;
-      line += glyphs[Math.min(glyphs.length - 1, Math.floor(luma * glyphs.length))];
-      rowColors.push([Math.round(red), Math.round(green), Math.round(blue)]);
+  let line = "";
+  for (const word of words) {
+    if (context.measureText(word).width > maximumWidth) {
+      if (line) lines.push(line);
+      let fragment = "";
+      for (const character of Array.from(word)) {
+        if (fragment && context.measureText(`${fragment}${character}`).width > maximumWidth) {
+          lines.push(fragment);
+          fragment = character;
+        } else {
+          fragment += character;
+        }
+      }
+      line = fragment;
+      continue;
     }
-    lines.push(line);
-    colors.push(rowColors);
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && context.measureText(candidate).width > maximumWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
   }
-  return { lines, colors, options };
+  if (line) lines.push(line);
+  return lines;
+}
+
+async function openTextSource() {
+  const value = elements.textSource.value.trim();
+  if (!value) {
+    elements.textSource.focus();
+    setStatus("Type something to forge first.", true);
+    return;
+  }
+  await stopSource({ reset: false });
+  const canvas = document.createElement("canvas");
+  canvas.width = 1600;
+  canvas.height = 900;
+  const context = canvas.getContext("2d", { alpha: false });
+  context.fillStyle = elements.background.value;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = elements.foreground.value;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  let fontSize = 280;
+  let lines = [];
+  for (; fontSize > 42; fontSize -= 6) {
+    context.font = `800 ${fontSize}px ${elements.font.value}`;
+    lines = wrappedText(context, value, canvas.width * 0.84);
+    const tooWide = lines.some((line) => context.measureText(line).width > canvas.width * 0.84);
+    const tooTall = lines.length * fontSize * 1.12 > canvas.height * 0.76;
+    if (!tooWide && !tooTall && lines.length <= 5) break;
+  }
+  const lineHeight = fontSize * 1.12;
+  const start = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
+  context.font = `800 ${fontSize}px ${elements.font.value}`;
+  lines.forEach((line, index) => context.fillText(line, canvas.width / 2, start + index * lineHeight));
+  state.source = canvas;
+  state.sourceKind = "text";
+  state.sourceName = value.length > 36 ? `${value.slice(0, 33)}…` : value;
+  describeSource(`Text · ${state.sourceName}`);
+  beginRenderLoop();
+}
+
+function sampleTextFrame() {
+  const options = currentOptions();
+  if (!state.source) return { lines: [], colors: [], options };
+  const context = elements.sampler.getContext("2d", { willReadFrequently: true });
+  return sampleGlyphFrame(state.source, options, elements.sampler, context);
 }
 
 function download(blob, filename) {
@@ -564,6 +505,233 @@ function download(blob, filename) {
 function outputName(extension) {
   const base = (state.sourceName || "glyph-forge").replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]+/gi, "-");
   return `${base || "glyph-forge"}.glyph.${extension}`;
+}
+
+function humanBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
+}
+
+function elapsedLabel(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  return `${minutes}:${String(totalSeconds % 60).padStart(2, "0")}`;
+}
+
+function recordingFormat() {
+  const candidates = [
+    ["video/webm;codecs=vp9,opus", "webm"],
+    ["video/webm;codecs=vp8,opus", "webm"],
+    ["video/webm", "webm"],
+    ["video/mp4;codecs=avc1,mp4a.40.2", "mp4"],
+    ["video/mp4", "mp4"],
+  ];
+  for (const [mimeType, extension] of candidates) {
+    if (!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(mimeType)) {
+      return { mimeType, extension };
+    }
+  }
+  return { mimeType: "", extension: "webm" };
+}
+
+function recordingFrameRate() {
+  const sourceTrack = elements.video.srcObject?.getVideoTracks()[0];
+  const sourceRate = Number(sourceTrack?.getSettings?.().frameRate) || 30;
+  return clamp(Math.round(sourceRate), 24, 60);
+}
+
+async function sourceAudioCapture() {
+  if (!elements.audio.checked) return { tracks: [], usesBridge: false };
+  if (elements.video.srcObject) {
+    return { tracks: elements.video.srcObject.getAudioTracks(), usesBridge: false };
+  }
+  let capture = null;
+  try {
+    capture = elements.video.captureStream?.() || elements.video.mozCaptureStream?.();
+  } catch (error) {
+    console.warn("Media-element capture is unavailable; trying Web Audio", error);
+  }
+  const tracks = capture?.getAudioTracks() || [];
+  if (tracks.length) return { tracks, usesBridge: false };
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext || state.sourceKind !== "video") return { tracks: [], usesBridge: false };
+  if (!state.audioBridge) {
+    const context = new AudioContext();
+    const source = context.createMediaElementSource(elements.video);
+    const destination = context.createMediaStreamDestination();
+    source.connect(destination);
+    state.audioBridge = { context, source, destination };
+  }
+  elements.video.muted = false;
+  await state.audioBridge.context.resume();
+  return { tracks: state.audioBridge.destination.stream.getAudioTracks(), usesBridge: true };
+}
+
+function resetRecordingUi() {
+  elements.record.classList.remove("recording");
+  elements.record.textContent = state.sourceKind === "video"
+    ? "Render full video"
+    : (isDynamicSource() ? "Record live video" : "Record video");
+  elements.record.setAttribute("aria-pressed", "false");
+  syncAudioControl();
+  enableExports(Boolean(state.source));
+}
+
+function finishRecording(session) {
+  if (session.finished) return;
+  session.finished = true;
+  clearInterval(session.timer);
+  for (const track of session.canvasStream.getTracks()) track.stop();
+  if (session.endedHandler) elements.video.removeEventListener("ended", session.endedHandler);
+  if (session.usesAudioBridge) {
+    elements.video.muted = true;
+    void state.audioBridge?.context.suspend();
+  }
+  if (state.recording === session) state.recording = null;
+  resetRecordingUi();
+  const duration = performance.now() - session.startedAt;
+  if (session.save && session.chunks.length) {
+    const mimeType = session.recorder.mimeType || session.format.mimeType || "video/webm";
+    const blob = new Blob(session.chunks, { type: mimeType });
+    download(blob, outputName(session.format.extension));
+    const audio = session.hasAudio ? "source audio included" : "video only";
+    setStatus(`Recording saved · ${elapsedLabel(duration)} · ${humanBytes(blob.size)} · ${audio}.`);
+  } else if (session.save) {
+    setStatus("The browser stopped recording before it produced any media.", true);
+  }
+  if (session.fileVideo && session.resumePreview && state.source === elements.video) {
+    elements.video.loop = true;
+    if (elements.video.ended) elements.video.currentTime = 0;
+    void elements.video.play();
+    beginRenderLoop();
+  }
+  session.resolve();
+}
+
+async function startRecording() {
+  if (!state.source || !isDynamicSource() || !recordingSupported()) {
+    setStatus("Video recording is unavailable for this source or browser.", true);
+    return;
+  }
+  let canvasStream = null;
+  let session = null;
+  let usesAudioBridge = false;
+  const fileVideo = state.sourceKind === "video";
+  try {
+    if (fileVideo) {
+      elements.video.loop = false;
+      elements.video.pause();
+      await seekVideo(elements.video, 0);
+    }
+    renderCurrent();
+    const frameRate = recordingFrameRate();
+    canvasStream = elements.canvas.captureStream(frameRate);
+    const audioCapture = await sourceAudioCapture();
+    usesAudioBridge = audioCapture.usesBridge;
+    const audioTracks = audioCapture.tracks;
+    const stream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
+    const format = recordingFormat();
+    const pixelsPerSecond = elements.canvas.width * elements.canvas.height * frameRate;
+    const videoBitsPerSecond = clamp(Math.round(pixelsPerSecond * 0.12), 4_000_000, 30_000_000);
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, {
+        ...(format.mimeType ? { mimeType: format.mimeType } : {}),
+        videoBitsPerSecond,
+        audioBitsPerSecond: 192_000,
+      });
+    } catch (error) {
+      console.warn("Preferred recording settings unavailable; using browser defaults", error);
+      recorder = new MediaRecorder(stream);
+      format.mimeType = recorder.mimeType;
+      format.extension = recorder.mimeType.includes("mp4") ? "mp4" : "webm";
+    }
+    let resolve;
+    const done = new Promise((complete) => { resolve = complete; });
+    session = {
+      recorder,
+      canvasStream,
+      chunks: [],
+      format,
+      hasAudio: audioTracks.length > 0,
+      usesAudioBridge: audioCapture.usesBridge,
+      startedAt: performance.now(),
+      save: true,
+      resumePreview: true,
+      finished: false,
+      fileVideo,
+      endedHandler: null,
+      timer: 0,
+      done,
+      resolve,
+    };
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size) session.chunks.push(event.data);
+    });
+    recorder.addEventListener("stop", () => finishRecording(session), { once: true });
+    recorder.addEventListener("error", (event) => {
+      console.error("MediaRecorder failed", event.error);
+      setStatus(`Recording failed: ${event.error?.message || "browser encoder error"}`, true);
+    });
+    state.recording = session;
+    elements.record.classList.add("recording");
+    elements.record.setAttribute("aria-pressed", "true");
+    syncAudioControl();
+    session.timer = window.setInterval(() => {
+      elements.record.textContent = `Stop recording · ${elapsedLabel(performance.now() - session.startedAt)}`;
+    }, 250);
+    recorder.start(1000);
+    if (fileVideo) {
+      session.endedHandler = () => void stopRecording();
+      elements.video.addEventListener("ended", session.endedHandler, { once: true });
+      await elements.video.play();
+    }
+    const audioMessage = session.hasAudio
+      ? "Rendered video and source audio are recording on one synchronized timeline."
+      : "Recording rendered video without audio.";
+    setStatus(audioMessage);
+  } catch (error) {
+    if (session) {
+      session.save = false;
+      session.resumePreview = false;
+      if (session.recorder.state === "inactive") finishRecording(session);
+      else session.recorder.stop();
+      await session.done;
+    } else if (canvasStream) {
+      for (const track of canvasStream.getTracks()) track.stop();
+    }
+    if (usesAudioBridge) {
+      elements.video.muted = true;
+      void state.audioBridge?.context.suspend();
+    }
+    if (fileVideo) {
+      elements.video.loop = true;
+      void elements.video.play();
+      beginRenderLoop();
+    }
+    setStatus(`Could not start recording: ${error.message}`, true);
+    resetRecordingUi();
+  }
+}
+
+async function stopRecording({ save = true, resumePreview = true } = {}) {
+  const session = state.recording;
+  if (!session) return;
+  session.save = save;
+  session.resumePreview = resumePreview;
+  if (session.recorder.state === "inactive") {
+    finishRecording(session);
+  } else {
+    session.recorder.stop();
+  }
+  await session.done;
+}
+
+async function toggleRecording() {
+  if (state.recording) await stopRecording();
+  else await startRecording();
 }
 
 function canvasBlob(type = "image/png") {
@@ -603,6 +771,7 @@ function saveSvg() {
 
 function settingsHash() {
   const values = new URLSearchParams({
+    mode: elements.mode.value,
     style: elements.charset.value,
     glyphs: elements.charset.value === "custom" ? elements.customCharset.value : "",
     columns: elements.columns.value,
@@ -719,16 +888,44 @@ async function publishLink() {
   }
 }
 
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement;
+}
+
+function syncFullscreenUi() {
+  const active = Boolean(fullscreenElement());
+  elements.fullscreen.textContent = active ? "Exit fullscreen" : "Fullscreen output";
+  elements.fullscreen.setAttribute("aria-pressed", active ? "true" : "false");
+}
+
+async function toggleFullscreen() {
+  try {
+    if (fullscreenElement()) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      await exit.call(document);
+    } else {
+      const request = elements.canvasShell.requestFullscreen || elements.canvasShell.webkitRequestFullscreen;
+      await request.call(elements.canvasShell);
+    }
+  } catch (error) {
+    setStatus(`Fullscreen failed: ${error.message}`, true);
+  }
+}
+
 function restoreSettings() {
-  if (!window.location.hash) return;
+  if (!window.location.hash) {
+    elements.columns.value = String(adaptiveColumns());
+    return;
+  }
   const values = new URLSearchParams(window.location.hash.slice(1));
   const assign = (element, key, validate = () => true) => {
     const value = values.get(key);
     if (value !== null && validate(value)) element.value = value;
   };
+  assign(elements.mode, "mode", (value) => [...elements.mode.options].some((option) => option.value === value));
   assign(elements.charset, "style", (value) => [...elements.charset.options].some((option) => option.value === value));
   assign(elements.customCharset, "glyphs");
-  assign(elements.columns, "columns", (value) => Number(value) >= 32 && Number(value) <= 240);
+  assign(elements.columns, "columns", (value) => Number(value) >= 32 && Number(value) <= 480);
   assign(elements.resolution, "resolution", (value) => [...elements.resolution.options].some((option) => option.value === value));
   assign(elements.colorMode, "color");
   const ink = values.get("ink");
@@ -746,12 +943,14 @@ function syncControlLabels() {
   elements.columnsValue.textContent = elements.columns.value;
   elements.brightnessValue.textContent = Number(elements.brightness.value).toFixed(2);
   elements.contrastValue.textContent = Number(elements.contrast.value).toFixed(2);
-  elements.customField.classList.toggle("hidden", elements.charset.value !== "custom");
+  const densityMode = ["glyph", "edge"].includes(elements.mode.value);
+  elements.charsetField.classList.toggle("hidden", !densityMode);
+  elements.customField.classList.toggle("hidden", !densityMode || elements.charset.value !== "custom");
 }
 
 function rerender() {
   syncControlLabels();
-  if (state.sourceKind === "image") renderCurrent();
+  if (state.source && !isDynamicSource()) renderCurrent();
 }
 
 function bindEvents() {
@@ -761,19 +960,31 @@ function bindEvents() {
     if (event.key === "Enter" || event.key === " ") openPicker();
   });
   elements.emptyOpen.addEventListener("click", openPicker);
-  elements.fileInput.addEventListener("change", () => openFile(elements.fileInput.files[0]));
-  elements.webcam.addEventListener("click", () => openLive("webcam"));
-  elements.screen.addEventListener("click", () => openLive("screen"));
-  elements.stop.addEventListener("click", () => stopSource());
+  elements.fileInput.addEventListener("change", () => {
+    const [file] = elements.fileInput.files;
+    elements.fileInput.value = "";
+    void openFile(file);
+  });
+  elements.webcam.addEventListener("click", () => void openLive("webcam"));
+  elements.screen.addEventListener("click", () => void openLive("screen"));
+  elements.stop.addEventListener("click", () => void stopSource());
+  elements.useText.addEventListener("click", () => void openTextSource());
+  elements.textSource.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") void openTextSource();
+  });
   elements.png.addEventListener("click", savePng);
   elements.svg.addEventListener("click", saveSvg);
   elements.text.addEventListener("click", saveText);
   elements.share.addEventListener("click", shareOutput);
   elements.publish.addEventListener("click", publishLink);
   elements.link.addEventListener("click", copyStyleLink);
+  elements.record.addEventListener("click", () => void toggleRecording());
+  elements.fullscreen.addEventListener("click", () => void toggleFullscreen());
+  document.addEventListener("fullscreenchange", syncFullscreenUi);
+  document.addEventListener("webkitfullscreenchange", syncFullscreenUi);
 
   for (const control of [
-    elements.charset, elements.customCharset, elements.font, elements.columns,
+    elements.mode, elements.charset, elements.customCharset, elements.font, elements.columns,
     elements.resolution, elements.colorMode, elements.foreground, elements.background,
     elements.brightness, elements.contrast, elements.invert,
   ]) {
@@ -797,10 +1008,10 @@ function bindEvents() {
     event.preventDefault();
     dragDepth = 0;
     elements.dropOverlay.classList.remove("visible");
-    openFile(event.dataTransfer.files[0]);
+    void openFile(event.dataTransfer.files[0]);
   });
 
-  window.addEventListener("beforeunload", () => stopSource({ reset: false }));
+  window.addEventListener("beforeunload", () => void stopSource({ reset: false, saveRecording: false }));
 }
 
 restoreSettings();

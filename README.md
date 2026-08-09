@@ -215,15 +215,31 @@ glyph-forge studio --lan
 ```
 
 Studio is included in the core install and opens a private loopback server. It
-supports drag-and-drop images and videos, webcam capture, browser-mediated
-screen capture, live style controls, and a WebGL2 glyph-atlas renderer with a
-Canvas2D fallback.
+supports drag-and-drop images and videos, local text sources, webcam capture,
+browser-mediated screen capture, live style controls, and presentation
+fullscreen. Its WebGL2 renderer exposes the same density, edge, Braille 2×4,
+quadrant 2×2, and true-colour half-block modes as the maintained live engine;
+a complete Canvas2D fallback keeps those modes available without a GPU.
+
+For uploaded videos, **Render full video** restarts at frame zero and saves the
+whole processed result when playback ends. Webcam and screen sources use a
+manual **Record live video** toggle. When **Include source audio** is enabled,
+the rendered canvas and available file, microphone, or shared-screen audio
+tracks enter one browser media stream so their timestamps stay synchronized.
+The browser chooses a supported WebM or MP4 encoder. Audio permission is never
+requested unless the toggle is enabled, and a clear status message reports
+when a source or browser provides video only.
 
 Exports include PNG, scalable real-text SVG, and TXT. When supported, the Web
 Share API can hand an export to another installed app. Copyable style links
 encode settings only. Temporary output links are hidden unless explicitly
 enabled; pressing **Copy temporary link** publishes only the current PNG frame
 to the bounded in-memory local server, never the source media.
+
+Fullscreen Studio output is a high-fidelity local presentation surface. Browser
+screen-capture security does not permit it to inject input into the captured
+desktop; use `glyph-forge live launch --control -- COMMAND` for the isolated,
+interactive desktop path with its Ctrl+] emergency stop.
 
 The server refuses non-loopback addresses unless trusted-LAN access is
 explicitly enabled:
@@ -398,7 +414,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite has 394 passing tests (plus one platform-dependent skip) and
+The current suite has 396 passing tests (plus one platform-dependent skip) and
 measures at least 70% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource

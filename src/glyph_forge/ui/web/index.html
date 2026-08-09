@@ -47,6 +47,20 @@
             <button id="screenButton" class="button secondary" type="button">Share screen</button>
             <button id="stopButton" class="button ghost" type="button" disabled>Stop</button>
           </div>
+
+          <div class="text-source">
+            <label class="field" for="textSourceInput">
+              <span>Or forge text</span>
+              <input id="textSourceInput" type="text" maxlength="240" placeholder="Type a title, message, or symbol…">
+            </label>
+            <button id="textSourceButton" class="button secondary" type="button">Use text</button>
+          </div>
+
+          <label class="toggle-field compact-toggle">
+            <input id="audioToggle" type="checkbox">
+            <span class="toggle" aria-hidden="true"></span>
+            <span>Include audio · choose before live capture</span>
+          </label>
         </section>
 
         <section class="control-section">
@@ -59,6 +73,17 @@
           </div>
 
           <label class="field">
+            <span>Render mode</span>
+            <select id="modeSelect">
+              <option value="glyph">Density glyphs</option>
+              <option value="braille">Braille · 2×4 subpixels</option>
+              <option value="quadrant">Quadrants · 2×2 subpixels</option>
+              <option value="half-block">Half-block · full colour</option>
+              <option value="edge">Directional edges</option>
+            </select>
+          </label>
+
+          <label id="charsetField" class="field">
             <span>Glyph style</span>
             <select id="charsetSelect">
               <option value="detailed">Detailed</option>
@@ -91,7 +116,7 @@
 
           <label class="field range-field">
             <span>Glyph columns <output id="columnsValue">128</output></span>
-            <input id="columnsRange" type="range" min="32" max="240" step="8" value="128">
+            <input id="columnsRange" type="range" min="32" max="480" step="8" value="128">
           </label>
 
           <label class="field">
@@ -153,6 +178,7 @@
             <button id="svgButton" class="button secondary" type="button" disabled>Save SVG</button>
             <button id="textButton" class="button secondary" type="button" disabled>Save text</button>
             <button id="shareButton" class="button accent" type="button" disabled>Share file</button>
+            <button id="recordButton" class="button record wide" type="button" aria-pressed="false" disabled>Record video</button>
             <button id="publishButton" class="button accent wide hidden" type="button" disabled>Copy temporary link</button>
             <button id="linkButton" class="button ghost wide" type="button">Copy style link</button>
           </div>
@@ -165,10 +191,13 @@
             <span id="sourceName" class="source-name">No source selected</span>
             <span id="sourceMeta" class="source-meta">Drop a file or start a live source</span>
           </div>
-          <div class="metrics" aria-live="polite">
-            <span><strong id="fpsMetric">0</strong> FPS</span>
-            <span><strong id="gridMetric">—</strong> grid</span>
-            <span id="engineMetric" class="engine-badge">Detecting GPU</span>
+          <div class="stage-actions">
+            <div class="metrics" aria-live="polite">
+              <span><strong id="fpsMetric">0</strong> FPS</span>
+              <span><strong id="gridMetric">—</strong> grid</span>
+              <span id="engineMetric" class="engine-badge">Detecting GPU</span>
+            </div>
+            <button id="fullscreenButton" class="button ghost fullscreen-button" type="button" aria-pressed="false" disabled>Fullscreen output</button>
           </div>
         </div>
 
@@ -177,7 +206,7 @@
           <div id="emptyState" class="empty-state">
             <div class="empty-glyphs" aria-hidden="true">G L Y P H</div>
             <h1>Turn any visual signal into living type.</h1>
-            <p>Images, videos, webcams, and screen streams render locally with a GPU glyph atlas.</p>
+            <p>Images, text, videos, webcams, and screen streams render locally with a GPU glyph atlas.</p>
             <button id="emptyOpenButton" class="button primary" type="button">Open something</button>
           </div>
           <div id="dropOverlay" class="drop-overlay" aria-hidden="true">Drop to forge</div>
@@ -192,6 +221,6 @@
 
     <video id="videoSource" class="visually-hidden" muted playsinline></video>
     <canvas id="sampleCanvas" class="visually-hidden"></canvas>
-    <script src="studio.js" defer></script>
+    <script type="module" src="studio.js"></script>
   </body>
 </html>

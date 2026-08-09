@@ -226,6 +226,17 @@ select:focus-visible,
   margin-top: 10px;
 }
 
+.text-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.text-source .button {
+  min-height: 38px;
+}
+
 .button {
   min-height: 36px;
   padding: 8px 12px;
@@ -255,6 +266,18 @@ select:focus-visible,
   color: #181204;
   background: var(--yellow);
   border-color: var(--yellow);
+}
+
+.button.record {
+  color: #fff1f4;
+  border-color: rgb(255 113 135 / 48%);
+  background: rgb(255 113 135 / 12%);
+}
+
+.button.record.recording {
+  border-color: var(--danger);
+  background: rgb(255 113 135 / 24%);
+  box-shadow: 0 0 18px rgb(255 113 135 / 18%);
 }
 
 .button.secondary {
@@ -344,6 +367,11 @@ input[type="range"] {
   cursor: pointer;
 }
 
+.compact-toggle {
+  align-items: flex-start;
+  line-height: 1.35;
+}
+
 .toggle-field input {
   position: absolute;
   opacity: 0;
@@ -397,6 +425,19 @@ input[type="range"] {
   justify-content: space-between;
   gap: 16px;
   min-width: 0;
+}
+
+.stage-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.fullscreen-button {
+  min-height: 30px;
+  padding-block: 5px;
+  white-space: nowrap;
 }
 
 .source-name,
@@ -454,6 +495,22 @@ input[type="range"] {
   border-radius: var(--radius);
   background: #030706;
   box-shadow: var(--shadow);
+}
+
+.canvas-shell:fullscreen,
+.canvas-shell:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+  box-shadow: none;
+}
+
+.canvas-shell:fullscreen #outputCanvas,
+.canvas-shell:-webkit-full-screen #outputCanvas {
+  width: 100vw;
+  height: 100vh;
 }
 
 #outputCanvas {
@@ -590,6 +647,12 @@ input[type="range"] {
   .stage-toolbar,
   .stage-footer {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stage-actions {
+    width: 100%;
+    align-items: stretch;
     flex-direction: column;
   }
 
