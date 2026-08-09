@@ -55,7 +55,9 @@ def subprocess_environment() -> dict[str, str] | None:
     ``LD_LIBRARY_PATH`` from another toolchain can take precedence and make a
     healthy FFmpeg installation fail at load time.  Android is the only host
     where Glyph Forge removes that override; every other platform inherits the
-    caller's environment unchanged.
+    caller's environment unchanged. Frozen applications retain the loader path
+    for their own process but still use this clean environment for external
+    tools.
     """
 
     if sys.platform != "android":
@@ -75,9 +77,16 @@ def reexec_clean_android_environment(
     therefore relaunch themselves with the same arguments and a clean linker
     environment.  The second process naturally skips this path because the
     override is no longer present.
+
+    PyInstaller sets a private library path required by its frozen process, so
+    frozen applications skip the relaunch after their bootloader has started.
     """
 
-    if sys.platform != "android" or not os.environ.get("LD_LIBRARY_PATH"):
+    if (
+        sys.platform != "android"
+        or getattr(sys, "frozen", False)
+        or not os.environ.get("LD_LIBRARY_PATH")
+    ):
         return False
 
     environment = os.environ.copy()

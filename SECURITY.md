@@ -50,6 +50,11 @@ promise a timeline it may be unable to meet.
   set `GLYPH_FORGE_DISABLE_PLUGINS=1` to disable entry-point discovery.
 - FFmpeg, OpenCV, yt-dlp, PyVirtualDisplay, and capture backends are optional
   third-party components with their own security policies and update cycles.
+- Tagged release assets include a `SHA256SUMS` manifest and GitHub artifact
+  attestations signed with an ephemeral Sigstore certificate. Verify both when
+  downloading outside a trusted package manager. This provenance is distinct
+  from Windows Authenticode signing or macOS notarization; those require
+  maintainer-owned platform certificates and are not claimed by the project.
 
 ## Defensive design
 

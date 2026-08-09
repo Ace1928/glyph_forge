@@ -12,6 +12,11 @@ the project uses semantic versioning.
 
 ### Added
 
+- Cross-platform PyInstaller one-directory bundles, deterministic ZIP/tar
+  archives, double-build reproducibility checks, portable smoke tests, SHA-256
+  manifests, and Sigstore-signed GitHub artifact provenance for tagged releases
+- Fast isolated installation and one-off launch guidance for `uv`, alongside
+  pipx, wheels, and no-Python release archives
 - Opt-in ephemeral capability links for Studio PNG snapshots and exact local
   files, including the `glyph-forge share` command, trusted-LAN address
   discovery, configurable expiry, and browser copy-to-clipboard workflow
@@ -54,6 +59,8 @@ the project uses semantic versioning.
 
 ### Repository
 
+- Release automation validates the full suite, builds Windows/macOS/Linux apps,
+  and exercises the frozen CLI, renderer, and packaged Studio before publishing
 - Package validation now rejects stale case-colliding legacy modules in built
   wheels
 

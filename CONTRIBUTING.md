@@ -43,12 +43,12 @@ permanent repository branch.
 Run the same checks as CI:
 
 ```bash
-ruff format src tests examples
-ruff check src tests examples
+ruff format src tests examples tools
+ruff check src tests examples tools
 python -m mypy src/glyph_forge
 python -m pytest
 python -m pytest --cov=glyph_forge --cov-fail-under=70
-python -m build
+SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python -m build
 python -m twine check dist/*
 ```
 
@@ -56,6 +56,12 @@ New behavior needs focused tests. Tests should be deterministic, independent,
 fast by default, and should not require a physical webcam, display, network
 connection, or FFmpeg process unless explicitly marked as an integration smoke
 test. Mock an optional boundary rather than its internal rendering logic.
+
+Release maintainers can dry-run the exact portable workflow from GitHub's
+Actions tab. A `vVERSION` tag is accepted only when it exactly matches
+`pyproject.toml`; only tag-triggered runs publish a GitHub release and signed
+provenance. Native Windows/macOS certificate signing must be handled by an
+authorized maintainer and must never place signing material in the repository.
 
 ## Design expectations
 

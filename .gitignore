@@ -10,6 +10,11 @@ __pycache__/
 .Python
 build/
 dist/
+bundle-build/
+bundle-dist/
+release-assets/
+package-a/
+package-b/
 .eggs/
 *.egg-info/
 

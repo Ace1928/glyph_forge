@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  validate:
+    name: Validate release source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install release checks
+        run: python -m pip install --upgrade --editable ".[dev,tui]"
+      - name: Verify tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python -m tools.release_assets verify-tag --tag "$GITHUB_REF_NAME"
+      - name: Check source quality
+        run: |
+          python -m ruff format --check src tests examples tools
+          python -m ruff check src tests examples tools
+          python -m mypy src/glyph_forge
+      - name: Run complete test suite
+        run: python -m pytest -q
+
+  python-package:
+    name: Reproducible Python distributions
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install build tools
+        run: python -m pip install --upgrade --editable ".[dev]"
+      - name: Set reproducible timestamp
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Build twice and compare
+        run: |
+          python -m build --outdir package-a
+          python -m build --outdir package-b
+          python -m tools.release_assets normalize-sdist package-a/*.tar.gz package-b/*.tar.gz
+          python -m tools.release_assets compare package-a package-b
+          python -m twine check package-a/*
+      - name: Stage Python assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          cp package-a/* release-assets/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-python
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  portable-bundle:
+    name: Portable bundle (${{ matrix.os }})
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install every user feature and bundler
+        run: python -m pip install --upgrade --editable ".[all,bundle]"
+      - name: Build inspectable one-directory app
+        run: >-
+          python -m PyInstaller --noconfirm --clean
+          --distpath bundle-dist --workpath bundle-build
+          tools/glyph-forge.spec
+      - name: Smoke-test frozen CLI, renderer, and Studio
+        run: python -m tools.release_assets smoke --bundle bundle-dist/glyph-forge
+      - name: Set reproducible timestamp
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Create portable archive
+        run: >-
+          python -m tools.release_assets archive
+          --source bundle-dist/glyph-forge
+          --output-directory release-assets
+          --platform "${{ runner.os }}-${{ runner.arch }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-portable-${{ runner.os }}-${{ runner.arch }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  assemble:
+    name: Checksums, provenance, and GitHub release
+    needs: [python-package, portable-bundle]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Generate portable checksums
+        run: >-
+          python -m tools.release_assets checksums
+          --directory release-assets
+          --output release-assets/SHA256SUMS
+      - name: Sign build provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest@v4
+        with:
+          subject-path: release-assets/*
+      - name: Publish immutable GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" release-assets/*
+          --verify-tag --generate-notes --title "Glyph Forge $GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-complete
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 30

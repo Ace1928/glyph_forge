@@ -51,6 +51,7 @@ media = [
 network = ["yt-dlp>=2025.1.15"]
 virtual = ["PyVirtualDisplay>=3.0"]
 control = ["pynput>=1.8.2"]
+bundle = ["pyinstaller>=6.22.0,<7"]
 all = [
     "mss>=9.0.1",
     "opencv-python>=4.8.0",
@@ -68,6 +69,7 @@ dev = [
     "ruff>=0.16.2",
     "twine>=6.0.0",
     "types-PyYAML>=6.0.12",
+    "tomli>=2.2.1; python_version < '3.11'",
 ]
 
 [project.scripts]

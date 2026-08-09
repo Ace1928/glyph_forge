@@ -7,7 +7,7 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 
 | Track | User outcome | Status |
 |---|---|---|
-| Portable core | Install, import, diagnose, and run on small or large systems | Complete in 0.2 |
+| Portable core | Install, import, diagnose, and run on small or large systems | Wheels and portable app archives complete |
 | Unified experiences | Friendly CLI, TUI, browser Studio, and compatibility launchers | Complete in 0.2 |
 | Live media | Stream files, cameras, screens, and URLs with bounded latency | Complete in 0.2 |
 | Desktop viewing | Render a desktop or isolated X11 app through glyph modes | Viewer complete in 0.2 |
@@ -65,8 +65,11 @@ rejected because injected input can feed back into the focused terminal.
    sources, renderers, transforms, and exporters.~~ Completed with lazy entry
    points, live-pipeline integration, diagnostics, and failure isolation.
 7. ~~Add bounded, opt-in, seekable local/LAN links without changing the
-   local-first default.~~ Completed. Next, produce reproducible signed wheels
-   and standalone installers; evaluate an opt-in hosted relay separately.
+   local-first default.~~ Completed.
+8. ~~Produce reproducible wheels plus tested Windows, macOS, and Linux portable
+   app archives with checksums and signed build provenance.~~ Completed.
+   Certificate-backed Windows Authenticode and macOS notarization remain a
+   release-operations task; evaluate an opt-in hosted relay separately.
 
 Every milestone must keep imports side-effect-free, optional dependencies lazy,
 buffers bounded, compatibility adapters tested, and the cross-platform CI suite

@@ -85,6 +85,19 @@ def test_non_android_subprocess_environment_inherits_unchanged(monkeypatch) -> N
     assert runtime.subprocess_environment() is None
 
 
+def test_frozen_android_app_keeps_its_bootloader_library_path(monkeypatch) -> None:
+    monkeypatch.setattr(runtime.sys, "platform", "android")
+    monkeypatch.setattr(runtime.sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/bundle/_internal")
+    monkeypatch.setattr(
+        runtime.os,
+        "execve",
+        lambda *_args: pytest.fail("a frozen app must not relaunch itself"),
+    )
+
+    assert runtime.reexec_clean_android_environment() is False
+
+
 @pytest.mark.parametrize("module_entry", [False, True])
 def test_android_cli_reexecs_before_loading_native_modules(
     tmp_path: Path,

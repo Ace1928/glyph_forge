@@ -32,6 +32,14 @@ For an isolated command-line installation, use pipx:
 pipx install "glyph-forge[all]"
 ```
 
+Or use `uv` for a fast isolated install—or even a one-off run with no permanent
+environment:
+
+```bash
+uv tool install "glyph-forge[all]"
+uvx --from "glyph-forge[all]" glyph-forge launch
+```
+
 Install only what you use:
 
 | Extra | Adds |
@@ -42,11 +50,21 @@ Install only what you use:
 | `virtual` | PyVirtualDisplay support for isolated X11 applications |
 | `control` | Explicit keyboard and pointer forwarding through pynput |
 | `all` | Every optional interface and backend |
+| `bundle` | Maintainer tooling for standalone portable app builds |
 | `dev` | Tests, Ruff, mypy, build, and release checks |
 
 Full-colour video export also needs `ffmpeg` and `ffprobe` on `PATH`. The
 isolated app display needs Xvfb and is available on Linux/FreeBSD X11 systems.
 Run `glyph-forge doctor` for exact capability and installation guidance.
+
+Tagged releases also produce no-Python, one-directory archives for Windows,
+macOS, and Linux. Unpack one and run `glyph-forge` (`glyph-forge.exe` on
+Windows); keeping the bundle as a directory avoids slow one-file extraction on
+every launch. Release archives include all Python feature extras, SHA-256
+checksums, and signed GitHub/Sigstore build provenance. FFmpeg, Xvfb, and OS
+capture permissions remain external platform facilities. See the
+[installation guide](docs/install.md) for upgrades, verification, and the
+tradeoffs between `uv`, pipx, and portable archives.
 
 ## Start anywhere
 
@@ -363,8 +381,8 @@ python -m venv .venv
 # .venv\Scripts\Activate.ps1
 
 python -m pip install --editable ".[dev,tui]"
-ruff format src tests examples
-ruff check src tests examples
+ruff format src tests examples tools
+ruff check src tests examples tools
 python -m mypy src/glyph_forge
 python -m pytest
 python -m pytest --cov=glyph_forge --cov-fail-under=70
@@ -372,7 +390,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite has 361 passing tests (plus one platform-dependent skip) and
+The current suite has 387 passing tests (plus one platform-dependent skip) and
 measures at least 70% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource
