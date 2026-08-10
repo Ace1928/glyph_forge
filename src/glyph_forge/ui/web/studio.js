@@ -35,6 +35,8 @@ const elements = {
   stop: $("stopButton"),
   textSource: $("textSourceInput"),
   useText: $("textSourceButton"),
+  glyphCode: $("glyphCodeInput"),
+  glyphCodeButton: $("glyphCodeButton"),
   audio: $("audioToggle"),
   mode: $("modeSelect"),
   charsetField: $("charsetField"),
@@ -80,6 +82,10 @@ const state = {
   dimensions: { width: 1280, height: 720, rows: 72 },
   recording: null,
   audioBridge: null,
+  gifFrames: null,
+  gifDurations: null,
+  gifIndex: 0,
+  gifElapsedBase: undefined,
   shareConfig: {
     enabled: false,
     csrfToken: null,
@@ -119,7 +125,7 @@ function activeCharset(mode = elements.mode.value) {
 }
 
 function isDynamicSource() {
-  return ["video", "webcam", "screen"].includes(state.sourceKind);
+  return ["video", "webcam", "screen"].includes(state.sourceKind) || Boolean(state.gifFrames);
 }
 
 function sourceSize() {
@@ -245,16 +251,34 @@ function updateMetrics(timestamp) {
   elements.fps.textContent = String(Math.max(0, state.frameTimes.length - 1));
 }
 
-function renderCurrent(timestamp = performance.now()) {
-  if (!state.source || !state.renderer) return;
-  try {
-    state.renderer.draw(state.source, currentOptions());
-    updateMetrics(timestamp);
-  } catch (error) {
-    console.error(error);
-    setStatus(`Render failed: ${error.message}`, true);
+  function gifAdvance(timestamp) {
+    if (!state.gifDurations || !state.gifFrames || state.gifDurations.length < 2) return;
+    if (state.gifElapsedBase === undefined) state.gifElapsedBase = timestamp;
+    let elapsed = timestamp - state.gifElapsedBase;
+    let index = state.gifIndex || 0;
+    while (elapsed > 0) {
+      const duration = state.gifDurations[index];
+      if (elapsed < duration) break;
+      elapsed -= duration;
+      index = (index + 1) % state.gifDurations.length;
+    }
+    if (index !== state.gifIndex) {
+      state.gifIndex = index;
+      state.source.src = state.gifFrames[index];
+    }
   }
-}
+
+  function renderCurrent(timestamp = performance.now()) {
+    if (!state.source || !state.renderer) return;
+    try {
+      gifAdvance(timestamp);
+      state.renderer.draw(state.source, currentOptions());
+      updateMetrics(timestamp);
+    } catch (error) {
+      console.error(error);
+      setStatus(`Render failed: ${error.message}`, true);
+    }
+  }
 
 function beginRenderLoop() {
   state.generation += 1;
@@ -303,6 +327,10 @@ async function stopSource({ reset = true, saveRecording = true } = {}) {
   state.source = null;
   state.sourceKind = null;
   state.frameTimes = [];
+  state.gifFrames = null;
+  state.gifDurations = null;
+  state.gifIndex = 0;
+  state.gifElapsedBase = undefined;
   elements.record.textContent = "Record video";
   syncAudioControl();
   elements.fps.textContent = "0";
@@ -484,6 +512,60 @@ async function openTextSource() {
   state.sourceName = value.length > 36 ? `${value.slice(0, 33)}…` : value;
   describeSource(`Text · ${state.sourceName}`);
   beginRenderLoop();
+}
+
+async function openGlyphCode(raw) {
+  const value = String(raw || "").trim() || elements.glyphCode.value.trim();
+  if (!value) {
+    setStatus("Paste a glyph code first.", true);
+    return;
+  }
+  if (!value.startsWith("glyph:v1:")) {
+    setStatus("That does not look like a glyph:v1:… code.", true);
+    return;
+  }
+  const body = value.slice("glyph:v1:".length);
+  const kind = body.slice(0, body.indexOf(":"));
+  const payload = body.slice(kind.length + 1);
+  try {
+    if (kind === "img") {
+      const blob = await (await fetch(`data:image/png;base64,${payload}`)).blob();
+      await openFile(new File([blob], "glyph-code.png", { type: "image/png" }));
+      setStatus("Image regenerated from the glyph code.");
+    } else if (kind === "banner") {
+      const spec = JSON.parse(atob(payload));
+      elements.textSource.value = String(spec.text || "GLYPH");
+      await openTextSource();
+      setStatus(`Banner text restored. Font “${spec.font || "small"}” and style “${spec.style || "minimal"}” apply exactly in the terminal.`);
+    } else if (kind === "gif") {
+      const tilde = payload.indexOf("~");
+      if (tilde < 0) throw new Error("GIF code is missing its frames");
+      const info = JSON.parse(atob(payload.slice(0, tilde)));
+      const frames = payload.slice(tilde + 1).split("~");
+      if (!frames.length) throw new Error("GIF code has no frames");
+      const durations = Array.isArray(info.durations) && info.durations.length === frames.length
+        ? info.durations.map((value) => Math.min(10000, Math.max(10, Number(value) || 80)))
+        : frames.map(() => 80);
+      await stopSource({ reset: false });
+      const image = new Image();
+      image.src = `data:image/png;base64,${frames[0]}`;
+      await image.decode();
+      state.source = image;
+      state.sourceKind = "image";
+      state.gifFrames = frames.map((frame) => `data:image/png;base64,${frame}`);
+      state.gifDurations = durations;
+      state.gifIndex = 0;
+      state.gifElapsedBase = undefined;
+      describeSource(`GIF · ${frames.length} frames from glyph code`);
+      beginRenderLoop();
+      setStatus(`Animated GIF regenerated locally — ${frames.length} frames at ${(1000 / (durations.reduce((a, b) => a + b, 0) / durations.length)).toFixed(1)} fps.`);
+    } else {
+      throw new Error(`unknown kind “${kind}” (try img, banner, or gif)`);
+    }
+  } catch (error) {
+    await stopSource();
+    setStatus(`Could not regenerate glyph code: ${error.message}`, true);
+  }
 }
 
 function sampleTextFrame() {
@@ -971,6 +1053,10 @@ function bindEvents() {
   elements.useText.addEventListener("click", () => void openTextSource());
   elements.textSource.addEventListener("keydown", (event) => {
     if (event.key === "Enter") void openTextSource();
+  });
+  elements.glyphCodeButton.addEventListener("click", () => void openGlyphCode());
+  elements.glyphCode.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") void openGlyphCode();
   });
   elements.png.addEventListener("click", savePng);
   elements.svg.addEventListener("click", saveSvg);

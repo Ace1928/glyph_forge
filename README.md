@@ -316,6 +316,32 @@ or the command stops. Capability URLs are random but use unencrypted HTTP: use
 viewers. Glyph Forge does not provide a public Internet relay or hosted storage.
 See [the sharing guide](docs/sharing.md) for behavior and security boundaries.
 
+## Glyph codes — the artwork IS the link
+
+Any image, banner, or animated GIF can be folded into one printable ASCII
+string that needs no hosting, no upload, and no server. Paste it anywhere;
+anyone can regenerate the original artwork from the string alone.
+
+```bash
+# Snap a shot of anything you rendered or captured
+glyph-forge link code photo.jpg
+# → glyph:v1:img:iVBORw0KGgoAAAANSUhEUgAAAAEA…
+
+# Banners carry their style settings with them
+glyph-forge link banner "FORGE ON" --font slant --style boxed
+# → glyph:v1:banner:eyJ0ZXh0IjoiRk9SR0UgT04i…
+
+# Peek or save it back (PNG for images, GIF for animations)
+glyph-forge link decode "glyph:v1:img:…"
+glyph-forge link decode "glyph:v1:…" --output restored.png
+```
+
+Round trips are lossless: an image code decodes to byte-identical data, a
+banner code reproduces the exact font/style render, and a GIF code keeps every
+frame plus its timing. Studio on this site and the CLI page both accept pasted
+codes in their source panel. Codes embed no secrets and expire never; keep
+them private if the artwork is private.
+
 ## Third-party extensions
 
 Glyph Forge has a versioned plugin API for external sources, renderers,

@@ -41,6 +41,182 @@ app = typer.Typer(
 )
 app.add_typer(live_app, name="live")
 app.add_typer(plugins_app, name="plugins")
+
+
+link_app = typer.Typer(
+    help="Encode artwork into portable base64 glyph codes and decode them.",
+    no_args_is_help=True,
+)
+
+
+@link_app.command("code")
+def link_code_command(
+    source: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        help="Image or animated GIF to encode.",
+    ),
+    max_bytes: int = typer.Option(
+        8_388_608,
+        "--max-bytes",
+        min=1024,
+        help="Refuse payloads larger than this many bytes.",
+    ),
+) -> None:
+    """Encode an image or animated GIF into one shareable glyph code."""
+
+    from ..glyphcode import GlyphCodeError, encode_auto
+
+    try:
+        code = encode_auto(source, max_bytes=max_bytes)
+    except GlyphCodeError as exc:
+        error_console.print(f"[bold red]Could not encode:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+    typer.echo(code)
+    error_console.print(
+        f"[cyan]glyph code[/cyan] · {len(code)} characters · "
+        "paste anywhere, decode with 'glyph-forge link decode'"
+    )
+
+
+@link_app.command("banner")
+def link_banner_command(
+    text: str = typer.Argument(
+        ..., help="Banner text to encode along with its style settings."
+    ),
+    font: str = typer.Option("small", "--font", help="Banner font."),
+    style: str = typer.Option("minimal", "--style", help="Banner style."),
+    width: Optional[int] = typer.Option(
+        None, "--width", min=10, help="Target width in columns."
+    ),
+    effects: Optional[str] = typer.Option(
+        None, "--effects", help="Comma-separated text effects."
+    ),
+) -> None:
+    """Encode banner text plus its style as a shareable glyph code."""
+
+    from ..glyphcode import GlyphCodeError, encode_banner
+
+    try:
+        code = encode_banner(text, font=font, style=style, width=width, effects=effects)
+    except GlyphCodeError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(code)
+    error_console.print(
+        f"[cyan]banner glyph code[/cyan] · {len(code)} characters · "
+        "regenerate with 'glyph-forge link decode'"
+    )
+
+
+@link_app.command("decode")
+def link_decode_command(
+    code: str = typer.Argument(
+        ..., help="The glyph code to regenerate (starts with glyph:v1:)."
+    ),
+    output: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        file_okay=True,
+        dir_okay=False,
+        help="Save the regenerated PNG (images) or GIF (animations) to this file.",
+    ),
+) -> None:
+    """Regenerate the artwork carried by a glyph code."""
+
+    from ..glyphcode import GlyphCodeError, decode_code
+
+    try:
+        decoded = decode_code(code)
+    except GlyphCodeError as exc:
+        error_console.print(f"[bold red]Could not decode:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+    if decoded.banner is not None:
+        banner = decoded.banner_text()
+        assert banner is not None
+        typer.echo(banner)
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(banner + "\n", encoding="utf-8")
+            error_console.print(f"[green]Saved[/green] {output}")
+        return
+    if decoded.image is not None:
+        if output is not None:
+            decoded.save_image(output)
+            dimensions = _image_dimensions(decoded.image)
+            detail = f" · {dimensions}" if dimensions else ""
+            error_console.print(f"[green]Regenerated[/green] {output}{detail}")
+            return
+        _preview_image(decoded.image)
+        return
+    if decoded.frames:
+        if output is not None:
+            decoded.save_gif(output)
+            error_console.print(
+                f"[green]Regenerated[/green] {output} · "
+                f"{len(decoded.frames)} frames at {decoded.fps} fps"
+            )
+            return
+        _preview_image(decoded.frames[0])
+        error_console.print(
+            f"[cyan]{len(decoded.frames)} frames[/cyan] at {decoded.fps} fps · "
+            "use --output to save the animated GIF"
+        )
+        return
+    error_console.print("[bold red]This code carries no artwork.[/bold red]")
+    raise typer.Exit(2)
+
+
+def _image_dimensions(image_bytes: bytes) -> Optional[str]:
+    from io import BytesIO
+
+    from PIL import Image
+
+    try:
+        with Image.open(BytesIO(image_bytes)) as opened:
+            return f"{opened.width}×{opened.height}"
+    except OSError:
+        return None
+
+
+def _preview_image(image_bytes: bytes) -> None:
+    from io import BytesIO
+
+    import numpy as np
+    from PIL import Image
+
+    from ..live.renderers import (
+        FrameRenderer,
+        RenderConfig,
+        normalize_render_mode,
+    )
+
+    try:
+        with Image.open(BytesIO(image_bytes)) as opened:
+            pixels = np.asarray(opened.convert("RGB"), dtype=np.uint8)
+    except OSError as exc:
+        error_console.print(f"[bold red]Could not preview:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+    profile = detect_runtime_profile("auto")
+    width = min(profile.stream_width, 90)
+    rendered = FrameRenderer(
+        RenderConfig(
+            width=width,
+            mode=normalize_render_mode("braille"),
+            color="truecolor" if sys.stdout.isatty() else "none",
+            charset="detailed",
+            resample=profile.resample,
+        )
+    ).render(pixels)
+    typer.echo("Glyph Forge · braille")
+    typer.echo(rendered.text)
+
+
+app.add_typer(link_app, name="link")
 app.command("webcam")(camera_command)
 app.command("desktop")(screen_command)
 app.command("stream")(source_command)
@@ -1133,6 +1309,7 @@ def list_commands() -> None:
         ("live", "View a camera, video, or desktop with bounded latency"),
         ("studio", "Open the local browser GUI and sharing surface"),
         ("share", "Create a temporary seekable link to one local file"),
+        ("link", "Encode and decode portable base64 glyph codes"),
         ("demo", "Render a built-in showcase with no input file"),
         ("benchmark", "Measure adaptive renderer throughput"),
         ("plugins", "Discover and diagnose third-party extensions"),

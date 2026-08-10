@@ -12,6 +12,11 @@ the project uses semantic versioning.
 
 ### Added
 
+- Portable glyph codes: encode any image, banner, or animated GIF into one
+  printable ASCII string (`glyph:v1:…`) that regenerates the original artwork
+  with no hosting or server — `glyph-forge link code|banner|decode`, lossless
+  byte-exact image round trips, banner style retention, and per-frame GIF
+  timing; the browser Studio and GitHub Pages playground accept pasted codes
 - Self-contained `glyph-forge demo` showcase: an entertaining, self-sufficient
   tour of the whole toolkit, with meme templates and popular video thumbnails
   downloaded at runtime (deterministic offline stand-ins when the network is
