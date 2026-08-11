@@ -451,6 +451,7 @@ input[type="range"] {
 }
 
 .toggle-field {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -465,13 +466,26 @@ input[type="range"] {
 
 .toggle-field input {
   position: absolute;
+  z-index: 1;
+  inset-inline-start: 0;
+  top: 50%;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  transform: translateY(-50%);
   opacity: 0;
-  pointer-events: none;
+  cursor: pointer;
+}
+
+.compact-toggle input {
+  top: 0;
+  transform: none;
 }
 
 .toggle {
   width: 32px;
   height: 18px;
+  flex: 0 0 auto;
   padding: 2px;
   border: 1px solid var(--line-bright);
   border-radius: 999px;
@@ -782,6 +796,11 @@ input[type="range"] {
     height: 24px;
     flex: 0 0 auto;
     padding: 3px;
+  }
+
+  .toggle-field input {
+    width: 42px;
+    height: 24px;
   }
 
   .toggle::after {
