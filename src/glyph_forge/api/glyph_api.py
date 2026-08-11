@@ -7,7 +7,7 @@ import os
 import threading
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, cast
 
 from ..config.settings import ConfigManager, get_config
 from ..contracts import RenderArtifact, RenderRequest
@@ -17,6 +17,10 @@ from ..persistence import AtomicWriteError, atomic_write_text
 from ..rendering import ImageSource, format_for_path, render_image
 from ..utils.alphabet_manager import AlphabetManager
 from ..visual_defaults import DEFAULT_BRIGHTNESS, DEFAULT_CONTRAST
+
+if TYPE_CHECKING:
+    from ..batch import BatchRenderReport
+    from ..projects import GlyphProject, ProjectSession, RenderPreset
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +105,119 @@ class GlyphForgeAPI:
             dither=bool(self.config.get("image", "dithering", False)),
         )
         return render_image(source, selected, destination=destination)
+
+    def create_project(
+        self,
+        project_path: str | os.PathLike[str],
+        source: str | os.PathLike[str],
+        *,
+        name: str | None = None,
+        request: RenderRequest | None = None,
+    ) -> "GlyphProject":
+        """Create a portable project for an asset inside its project directory."""
+
+        from ..projects import (
+            AssetReference,
+            GlyphProject,
+            RecentProjectStore,
+            save_project,
+        )
+
+        destination = Path(project_path).expanduser()
+        project = GlyphProject.create(
+            name or destination.name.removesuffix(".glyphforge.json") or "Untitled",
+            AssetReference.from_path(source, destination),
+            request,
+        )
+        save_project(project, destination)
+        RecentProjectStore().touch(destination)
+        return project
+
+    def open_project(
+        self,
+        project_path: str | os.PathLike[str],
+        *,
+        recover: bool = True,
+        autosave_delay: float | None = 1.0,
+    ) -> "ProjectSession":
+        """Open a project session with recovery, history, and autosave."""
+
+        from ..projects import ProjectSession, RecentProjectStore
+
+        session = ProjectSession.open(
+            project_path,
+            recover=recover,
+            autosave_delay=autosave_delay,
+        )
+        RecentProjectStore().touch(project_path)
+        return session
+
+    def render_project(
+        self,
+        project_path: str | os.PathLike[str],
+        *,
+        destination: str | os.PathLike[str] | None = None,
+        variant: str | None = None,
+    ) -> RenderArtifact:
+        """Render one project variant through the canonical still pipeline."""
+
+        from ..projects import ProjectValidationError, load_project
+
+        path = Path(project_path).expanduser()
+        project = load_project(path)
+        selected = project.active
+        if variant is not None:
+            matches = [
+                item
+                for item in project.variants
+                if item.identifier == variant.casefold()
+            ]
+            if not matches:
+                raise ProjectValidationError(f"unknown variant {variant!r}")
+            selected = matches[0]
+        return render_image(
+            project.source.resolve(path),
+            selected.request,
+            destination=destination,
+        )
+
+    def render_preset(
+        self,
+        preset_path: str | os.PathLike[str],
+        source: ImageSource,
+        *,
+        destination: str | os.PathLike[str] | None = None,
+    ) -> RenderArtifact:
+        """Render an image with a portable preset document."""
+
+        from ..projects import load_preset
+
+        return render_image(
+            source,
+            load_preset(preset_path).request,
+            destination=destination,
+        )
+
+    def render_batch(
+        self,
+        sources: Iterable[str | os.PathLike[str]],
+        output_directory: str | os.PathLike[str],
+        preset: "RenderPreset | str | os.PathLike[str]",
+        *,
+        workers: int = 1,
+        fail_fast: bool = False,
+    ) -> "BatchRenderReport":
+        """Render a bounded still queue from one shared preset."""
+
+        from ..batch import items_for_sources, render_batch
+        from ..projects import RenderPreset, load_preset
+
+        selected = preset if isinstance(preset, RenderPreset) else load_preset(preset)
+        return render_batch(
+            items_for_sources(sources, output_directory, selected.request),
+            workers=workers,
+            fail_fast=fail_fast,
+        )
 
     def image_to_glyph(
         self,

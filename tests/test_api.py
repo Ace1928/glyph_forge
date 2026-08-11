@@ -17,6 +17,7 @@ from PIL import Image
 
 from glyph_forge.api.glyph_api import GlyphForgeAPI, get_api
 from glyph_forge.contracts import RenderArtifact, RenderFormat, RenderRequest
+from glyph_forge.projects import RenderPreset
 
 
 def test_top_level_image_helper_resolves_to_callable() -> None:
@@ -116,6 +117,40 @@ class TestGlyphForgeAPI:
         assert isinstance(artifact, RenderArtifact)
         assert artifact.request is request
         assert (artifact.columns, artifact.rows) == (2, 1)
+
+    def test_project_preset_and_batch_workflows_share_the_public_contract(
+        self,
+        api,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setenv("GLYPH_FORGE_CONFIG_HOME", str(tmp_path / "config"))
+        source = tmp_path / "source.png"
+        Image.new("RGB", (4, 2), "white").save(source)
+        project_path = tmp_path / "work.glyphforge.json"
+        request = RenderRequest(width=4, height=2, output_format="svg")
+
+        project = api.create_project(
+            project_path,
+            source,
+            name="Work",
+            request=request,
+        )
+        session = api.open_project(project_path, autosave_delay=None)
+        artifact = api.render_project(project_path)
+        preset = RenderPreset("Shared", request)
+        report = api.render_batch(
+            [source],
+            tmp_path / "batch",
+            preset,
+            workers=1,
+        )
+
+        assert project.name == session.project.name == "Work"
+        assert artifact.request == request
+        assert report.succeeded == 1
+        assert report.results[0].destination.suffix == ".svg"
+        assert (tmp_path / "config" / "recent_projects.json").is_file()
 
     # ──── Banner Generation Tests ───────────────────────────────────────
 

@@ -179,6 +179,26 @@ atomically, so an interrupted save cannot expose a partial file. All visual
 paths start from the brighter, clearer `1.12` brightness and `1.08` contrast
 curve, with both values directly overridable.
 
+## Projects, presets, and batches
+
+Creative sessions can be saved as portable, recoverable projects. External
+media is copied into a relative `assets/` folder by default; presets contain
+only render settings and are safe to exchange without sharing the source.
+
+```bash
+glyph-forge project new artwork.glyphforge.json photo.jpg
+glyph-forge project variant-add artwork.glyphforge.json bright --name Bright
+glyph-forge preset export artwork.glyphforge.json bright.glyphpreset.json
+glyph-forge batch bright.glyphpreset.json photos/*.jpg --output-dir exports -j 4
+```
+
+Projects have bounded undo/redo, atomic debounced autosave, stale-recovery
+protection, non-destructive variants, and a platform-native recent list. Batch
+queues are bounded, keep only one job per worker in flight, preserve input
+order, isolate failures, avoid output collisions, and can emit complete JSON
+reports. See [the project workflow guide](docs/projects.md) for recovery,
+schema, CLI, and Python API details.
+
 ## Rendering modes
 
 | Mode | Detail per terminal cell | Best use |

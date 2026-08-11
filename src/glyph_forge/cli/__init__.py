@@ -29,6 +29,7 @@ from ..visual_defaults import DEFAULT_BRIGHTNESS, DEFAULT_CONTRAST
 from .live import app as live_app
 from .live import camera_command, screen_command, source_command
 from .plugins import app as plugins_app
+from .project import batch_command, preset_app, project_app
 
 if TYPE_CHECKING:
     from .image import CharsetAction
@@ -62,6 +63,9 @@ app = typer.Typer(
 )
 app.add_typer(live_app, name="live")
 app.add_typer(plugins_app, name="plugins")
+app.add_typer(project_app, name="project")
+app.add_typer(preset_app, name="preset")
+app.command("batch")(batch_command)
 
 
 link_app = typer.Typer(
