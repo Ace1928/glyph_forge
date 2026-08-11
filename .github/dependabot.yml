@@ -4,47 +4,25 @@ updates:
   - package-ecosystem: pip
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: "05:00"
       timezone: Australia/Brisbane
-    open-pull-requests-limit: 5
-    groups:
-      python-minor-and-patch:
-        update-types:
-          - minor
-          - patch
-    commit-message:
-      prefix: deps(python)
+    # Routine upgrades are maintained directly on main. Security updates remain
+    # enabled in the repository settings without creating version-update branches.
+    open-pull-requests-limit: 0
 
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-      day: tuesday
+      interval: monthly
       time: "05:00"
       timezone: Australia/Brisbane
-    open-pull-requests-limit: 5
-    groups:
-      web-minor-and-patch:
-        update-types:
-          - minor
-          - patch
-    commit-message:
-      prefix: deps(web)
+    open-pull-requests-limit: 0
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: wednesday
+      interval: monthly
       time: "05:00"
       timezone: Australia/Brisbane
-    open-pull-requests-limit: 5
-    groups:
-      actions-minor-and-patch:
-        update-types:
-          - minor
-          - patch
-    commit-message:
-      prefix: deps(actions)
+    open-pull-requests-limit: 0

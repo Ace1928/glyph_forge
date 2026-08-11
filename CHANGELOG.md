@@ -23,7 +23,7 @@ the project uses semantic versioning.
 - Automated Chromium, Firefox, and WebKit acceptance checks with Pixel and
   iPhone touch profiles, accessibility scanning, responsive geometry, offline
   operation, manifest validation, and a browser source-size budget
-- CodeQL scanning for Python and browser JavaScript, grouped Dependabot updates,
+- CodeQL scanning for Python and browser JavaScript, Dependabot security monitoring,
   structured bug/feature/performance reports, and a production pull-request
   checklist
 - Portable glyph codes: encode any image, banner, or animated GIF into one
