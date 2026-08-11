@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 
@@ -141,7 +142,9 @@ def test_user_write_is_atomic_private_and_reloadable(tmp_path: Path) -> None:
     assert path.is_file()
     assert list(path.parent.glob(".*.tmp")) == []
     assert ConfigManager(user_path=path).get("banner", "default_font") == "small"
-    if path.stat().st_mode & 0o077:
+    # Windows inherits the per-user directory ACL and does not expose POSIX
+    # group/world permission semantics through ``st_mode``.
+    if os.name == "posix" and path.stat().st_mode & 0o077:
         pytest.fail("User configuration must not be group/world accessible")
 
 

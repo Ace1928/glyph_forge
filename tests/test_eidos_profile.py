@@ -1,5 +1,6 @@
 """Tests for the bundled design-profile loader."""
 
+import os
 import shutil
 from pathlib import Path
 
@@ -50,7 +51,9 @@ def test_profile_save_is_atomic_and_private(tmp_path: Path) -> None:
 
     assert load_profile(destination)["values"] == ["durability"]
     assert not list(destination.parent.glob(".*.tmp"))
-    if destination.stat().st_mode & 0o077:
+    # Windows inherits the per-user directory ACL and does not expose POSIX
+    # group/world permission semantics through ``st_mode``.
+    if os.name == "posix" and destination.stat().st_mode & 0o077:
         raise AssertionError("User profile must not be group/world accessible")
 
 
