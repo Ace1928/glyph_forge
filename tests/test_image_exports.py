@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from PIL import Image
 from typer.testing import CliRunner
 
@@ -97,11 +98,13 @@ def test_cli_rejects_conflicting_pixel_size_options(tmp_path: Path) -> None:
             "--output-width",
             "640",
         ],
+        color=True,
     )
 
     assert result.exit_code == 2
-    assert "--size" in result.output
-    assert "not both" in result.output
+    message = unstyle(result.output)
+    assert "--size" in message
+    assert "not both" in message
 
 
 def test_cli_svg_has_exact_vector_viewbox(tmp_path: Path) -> None:
