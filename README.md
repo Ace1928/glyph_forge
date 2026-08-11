@@ -64,7 +64,7 @@ Termux/Android too).
 The Python distribution is `glyphforge` (no separator); the product and command
 remain **Glyph Forge** and `glyph-forge`, and the import remains `glyph_forge`.
 The hyphenated PyPI project `glyph-forge` belongs to an unrelated API client.
-The immutable GitHub tag above is the canonical Python install until the
+The versioned GitHub tag above is the canonical Python install until the
 available `glyphforge` PyPI name receives its one-time owner configuration.
 
 Install only what you use with extras:

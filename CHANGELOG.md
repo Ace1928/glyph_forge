@@ -5,6 +5,11 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+### Security
+
+- Future release assets are assembled as drafts before publication so GitHub
+  can lock their tag and files through enforced immutable releases
+
 ### Planned
 
 - Native capture adapters and optional compiled rendering hot paths
