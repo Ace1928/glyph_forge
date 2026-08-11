@@ -5,10 +5,16 @@ Choose the route that matches how you want to use Glyph Forge:
 | Route | Python needed | Updates | Best for |
 |---|---:|---|---|
 | browser / installed web app | no | automatic | phones, tablets, Chromebooks, and instant sharing |
-| `uv tool` | managed automatically | `uv tool upgrade glyph-forge` | fastest isolated install |
-| pipx | managed automatically | `pipx upgrade glyph-forge` | familiar isolated CLI install |
+| `uv tool` | managed automatically | reinstall the next versioned tag | fastest isolated install |
+| pipx | managed automatically | reinstall the next versioned tag | familiar isolated CLI install |
 | portable archive | no | replace the unpacked directory | friends and machines without Python |
 | `pip` in a venv | yes, 3.10–3.14 | `pip install --upgrade` | Python/API development |
+
+Install the Python distribution named `glyphforge` (no separator). It provides
+the `glyph-forge` command and `glyph_forge` import. The hyphenated PyPI project
+`glyph-forge` is an unrelated API client and is not this repository. Until the
+available `glyphforge` name receives its one-time PyPI owner configuration, the
+immutable `v0.3.0` GitHub tag below is the canonical Python source.
 
 ## Install the browser Studio
 
@@ -30,20 +36,20 @@ the rest of the editor.
 With [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
-uv tool install "glyph-forge[all]"
+uv tool install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
 glyph-forge launch
 ```
 
 Try it once without keeping an environment:
 
 ```bash
-uvx --from "glyph-forge[all]" glyph-forge launch
+uvx --from "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip" glyph-forge launch
 ```
 
 With [pipx](https://pipx.pypa.io/stable/installation/):
 
 ```bash
-pipx install "glyph-forge[all]"
+pipx install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
 glyph-forge launch
 ```
 
@@ -106,16 +112,16 @@ The core is enough for images, text, Studio, demos, and diagnostics:
 
 ```bash
 python -m venv .venv
-python -m pip install glyph-forge
+python -m pip install "glyphforge @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
 glyph-forge studio
 ```
 
 Install focused extras rather than everything when disk or memory is tight:
 
 ```bash
-python -m pip install "glyph-forge[tui]"
-python -m pip install "glyph-forge[media]"
-python -m pip install "glyph-forge[network]"
+python -m pip install "glyphforge[tui] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
+python -m pip install "glyphforge[media] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
+python -m pip install "glyphforge[network] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
 ```
 
 The runtime profiles (`eco`, `balanced`, and `workstation`) are independent of
@@ -124,11 +130,11 @@ installation size. `--performance auto` remains the recommended default.
 ## Upgrade or remove
 
 ```bash
-uv tool upgrade glyph-forge
-uv tool uninstall glyph-forge
+uv tool install --force "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
+uv tool uninstall glyphforge
 
-pipx upgrade glyph-forge
-pipx uninstall glyph-forge
+pipx install --force "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
+pipx uninstall glyphforge
 ```
 
 For a portable archive, stop Glyph Forge and replace the entire unpacked

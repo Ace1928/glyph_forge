@@ -17,6 +17,8 @@ from typing import Any, Protocol, cast, runtime_checkable
 import numpy as np
 from numpy.typing import NDArray
 
+from ..runtime import python_install_hint
+
 RGBFrame = NDArray[np.uint8]
 
 
@@ -85,7 +87,7 @@ def _load_opencv() -> Any:
         import cv2  # type: ignore[import-untyped]
     except (ImportError, OSError) as exc:
         raise CaptureError(
-            "Camera and video capture require OpenCV; install glyph-forge[media]"
+            f"Camera and video capture require OpenCV; {python_install_hint('media')}"
         ) from exc
     return cv2
 
@@ -192,7 +194,7 @@ class MSSScreenSource:
             import mss  # type: ignore[import-untyped]
         except (ImportError, OSError) as exc:
             raise CaptureBackendUnavailable(
-                "Screen capture needs MSS; install glyph-forge[media]"
+                f"Screen capture needs MSS; {python_install_hint('media')}"
             ) from exc
         try:
             factory = getattr(mss, "MSS", None) or mss.mss
@@ -309,7 +311,8 @@ class PillowScreenSource:
             image = self._grab(bbox=bbox, all_screens=True).convert("RGB")
         except Exception as exc:
             raise CaptureError(
-                "Pillow screen capture failed; install glyph-forge[media] for MSS "
+                "Pillow screen capture failed; "
+                f"{python_install_hint('media')} for MSS "
                 f"or grant screen-recording permission ({exc})"
             ) from exc
         return np.asarray(image, dtype=np.uint8)

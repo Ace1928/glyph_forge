@@ -43,7 +43,9 @@ Register that function in the plugin package's `pyproject.toml`:
 [project]
 name = "my-glyph-plugin"
 version = "1.0.0"
-dependencies = ["glyph-forge"] # Pin to the first release your plugin tests.
+dependencies = [
+  "glyphforge @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip",
+] # Pin to the first release your plugin tests.
 
 [project.entry-points."glyph_forge.plugins"]
 my-effects = "my_glyph_plugin:plugin"
@@ -66,7 +68,7 @@ glyph-forge live source camera:0 --mode plugin:my-effects/solid
 For a pipx installation, inject the plugin into Glyph Forge's environment:
 
 ```bash
-pipx inject glyph-forge my-glyph-plugin
+pipx inject glyphforge my-glyph-plugin
 ```
 
 ## Source contract

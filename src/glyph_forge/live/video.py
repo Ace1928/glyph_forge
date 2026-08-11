@@ -26,6 +26,7 @@ from PIL import Image, ImageDraw, ImageFont
 from ..runtime import (
     PerformanceTier,
     detect_runtime_profile,
+    python_install_hint,
     subprocess_environment,
 )
 from ..utils.alphabet_manager import AlphabetCategory, AlphabetManager
@@ -454,7 +455,7 @@ def _load_opencv() -> Any:
         import cv2  # type: ignore[import-untyped]
     except (ImportError, OSError) as exc:
         raise MissingMediaDependency(
-            "Video export requires OpenCV; install glyph-forge[media]"
+            f"Video export requires OpenCV; {python_install_hint('media')}"
         ) from exc
     return cv2
 

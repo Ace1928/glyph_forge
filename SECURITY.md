@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the current `0.2.x` line and `main`. Older releases may
+Security fixes target the current `0.3.x` line and `main`. Older releases may
 receive a fix when practical but are not actively supported.
 
 ## Report a vulnerability

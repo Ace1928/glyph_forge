@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import Any, cast
 from urllib.parse import urlparse
 
+from ..runtime import python_install_hint
+
 
 class NetworkSourceError(RuntimeError):
     """Raised when a remote media page cannot be resolved safely."""
@@ -63,7 +65,7 @@ def resolve_network_source(
         yt_dlp = importlib.import_module("yt_dlp")
     except (ImportError, OSError) as exc:
         raise NetworkSourceError(
-            "Network video pages require yt-dlp; install glyph-forge[network]"
+            f"Network video pages require yt-dlp; {python_install_hint('network')}"
         ) from exc
 
     options = {

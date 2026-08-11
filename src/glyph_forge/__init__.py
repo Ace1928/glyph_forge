@@ -28,7 +28,7 @@ from typing import (
     Union,
 )
 
-VERSION: Final[Tuple[int, int, int]] = (0, 2, 0)
+VERSION: Final[Tuple[int, int, int]] = (0, 3, 0)
 __version__ = ".".join(map(str, VERSION))
 __author__ = "Lloyd Handyside"
 __license__ = "MIT"

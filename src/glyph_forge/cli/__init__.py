@@ -21,6 +21,7 @@ from ..config.settings import ConfigManager, get_config
 from ..runtime import (
     configure_utf8_stdio,
     detect_runtime_profile,
+    python_install_hint,
     reexec_clean_android_environment,
     runtime_report,
 )
@@ -925,9 +926,7 @@ def interactive() -> None:
     except ImportError as exc:
         if exc.name and exc.name.startswith("textual"):
             console.print("[yellow]The TUI is optional.[/yellow]")
-            console.print(
-                "Install it with: [bold]pip install 'glyph-forge[tui]'[/bold]"
-            )
+            console.print(Text(f"Install it with: {python_install_hint('tui')}"))
             raise typer.Exit(2) from exc
         raise
     result = GlyphForgeApp().run()

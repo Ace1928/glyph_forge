@@ -10,6 +10,8 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any
 
+from ..runtime import python_install_hint
+
 
 class VirtualDisplayError(RuntimeError):
     """Raised when an isolated display or its application cannot start."""
@@ -61,7 +63,7 @@ class VirtualDisplaySession:
         except (ImportError, OSError) as exc:
             raise VirtualDisplayError(
                 "Virtual application displays require PyVirtualDisplay and Xvfb; "
-                "install glyph-forge[virtual] and your OS Xvfb package"
+                f"{python_install_hint('virtual')} and your OS Xvfb package"
             ) from exc
         try:
             display = module.Display(

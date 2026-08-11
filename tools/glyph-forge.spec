@@ -16,7 +16,7 @@ project_root = tool_root.parent
 datas = (
     collect_data_files("glyph_forge")
     + collect_data_files("pyfiglet")
-    + copy_metadata("glyph-forge")
+    + copy_metadata("glyphforge")
 )
 hidden_imports = [*collect_submodules("glyph_forge"), "pyfiglet.fonts"]
 core_excludes = (

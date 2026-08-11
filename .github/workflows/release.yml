@@ -40,9 +40,25 @@ jobs:
       - name: Run complete test suite
         run: python -m pytest -q
 
+  validate-web:
+    name: Validate browser Studio
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install locked web test tools
+        run: npm ci
+      - name: Install current browser engines
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run browser, touch, accessibility, offline, and performance gates
+        run: npm run test:web
+
   python-package:
     name: Reproducible Python distributions
-    needs: validate
+    needs: [validate, validate-web]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -76,7 +92,7 @@ jobs:
 
   portable-bundle:
     name: Portable bundle (${{ matrix.os }})
-    needs: validate
+    needs: [validate, validate-web]
     strategy:
       fail-fast: false
       matrix:

@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional
 import typer
 from rich.console import Console
 
-from ..runtime import RuntimeProfile, detect_runtime_profile
+from ..runtime import RuntimeProfile, detect_runtime_profile, python_install_hint
 
 console = Console(stderr=True)
 
@@ -206,7 +206,7 @@ def _run_source(
             if not isinstance(region, CaptureRegion):
                 raise InputRoutingError(
                     "This capture backend cannot map pointer coordinates safely; "
-                    "install glyph-forge[media,control] and use --backend mss"
+                    f"{python_install_hint('media,control')} and use --backend mss"
                 )
             input_router = InputRouter(
                 create_input_sink(input_backend, display_name=control_display),

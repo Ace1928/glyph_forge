@@ -66,7 +66,7 @@ def test_missing_network_extra_has_actionable_error(monkeypatch) -> None:
 
     monkeypatch.setattr(network.importlib, "import_module", missing)
 
-    with pytest.raises(network.NetworkSourceError, match=r"glyph-forge\[network\]"):
+    with pytest.raises(network.NetworkSourceError, match=r"glyphforge\[network\]"):
         network.resolve_network_source("https://videos.invalid/watch/123")
 
 

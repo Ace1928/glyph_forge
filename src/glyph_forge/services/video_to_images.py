@@ -8,6 +8,8 @@ from typing import Any
 
 from PIL import Image, ImageSequence, UnidentifiedImageError
 
+from ..runtime import python_install_hint
+
 
 def _load_opencv() -> Any | None:
     try:
@@ -60,7 +62,7 @@ def iter_video_images(
     except UnidentifiedImageError as exc:
         if cv2 is None:
             raise RuntimeError(
-                "This video needs OpenCV; install glyph-forge[media]"
+                f"This video needs OpenCV; {python_install_hint('media')}"
             ) from exc
         raise RuntimeError(f"No decoder could open video: {source}") from exc
 

@@ -53,13 +53,19 @@ Termux/Android too).
 
 | OS | Fastest path |
 |---|---|
-| **Windows** | `py -m pip install "glyph-forge[all]"` |
-| **macOS / Linux** | `python3 -m pip install "glyph-forge[all]"` |
-| **Any OS, isolated** | `pipx install "glyph-forge[all]"` |
-| **Any OS, fastest** | `uv tool install "glyph-forge[all]"` |
-| **No install at all** | `uvx --from "glyph-forge[all]" glyph-forge launch` |
-| **Small core** | `python -m pip install glyph-forge` — images, text, Studio, demo |
+| **Windows** | `py -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
+| **macOS / Linux** | `python3 -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
+| **Any OS, isolated** | `pipx install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
+| **Any OS, fastest** | `uv tool install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
+| **No install at all** | `uvx --from "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip" glyph-forge launch` |
+| **Small core** | Install the same release URL without `[all]` — images, text, Studio, demo |
 | **Portable binaries** | Tagged releases ship no-Python one-directory archives for all three OSes |
+
+The Python distribution is `glyphforge` (no separator); the product and command
+remain **Glyph Forge** and `glyph-forge`, and the import remains `glyph_forge`.
+The hyphenated PyPI project `glyph-forge` belongs to an unrelated API client.
+The immutable GitHub tag above is the canonical Python install until the
+available `glyphforge` PyPI name receives its one-time owner configuration.
 
 Install only what you use with extras:
 
@@ -175,7 +181,8 @@ NumPy operations, keeping their cost proportional to visible cells.
 
 ## Video, webcam, screen, and URLs
 
-Install `glyph-forge[media]` for the primary live backends.
+Install the `media` extra from the versioned source above for the primary live
+backends.
 
 ```bash
 # Memory-bounded terminal playback
@@ -230,12 +237,12 @@ On an X11 host, Glyph Forge can launch one application in an isolated virtual
 display and render that display through the same pipeline:
 
 ```bash
-python -m pip install "glyph-forge[media,virtual]"
+python -m pip install "glyphforge[media,virtual] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
 glyph-forge live launch -- xterm
 glyph-forge live launch --display-width 1600 --display-height 900 -- firefox
 
 # Explicit interactive mode (install media, virtual, and control extras)
-python -m pip install "glyph-forge[media,virtual,control]"
+python -m pip install "glyphforge[media,virtual,control] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
 glyph-forge live launch --control -- xterm
 ```
 
@@ -381,7 +388,7 @@ glyph-forge live source "plugin:synth/waves:440" --mode plugin:effects/neon
 
 Plugins are ordinary Python packages registered in the
 `glyph_forge.plugins` entry-point group. pipx users can install one into the
-same isolated environment with `pipx inject glyph-forge PACKAGE`. Plugins run
+same isolated environment with `pipx inject glyphforge PACKAGE`. Plugins run
 in-process with your account's permissions and are not sandboxed, so install
 only packages you trust; `GLYPH_FORGE_DISABLE_PLUGINS=1` disables automatic
 discovery.
@@ -393,7 +400,7 @@ implementation is in [`examples/plugin_example.py`](examples/plugin_example.py).
 ## Full-screen terminal UI
 
 ```bash
-python -m pip install "glyph-forge[tui]"
+python -m pip install "glyphforge[tui] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
 glyph-forge interactive
 ```
 

@@ -25,7 +25,7 @@ body:
     attributes:
       label: Glyph Forge version
       description: Run `glyph-forge version` if possible.
-      placeholder: "0.2.0"
+      placeholder: "0.3.0"
     validations:
       required: true
   - type: input

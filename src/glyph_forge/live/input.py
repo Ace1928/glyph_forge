@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypeAlias, runtime_checkable
 
+from ..runtime import python_install_hint
 from .capture import CaptureRegion
 
 Modifier: TypeAlias = Literal["shift", "alt", "ctrl"]
@@ -203,7 +204,7 @@ class PynputInputSink:
             target = f" for display {display_name}" if display_name else ""
             raise InputBackendUnavailable(
                 "Desktop control requires pynput and OS input permission"
-                f"{target}; install glyph-forge[control] and grant Accessibility "
+                f"{target}; {python_install_hint('control')} and grant Accessibility "
                 f"or input-control access ({exc})"
             ) from exc
         self._key_namespace = keyboard.Key

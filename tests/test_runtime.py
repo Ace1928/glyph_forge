@@ -12,6 +12,7 @@ import pytest
 from PIL import Image
 from typer.testing import CliRunner
 
+import glyph_forge
 from glyph_forge import runtime
 from glyph_forge.cli import app
 from glyph_forge.runtime import PerformanceTier, detect_runtime_profile, runtime_report
@@ -46,6 +47,28 @@ def test_runtime_report_is_json_serializable() -> None:
     assert report["profile"]["tier"] == "eco"
     assert any(item["key"] == "PIL" for item in report["capabilities"])
     json.dumps(report)
+
+
+def test_package_version_uses_the_unambiguous_distribution_name(monkeypatch) -> None:
+    requested: list[str] = []
+
+    def fake_version(distribution: str) -> str:
+        requested.append(distribution)
+        return "9.8.7"
+
+    monkeypatch.setattr(runtime.metadata, "version", fake_version)
+
+    assert runtime.package_version() == "9.8.7"
+    assert requested == ["glyphforge"]
+
+
+def test_install_hint_tracks_the_stable_product_version() -> None:
+    command = runtime.python_install_hint("media")
+
+    assert runtime.STABLE_RELEASE_VERSION == glyph_forge.__version__
+    assert "glyphforge[media]" in command
+    assert f"/tags/v{glyph_forge.__version__}.zip" in command
+    assert "glyph-forge[" not in command
 
 
 def test_tool_probe_rejects_a_binary_that_exists_but_cannot_start(
@@ -199,7 +222,7 @@ def test_package_import_is_lazy_and_has_no_home_side_effects(tmp_path: Path) -> 
     )
     result = json.loads(completed.stdout)
 
-    assert result == {"pil": False, "numpy": False, "version": "0.2.0"}
+    assert result == {"pil": False, "numpy": False, "version": "0.3.0"}
     assert not (tmp_path / ".glyph_forge").exists()
 
 
@@ -210,7 +233,7 @@ def test_cli_home_and_version_json() -> None:
     assert home.exit_code == 0
     assert "Quick start" in home.stdout
     assert version.exit_code == 0
-    assert json.loads(version.stdout)["glyph_forge"] == "0.2.0"
+    assert json.loads(version.stdout)["glyph_forge"] == "0.3.0"
 
 
 def test_cli_doctor_json() -> None:

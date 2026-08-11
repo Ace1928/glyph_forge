@@ -18,6 +18,20 @@ from enum import Enum
 from importlib import metadata
 from typing import Any, Iterable
 
+PYTHON_DISTRIBUTION = "glyphforge"
+STABLE_RELEASE_VERSION = "0.3.0"
+STABLE_SOURCE_URL = (
+    "https://github.com/Ace1928/glyph_forge/archive/refs/tags/"
+    f"v{STABLE_RELEASE_VERSION}.zip"
+)
+
+
+def python_install_hint(extra: str | None = None) -> str:
+    """Return the canonical install command for the current stable release."""
+
+    distribution = f"{PYTHON_DISTRIBUTION}[{extra}]" if extra else PYTHON_DISTRIBUTION
+    return f'pip install "{distribution} @ {STABLE_SOURCE_URL}"'
+
 
 class PerformanceTier(str, Enum):
     """Named performance envelopes used throughout Glyph Forge."""
@@ -144,31 +158,31 @@ class Capability:
 
 
 _PYTHON_CAPABILITIES: tuple[tuple[str, str, str, str | None], ...] = (
-    ("PIL", "Pillow", "image conversion", "pip install glyph-forge"),
-    ("numpy", "NumPy", "accelerated pixel mapping", "pip install glyph-forge"),
-    ("pyfiglet", "pyfiglet", "text banners", "pip install glyph-forge"),
-    ("rich", "Rich", "styled CLI output", "pip install glyph-forge"),
-    ("typer", "Typer", "command-line interface", "pip install glyph-forge"),
-    ("textual", "Textual", "terminal UI", "pip install 'glyph-forge[tui]'"),
-    ("cv2", "OpenCV", "video and webcam capture", "pip install 'glyph-forge[media]'"),
-    ("mss", "MSS", "cross-platform screen capture", "pip install 'glyph-forge[media]'"),
+    ("PIL", "Pillow", "image conversion", python_install_hint()),
+    ("numpy", "NumPy", "accelerated pixel mapping", python_install_hint()),
+    ("pyfiglet", "pyfiglet", "text banners", python_install_hint()),
+    ("rich", "Rich", "styled CLI output", python_install_hint()),
+    ("typer", "Typer", "command-line interface", python_install_hint()),
+    ("textual", "Textual", "terminal UI", python_install_hint("tui")),
+    ("cv2", "OpenCV", "video and webcam capture", python_install_hint("media")),
+    ("mss", "MSS", "cross-platform screen capture", python_install_hint("media")),
     (
         "yt_dlp",
         "yt-dlp",
         "video-site URL resolution",
-        "pip install 'glyph-forge[network]'",
+        python_install_hint("network"),
     ),
     (
         "pyvirtualdisplay",
         "PyVirtualDisplay",
         "isolated X11 application displays",
-        "pip install 'glyph-forge[virtual]' and install Xvfb",
+        f"{python_install_hint('virtual')} and install Xvfb",
     ),
     (
         "pynput",
         "pynput",
         "explicit keyboard and pointer forwarding",
-        "pip install 'glyph-forge[control]' and grant OS input permission",
+        f"{python_install_hint('control')} and grant OS input permission",
     ),
 )
 
@@ -351,9 +365,9 @@ def package_version() -> str:
     """Return the installed distribution version without importing the package."""
 
     try:
-        return metadata.version("glyph-forge")
+        return metadata.version("glyphforge")
     except metadata.PackageNotFoundError:
-        return "0.2.0.dev0"
+        return "0.3.0.dev0"
 
 
 def runtime_report(preference: str | PerformanceTier | None = None) -> dict[str, Any]:
@@ -375,11 +389,15 @@ def runtime_report(preference: str | PerformanceTier | None = None) -> dict[str,
 __all__ = [
     "Capability",
     "PerformanceTier",
+    "PYTHON_DISTRIBUTION",
     "RuntimeProfile",
+    "STABLE_RELEASE_VERSION",
+    "STABLE_SOURCE_URL",
     "configure_utf8_stdio",
     "detect_runtime_profile",
     "iter_capabilities",
     "package_version",
+    "python_install_hint",
     "reexec_clean_android_environment",
     "runtime_report",
     "subprocess_environment",

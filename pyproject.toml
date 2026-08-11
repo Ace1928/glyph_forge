@@ -3,8 +3,8 @@ requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "glyph-forge"
-version = "0.2.0"
+name = "glyphforge"
+version = "0.3.0"
 description = "Fast, portable image, text, video, and live-media glyph rendering"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -82,7 +82,8 @@ bannerize = "glyph_forge.cli.bannerize:main"
 
 [project.urls]
 Homepage = "https://github.com/Ace1928/glyph_forge"
-Documentation = "https://glyph-forge.readthedocs.io/"
+Documentation = "https://github.com/Ace1928/glyph_forge/tree/main/docs"
+Demo = "https://ace1928.github.io/glyph_forge/"
 Issues = "https://github.com/Ace1928/glyph_forge/issues"
 Source = "https://github.com/Ace1928/glyph_forge"
 

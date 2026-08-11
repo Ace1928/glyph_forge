@@ -9,6 +9,11 @@ the project uses semantic versioning.
 
 - Native capture adapters and optional compiled rendering hot paths
 - Signed standalone installers and an opt-in hosted sharing service
+- One-time PyPI owner setup for the unambiguous `glyphforge` distribution;
+  versioned GitHub wheels and portable archives remain the canonical release
+  path until then
+
+## [0.3.0] - 2026-08-11
 
 ### Added
 
@@ -64,6 +69,10 @@ the project uses semantic versioning.
 
 ### Changed
 
+- The installable Python distribution is now the unambiguous `glyphforge`
+  project while the product, `glyph-forge` executable, and `glyph_forge` import
+  stay unchanged; documentation warns against the unrelated hyphenated PyPI
+  package
 - Every CLI command, option, and argument now carries an explicit help
   description, so `--help` fully explains each workflow without reading docs
 - The repeated live-media options (mode, colour, width, charset, edges, timing,
