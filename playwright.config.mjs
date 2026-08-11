@@ -16,7 +16,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 4 : undefined,
+  // A latency SLA must model one active user, not four browser engines
+  // competing for the same small CI runner. Cross-engine coverage stays full.
+  workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [["github"], ["line"]] : "list",
   use: {
     baseURL: "http://localhost:4173/glyph_forge/",
