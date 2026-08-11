@@ -5,6 +5,39 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Strict, portable project and preset v1 documents shared by CLI, TUI, Studio,
+  and Python API, including relative assets, immutable variants, bounded
+  metadata, checked-in cross-runtime fixtures, and atomic persistence
+- Recoverable project sessions with bounded undo/redo, debounced sidecars,
+  stale-base protection, platform-native recents, and explicit recovery or
+  discard operations
+- Project, preset, and bounded batch commands plus high-level Python APIs;
+  TUI and Studio controls now expose creation/open/save, variants, history,
+  preset exchange, recovery, recents, and cancellable queues
+- Studio file-handler and offline-shell support for project/preset documents,
+  browser-local autosave, keyboard shortcuts, collision-safe batch downloads,
+  and startup session restoration
+
+### Changed
+
+- Portable project creation and external-asset copying now use one shared
+  application operation across CLI, TUI, and API instead of interface-local
+  filename and copy implementations
+
+### Performance
+
+- Native still batches use bounded worker backpressure with at most one pending
+  item per worker; Studio uses a bounded sequential queue suited to browser
+  download permission models
+
+### Security
+
+- Project loaders reject absolute, escaping, drive-prefixed, reserved-device,
+  and otherwise non-portable asset paths; Studio recovery stores settings only
+  and never source media
+
 ### Planned
 
 - Native capture adapters and optional compiled rendering hot paths

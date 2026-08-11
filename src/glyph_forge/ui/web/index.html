@@ -100,9 +100,78 @@
           </label>
         </section>
 
-        <section class="control-section">
+        <section class="control-section project-section">
           <div class="section-heading">
             <span class="step">02</span>
+            <div>
+              <h2>Keep a project</h2>
+              <p>Autosave, variants, presets, recovery, and batches.</p>
+            </div>
+          </div>
+
+          <label class="field" for="projectNameInput">
+            <span>Project name</span>
+            <input id="projectNameInput" type="text" maxlength="256" value="Untitled" autocomplete="off">
+          </label>
+          <p id="projectStatus" class="project-status" role="status">No project open. Choose a file, then create one.</p>
+          <div class="project-actions">
+            <button id="newProjectButton" class="button secondary" type="button">New project</button>
+            <button id="openProjectButton" class="button secondary" type="button">Open project</button>
+            <button id="saveProjectButton" class="button primary" type="button" disabled>Save project</button>
+          </div>
+          <input id="projectFileInput" class="visually-hidden" type="file" accept=".glyphforge.json,application/json" aria-label="Open a Glyph Forge project">
+
+          <label class="field" for="variantSelect">
+            <span>Active variant</span>
+            <select id="variantSelect" disabled>
+              <option value="default">Default</option>
+            </select>
+          </label>
+          <div class="text-source compact-source">
+            <label class="field" for="variantNameInput">
+              <span>New variant</span>
+              <input id="variantNameInput" type="text" maxlength="256" placeholder="Bright poster">
+            </label>
+            <button id="addVariantButton" class="button secondary" type="button" disabled>Add</button>
+          </div>
+          <div class="project-actions">
+            <button id="removeVariantButton" class="button ghost" type="button" disabled>Remove variant</button>
+            <button id="undoProjectButton" class="button ghost" type="button" disabled>Undo</button>
+            <button id="redoProjectButton" class="button ghost" type="button" disabled>Redo</button>
+          </div>
+
+          <div class="project-actions preset-actions">
+            <button id="importPresetButton" class="button secondary" type="button">Import preset</button>
+            <button id="exportPresetButton" class="button secondary" type="button">Export preset</button>
+          </div>
+          <input id="presetFileInput" class="visually-hidden" type="file" accept=".glyphpreset.json,application/json" aria-label="Import a Glyph Forge preset">
+
+          <div class="text-source compact-source recent-source">
+            <label class="field" for="recentProjectSelect">
+              <span>Recent projects</span>
+              <select id="recentProjectSelect" disabled>
+                <option value="">None yet</option>
+              </select>
+            </label>
+            <button id="openRecentButton" class="button ghost" type="button" disabled>Open</button>
+          </div>
+
+          <div class="batch-panel" aria-labelledby="batchHeading">
+            <div class="field-label" id="batchHeading">Batch queue</div>
+            <p id="batchQueueStatus" class="project-status">No queued images.</p>
+            <div class="project-actions">
+              <button id="addBatchButton" class="button secondary" type="button">Add images</button>
+              <button id="clearBatchButton" class="button ghost" type="button" disabled>Clear</button>
+              <button id="runBatchButton" class="button primary" type="button" disabled>Run batch</button>
+              <button id="cancelBatchButton" class="button ghost" type="button" disabled>Cancel</button>
+            </div>
+            <input id="batchFileInput" class="visually-hidden" type="file" accept="image/*" multiple aria-label="Add images to the batch queue">
+          </div>
+        </section>
+
+        <section class="control-section">
+          <div class="section-heading">
+            <span class="step">03</span>
             <div>
               <h2>Shape the signal</h2>
               <p>Every change previews instantly.</p>
@@ -154,6 +223,11 @@
           <label class="field range-field">
             <span>Glyph columns <output id="columnsValue">128</output></span>
             <input id="columnsRange" type="range" min="32" max="480" step="8" value="128">
+          </label>
+
+          <label class="field">
+            <span>Glyph rows · blank fits source</span>
+            <input id="rowsInput" type="number" min="1" max="1000" step="1" inputmode="numeric" placeholder="Auto">
           </label>
 
           <label class="field">
@@ -226,7 +300,7 @@
 
         <section class="control-section export-section">
           <div class="section-heading">
-            <span class="step">03</span>
+            <span class="step">04</span>
             <div>
               <h2>Save or share</h2>
               <p>Pixels, real vector glyphs, or plain text.</p>

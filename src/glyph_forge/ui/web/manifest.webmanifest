@@ -53,7 +53,8 @@
       "action": "./",
       "accept": {
         "image/*": [".avif", ".bmp", ".gif", ".heic", ".heif", ".jpeg", ".jpg", ".png", ".svg", ".webp"],
-        "video/*": [".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm"]
+        "video/*": [".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm"],
+        "application/json": [".glyphforge.json", ".glyphpreset.json"]
       }
     }
   ],

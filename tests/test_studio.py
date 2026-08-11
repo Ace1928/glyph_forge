@@ -296,6 +296,7 @@ def test_browser_assets_form_an_installable_offline_app_shell() -> None:
         for name in (
             "manifest.webmanifest",
             "service-worker.js",
+            "project-contract.js",
             "icon.svg",
             "icon-192.png",
             "icon-512.png",
@@ -308,6 +309,7 @@ def test_browser_assets_form_an_installable_offline_app_shell() -> None:
     manifest = json.loads(assets["manifest.webmanifest"][1])
     assert assets["manifest.webmanifest"][0] == "application/manifest+json"
     assert assets["service-worker.js"][0] == "text/javascript"
+    assert assets["project-contract.js"][0] == "text/javascript"
     assert manifest["display"] == "standalone"
     assert manifest["start_url"] == "./"
     assert {icon["sizes"] for icon in manifest["icons"]} >= {"192x192", "512x512"}
@@ -354,7 +356,12 @@ def test_browser_assets_expose_full_fidelity_and_recording_controls() -> None:
 def test_browser_javascript_parses() -> None:
     with StudioServer(port=0) as server:
         assets = []
-        for name in ("studio.js", "studio-renderers.js", "service-worker.js"):
+        for name in (
+            "studio.js",
+            "studio-renderers.js",
+            "project-contract.js",
+            "service-worker.js",
+        ):
             with urllib.request.urlopen(f"{server.url}{name}", timeout=2) as response:
                 assets.append((name, response.read()))
 

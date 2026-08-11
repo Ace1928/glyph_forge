@@ -7,16 +7,24 @@ import {
   clamp,
   sampleGlyphFrame,
 } from "./studio-renderers.js";
+import {
+  ProjectSessionModel,
+  createPresetDocument,
+  createProjectDocument,
+  encodeDocument,
+  parseDocument,
+  validateRenderRequest,
+} from "./project-contract.js";
 
 const CHARSETS = Object.freeze({
-  detailed: " .,:;irsXA253hMHGS#9B&@",
+  detailed: " .'`^\",:;Il!i><~+_-?][}{1)(|/''tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
   general: " .,:;i1tfLCG08@",
   blocks: " ░▒▓█",
   minimal: " .-=+*#%@",
-  matrix: " 01+*%#@アイウエオカキクケコ",
+  matrix: "日+*%$#@&01",
   stipple: " ·•○◎●◉",
-  binary: " 01",
-  cosmic: " ·˚。✧⋆✦✩★",
+  binary: "01",
+  cosmic: "✧·˚✫⋆˚。⋆｡⋆☾˚⋆✦✩★",
 });
 
 const OUTPUT_PRESETS = Object.freeze({
@@ -49,6 +57,29 @@ const elements = {
   useText: $("textSourceButton"),
   glyphCode: $("glyphCodeInput"),
   glyphCodeButton: $("glyphCodeButton"),
+  projectName: $("projectNameInput"),
+  projectStatus: $("projectStatus"),
+  newProject: $("newProjectButton"),
+  openProject: $("openProjectButton"),
+  saveProject: $("saveProjectButton"),
+  projectFile: $("projectFileInput"),
+  variant: $("variantSelect"),
+  variantName: $("variantNameInput"),
+  addVariant: $("addVariantButton"),
+  removeVariant: $("removeVariantButton"),
+  undoProject: $("undoProjectButton"),
+  redoProject: $("redoProjectButton"),
+  importPreset: $("importPresetButton"),
+  exportPreset: $("exportPresetButton"),
+  presetFile: $("presetFileInput"),
+  recentProject: $("recentProjectSelect"),
+  openRecent: $("openRecentButton"),
+  batchStatus: $("batchQueueStatus"),
+  addBatch: $("addBatchButton"),
+  clearBatch: $("clearBatchButton"),
+  runBatch: $("runBatchButton"),
+  cancelBatch: $("cancelBatchButton"),
+  batchFile: $("batchFileInput"),
   audio: $("audioToggle"),
   mode: $("modeSelect"),
   charsetField: $("charsetField"),
@@ -58,6 +89,7 @@ const elements = {
   font: $("fontSelect"),
   columns: $("columnsRange"),
   columnsValue: $("columnsValue"),
+  rows: $("rowsInput"),
   sizePreset: $("sizePreset"),
   outputWidth: $("outputWidth"),
   outputHeight: $("outputHeight"),
@@ -110,6 +142,14 @@ const state = {
   gifDurations: null,
   gifIndex: 0,
   gifElapsedBase: undefined,
+  sourceFile: null,
+  projectSession: null,
+  projectCaptureTimer: null,
+  requestControlsDirty: false,
+  requestTemplate: null,
+  syncingProject: false,
+  batchFiles: [],
+  batchController: null,
   shareConfig: {
     enabled: false,
     csrfToken: null,
@@ -138,6 +178,14 @@ function densityCharset() {
   const raw = selected === "custom" ? elements.customCharset.value : CHARSETS[selected];
   const glyphs = Array.from(raw || " .#").slice(0, 128);
   return glyphs.length ? glyphs.join("") : " .#";
+}
+
+function portableCharset() {
+  const selected = elements.charset.value;
+  if (selected !== "custom" && selected !== "stipple" && CHARSETS[selected]) {
+    return selected;
+  }
+  return `literal:${densityCharset()}`;
 }
 
 function activeCharset(mode = elements.mode.value) {
@@ -286,7 +334,10 @@ function targetDimensions() {
   );
   const aspect = sourceAspect();
   const columns = Number(elements.columns.value);
-  const rows = Math.max(1, Math.round((columns * 0.5) / aspect));
+  const explicitRows = Number(elements.rows.value);
+  const rows = Number.isInteger(explicitRows) && explicitRows >= 1 && explicitRows <= 1000
+    ? explicitRows
+    : Math.max(1, Math.round((columns * 0.5) / aspect));
   state.dimensions = { width, height, rows };
   elements.grid.textContent = `${columns}×${rows}`;
   return state.dimensions;
@@ -323,6 +374,503 @@ function currentOptions() {
 function invalidateOptions() {
   state.options = null;
   state.optionsDirty = true;
+}
+
+const PROJECT_AUTOSAVE_KEY = "glyph-forge-project-autosave-v1";
+const RECENT_PROJECTS_KEY = "glyph-forge-recent-projects-v1";
+const MAX_BROWSER_RECENTS = 20;
+const MAX_BROWSER_BATCH = 1000;
+
+function studioRenderRequest() {
+  const options = currentOptions();
+  const template = state.projectSession?.active.request || state.requestTemplate;
+  const requestedFormat = template?.output_format || "png";
+  const outputFormat = requestedFormat === "html" && options.mode !== "glyph"
+    ? "png"
+    : requestedFormat;
+  const graphical = outputFormat === "png" || outputFormat === "svg";
+  return validateRenderRequest({
+    width: options.columns,
+    height: options.rows,
+    mode: options.mode,
+    output_format: outputFormat,
+    charset: portableCharset(),
+    invert: options.invert,
+    dither: template?.dither ?? false,
+    threshold: template?.threshold ?? 128,
+    edge_algorithm: template?.edge_algorithm || "sobel",
+    edge_threshold: template?.edge_threshold ?? 48,
+    cell_aspect: template?.cell_aspect ?? 0.5,
+    resample: template?.resample || "bilinear",
+    brightness: options.brightness,
+    contrast: options.contrast,
+    style: template?.style ?? null,
+    optimize: template?.optimize ?? false,
+    max_width: template?.max_width ?? null,
+    max_height: template?.max_height ?? null,
+    output_width: graphical ? options.width : null,
+    output_height: graphical ? options.height : null,
+    fit: template?.fit || "stretch",
+    alignment: template?.alignment || "center",
+    foreground: elements.foreground.value,
+    background: elements.background.value,
+    font: template?.font ?? null,
+    contract_version: 1,
+  });
+}
+
+function applyRenderRequest(rawRequest) {
+  const request = validateRenderRequest(rawRequest);
+  state.requestTemplate = request;
+  state.requestControlsDirty = false;
+  state.syncingProject = true;
+  if ([...elements.mode.options].some(({ value }) => value === request.mode)) {
+    elements.mode.value = request.mode;
+  }
+  if (request.charset.startsWith("literal:")) {
+    elements.charset.value = "custom";
+    elements.customCharset.value = request.charset.slice("literal:".length).slice(0, 128);
+  } else if ([...elements.charset.options].some(({ value }) => value === request.charset)) {
+    elements.charset.value = request.charset;
+  } else {
+    elements.charset.value = "custom";
+    elements.customCharset.value = " .#";
+    setStatus(`The ${request.charset} alphabet is not bundled in this browser; choose custom glyphs to preview it.`, true);
+  }
+  elements.columns.value = String(clamp(request.width, 32, 480));
+  elements.rows.value = request.height === null ? "" : String(clamp(request.height, 1, 1000));
+  elements.brightness.value = String(request.brightness);
+  elements.contrast.value = String(request.contrast);
+  elements.invert.checked = request.invert;
+  elements.foreground.value = /^#[0-9a-f]{6}$/iu.test(request.foreground)
+    ? request.foreground
+    : "#e8fff7";
+  elements.background.value = /^#[0-9a-f]{6}$/iu.test(request.background)
+    ? request.background
+    : "#07110f";
+  if (request.output_width !== null && request.output_height !== null) {
+    elements.sizePreset.value = "custom";
+    writeOutputSize(request.output_width, request.output_height);
+  }
+  elements.colorMode.value = "mono";
+  state.syncingProject = false;
+  invalidateOptions();
+  syncControlLabels();
+  if (state.source) renderCurrent();
+}
+
+function storageRead(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : JSON.parse(value);
+  } catch (error) {
+    console.warn(`Could not read ${key}`, error);
+    return fallback;
+  }
+}
+
+function storageWrite(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    console.warn(`Could not write ${key}`, error);
+    return false;
+  }
+}
+
+function recentProjects() {
+  const values = storageRead(RECENT_PROJECTS_KEY, []);
+  if (!Array.isArray(values)) return [];
+  const result = [];
+  for (const item of values.slice(0, MAX_BROWSER_RECENTS)) {
+    try {
+      result.push({
+        project: parseDocument(JSON.stringify(item.project), "project"),
+        accessedAt: String(item.accessedAt),
+      });
+    } catch (error) {
+      console.warn("Ignoring invalid recent project", error);
+    }
+  }
+  return result;
+}
+
+function refreshRecentProjects() {
+  const recents = recentProjects();
+  elements.recentProject.replaceChildren();
+  if (!recents.length) {
+    elements.recentProject.add(new Option("None yet", ""));
+  } else {
+    recents.forEach((item, index) => {
+      elements.recentProject.add(new Option(
+        `${item.project.name} · ${item.project.source.path.split("/").pop()}`,
+        String(index),
+      ));
+    });
+  }
+  elements.recentProject.disabled = !recents.length;
+  elements.openRecent.disabled = !recents.length;
+}
+
+function rememberProject(project) {
+  const validated = parseDocument(JSON.stringify(project), "project");
+  const recents = recentProjects().filter((item) => (
+    item.project.name !== validated.name || item.project.source.path !== validated.source.path
+  ));
+  recents.unshift({ project: validated, accessedAt: new Date().toISOString() });
+  storageWrite(RECENT_PROJECTS_KEY, recents.slice(0, MAX_BROWSER_RECENTS));
+  refreshRecentProjects();
+}
+
+function autosaveProject() {
+  if (!state.projectSession) return;
+  const saved = storageWrite(PROJECT_AUTOSAVE_KEY, {
+    project: state.projectSession.project,
+    dirty: state.projectSession.dirty,
+    savedAt: new Date().toISOString(),
+  });
+  if (!saved) {
+    setStatus("Project changed, but browser autosave storage is unavailable.", true);
+  }
+  rememberProject(state.projectSession.project);
+}
+
+function refreshProjectUi(message = "") {
+  const session = state.projectSession;
+  const enabled = Boolean(session);
+  elements.saveProject.disabled = !enabled;
+  elements.variant.disabled = !enabled;
+  elements.addVariant.disabled = !enabled;
+  elements.removeVariant.disabled = !enabled || session.project.variants.length <= 1;
+  elements.undoProject.disabled = !enabled || !session.undoStack.length;
+  elements.redoProject.disabled = !enabled || !session.redoStack.length;
+  if (!session) {
+    elements.projectStatus.textContent = message || "No project open. Choose a file, then create one.";
+    return;
+  }
+  state.syncingProject = true;
+  elements.projectName.value = session.project.name;
+  elements.variant.replaceChildren();
+  for (const variant of session.project.variants) {
+    elements.variant.add(new Option(variant.name, variant.id));
+  }
+  elements.variant.value = session.project.active_variant;
+  state.syncingProject = false;
+  const stateLabel = session.dirty ? "autosaved" : "saved";
+  elements.projectStatus.textContent = message || (
+    `${stateLabel} · ${session.project.variants.length} variant`
+    + `${session.project.variants.length === 1 ? "" : "s"} · ${session.project.source.path}`
+  );
+}
+
+function scheduleProjectCapture() {
+  if (!state.projectSession || state.syncingProject || !state.requestControlsDirty) return;
+  window.clearTimeout(state.projectCaptureTimer);
+  state.projectCaptureTimer = window.setTimeout(() => {
+    try {
+      state.projectSession.replaceActiveRequest(studioRenderRequest());
+      state.requestControlsDirty = false;
+      autosaveProject();
+      refreshProjectUi();
+    } catch (error) {
+      setStatus(`Could not autosave project settings: ${error.message}`, true);
+    }
+  }, 250);
+}
+
+function createBrowserProject() {
+  if (!state.sourceFile || !["image", "video"].includes(state.sourceKind)) {
+    setStatus("Open an image or video file before creating a portable project.", true);
+    return;
+  }
+  try {
+    const document = createProjectDocument(
+      elements.projectName.value.trim() || state.sourceFile.name.replace(/\.[^.]+$/u, "") || "Untitled",
+      state.sourceFile.name,
+      studioRenderRequest(),
+      new Date().toISOString(),
+      state.sourceKind,
+    );
+    state.projectSession = new ProjectSessionModel(document);
+    state.projectSession.dirty = true;
+    state.requestTemplate = state.projectSession.active.request;
+    state.requestControlsDirty = false;
+    autosaveProject();
+    refreshProjectUi("New project · autosaved locally. Save the JSON to share it.");
+    setStatus("Project created. Source media remains local and separate.");
+  } catch (error) {
+    setStatus(`Could not create project: ${error.message}`, true);
+  }
+}
+
+function useProject(project, { recovered = false } = {}) {
+  state.projectSession = new ProjectSessionModel(project);
+  state.projectSession.dirty = recovered;
+  applyRenderRequest(state.projectSession.active.request);
+  autosaveProject();
+  refreshProjectUi(recovered
+    ? "Recovered browser autosave · reselect the source if needed."
+    : "Project opened · reselect the referenced source if needed.");
+  setStatus(recovered
+    ? "Recovered the latest local project autosave. Reselect its source media to render."
+    : `Opened project ${state.projectSession.project.name}.`);
+}
+
+async function importProjectFile(file) {
+  if (!file) return;
+  try {
+    const project = parseDocument(await file.text(), "project");
+    useProject(project);
+    state.projectSession.markSaved();
+    rememberProject(project);
+    refreshProjectUi("Project opened · saved document, local source unchanged.");
+    setStatus(`Opened project ${project.name}.`);
+  } catch (error) {
+    setStatus(`Could not open project: ${error.message}`, true);
+  }
+}
+
+function saveBrowserProject() {
+  if (!state.projectSession) {
+    setStatus("Create or open a project first.", true);
+    return;
+  }
+  try {
+    window.clearTimeout(state.projectCaptureTimer);
+    if (state.requestControlsDirty) {
+      state.projectSession.replaceActiveRequest(studioRenderRequest());
+      state.requestControlsDirty = false;
+    }
+    const content = encodeDocument(state.projectSession.project, "project");
+    const filename = `${state.projectSession.project.name.replace(/[^a-z0-9_-]+/giu, "-") || "project"}.glyphforge.json`;
+    download(new Blob([content], { type: "application/json" }), filename);
+    state.projectSession.markSaved();
+    autosaveProject();
+    refreshProjectUi("Project downloaded · keep its assets folder beside it when sharing.");
+  } catch (error) {
+    setStatus(`Could not save project: ${error.message}`, true);
+  }
+}
+
+function projectUndo() {
+  if (!state.projectSession) return;
+  try {
+    state.projectSession.undo();
+    applyRenderRequest(state.projectSession.active.request);
+    autosaveProject();
+    refreshProjectUi();
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+function projectRedo() {
+  if (!state.projectSession) return;
+  try {
+    state.projectSession.redo();
+    applyRenderRequest(state.projectSession.active.request);
+    autosaveProject();
+    refreshProjectUi();
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+function addProjectVariant() {
+  if (!state.projectSession) return;
+  const name = elements.variantName.value.trim();
+  const identifier = name.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^[-._]+|[-._]+$/gu, "");
+  if (!name || !identifier) {
+    setStatus("Enter a portable variant name first.", true);
+    return;
+  }
+  try {
+    state.projectSession.addVariant(identifier, name, studioRenderRequest());
+    state.requestTemplate = state.projectSession.active.request;
+    state.requestControlsDirty = false;
+    elements.variantName.value = "";
+    autosaveProject();
+    refreshProjectUi();
+  } catch (error) {
+    setStatus(`Could not add variant: ${error.message}`, true);
+  }
+}
+
+function renameProject() {
+  if (!state.projectSession || state.syncingProject) return;
+  const name = elements.projectName.value.trim();
+  if (!name) {
+    elements.projectName.value = state.projectSession.project.name;
+    setStatus("Project names cannot be empty.", true);
+    return;
+  }
+  try {
+    state.projectSession.apply({
+      ...state.projectSession.project,
+      name,
+      updated_at: new Date().toISOString(),
+    });
+    autosaveProject();
+    refreshProjectUi();
+  } catch (error) {
+    setStatus(`Could not rename project: ${error.message}`, true);
+  }
+}
+
+function removeProjectVariant() {
+  if (!state.projectSession) return;
+  try {
+    state.projectSession.removeVariant(state.projectSession.project.active_variant);
+    applyRenderRequest(state.projectSession.active.request);
+    autosaveProject();
+    refreshProjectUi();
+  } catch (error) {
+    setStatus(`Could not remove variant: ${error.message}`, true);
+  }
+}
+
+async function importPresetFile(file) {
+  if (!file) return;
+  try {
+    const preset = parseDocument(await file.text(), "preset");
+    applyRenderRequest(preset.request);
+    if (state.projectSession) {
+      state.projectSession.replaceActiveRequest(preset.request);
+      autosaveProject();
+      refreshProjectUi();
+    }
+    setStatus(`Applied preset ${preset.name}.`);
+  } catch (error) {
+    setStatus(`Could not import preset: ${error.message}`, true);
+  }
+}
+
+function exportBrowserPreset() {
+  try {
+    const name = state.projectSession?.active.name
+      || elements.projectName.value.trim()
+      || "Glyph Forge preset";
+    const request = state.requestTemplate && !state.requestControlsDirty
+      ? state.requestTemplate
+      : studioRenderRequest();
+    const preset = createPresetDocument(name, request, { source: "studio" });
+    const filename = `${name.replace(/[^a-z0-9_-]+/giu, "-") || "preset"}.glyphpreset.json`;
+    download(
+      new Blob([encodeDocument(preset, "preset")], { type: "application/json" }),
+      filename,
+    );
+    setStatus(`Exported preset ${name}.`);
+  } catch (error) {
+    setStatus(`Could not export preset: ${error.message}`, true);
+  }
+}
+
+function openRecentProject() {
+  const index = Number(elements.recentProject.value);
+  const item = recentProjects()[index];
+  if (!item) return;
+  try {
+    useProject(item.project, { recovered: true });
+  } catch (error) {
+    setStatus(`Could not open recent project: ${error.message}`, true);
+  }
+}
+
+function restoreProjectRecovery() {
+  const recovery = storageRead(PROJECT_AUTOSAVE_KEY, null);
+  if (!recovery?.project) {
+    refreshProjectUi();
+    return;
+  }
+  try {
+    useProject(parseDocument(JSON.stringify(recovery.project), "project"), {
+      recovered: recovery.dirty !== false,
+    });
+    if (recovery.dirty === false) {
+      refreshProjectUi("Restored the last browser project · reselect the source if needed.");
+      setStatus("Restored the last browser project session.");
+    }
+  } catch (error) {
+    console.warn("Ignoring invalid project autosave", error);
+    refreshProjectUi("Stored recovery was invalid and has been ignored.");
+  }
+}
+
+function refreshBatchUi(message = "") {
+  const count = state.batchFiles.length;
+  const preview = state.batchFiles.slice(0, 3).map(({ name }) => name).join(", ");
+  elements.batchStatus.textContent = message || (
+    count ? `${count} queued · ${preview}${count > 3 ? ` +${count - 3} more` : ""}` : "No queued images."
+  );
+  elements.clearBatch.disabled = !count || Boolean(state.batchController);
+  elements.runBatch.disabled = !count || Boolean(state.batchController);
+  elements.cancelBatch.disabled = !state.batchController;
+  elements.addBatch.disabled = Boolean(state.batchController);
+}
+
+function addBatchFiles(files) {
+  const known = new Set(state.batchFiles.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) continue;
+    const key = `${file.name}:${file.size}:${file.lastModified}`;
+    if (!known.has(key) && state.batchFiles.length < MAX_BROWSER_BATCH) {
+      state.batchFiles.push(file);
+      known.add(key);
+    }
+  }
+  refreshBatchUi(
+    state.batchFiles.length >= MAX_BROWSER_BATCH
+      ? `Queue capped at ${MAX_BROWSER_BATCH} images.`
+      : "",
+  );
+}
+
+function batchOutputName(file, used) {
+  const stem = file.name.replace(/\.[^.]+$/u, "").replace(/[^a-z0-9_-]+/giu, "-") || "glyph";
+  let name = `${stem}.glyph.png`;
+  let index = 2;
+  while (used.has(name.toLowerCase())) {
+    name = `${stem}-${index}.glyph.png`;
+    index += 1;
+  }
+  used.add(name.toLowerCase());
+  return name;
+}
+
+async function runBrowserBatch() {
+  if (!state.batchFiles.length || state.batchController) return;
+  const controller = new AbortController();
+  state.batchController = controller;
+  refreshBatchUi("Starting bounded sequential batch…");
+  const files = [...state.batchFiles];
+  const used = new Set();
+  let saved = 0;
+  let failed = 0;
+  for (let index = 0; index < files.length; index += 1) {
+    if (controller.signal.aborted) break;
+    const file = files[index];
+    refreshBatchUi(`${index + 1}/${files.length} · ${saved} saved · ${failed} failed`);
+    const opened = await openFile(file);
+    if (!opened || !state.source) {
+      failed += 1;
+      continue;
+    }
+    try {
+      renderCurrent();
+      const blob = await canvasBlob();
+      download(blob, batchOutputName(file, used));
+      saved += 1;
+    } catch (error) {
+      console.error("Batch item failed", error);
+      failed += 1;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+  }
+  const skipped = files.length - saved - failed;
+  const status = controller.signal.aborted ? "cancelled" : "complete";
+  state.batchController = null;
+  refreshBatchUi(`Batch ${status} · ${saved} saved · ${failed} failed · ${skipped} skipped.`);
 }
 
 function initializeRenderer() {
@@ -476,6 +1024,7 @@ async function stopSource({ reset = true, saveRecording = true } = {}) {
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   state.objectUrl = null;
   state.source = null;
+  state.sourceFile = null;
   state.sourceKind = null;
   state.frameTimes = [];
   state.lastMetricPaint = 0;
@@ -538,7 +1087,16 @@ function seekVideo(video, time) {
 }
 
 async function openFile(file) {
-  if (!file) return;
+  if (!file) return false;
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".glyphforge.json")) {
+    await importProjectFile(file);
+    return true;
+  }
+  if (lowerName.endsWith(".glyphpreset.json")) {
+    await importPresetFile(file);
+    return true;
+  }
   await stopSource({ reset: false });
   try {
     state.objectUrl = URL.createObjectURL(file);
@@ -572,11 +1130,14 @@ async function openFile(file) {
       throw new Error("Choose an image or video file");
     }
     state.sourceName = file.name;
+    state.sourceFile = file;
     describeSource(file.name);
     beginRenderLoop();
+    return true;
   } catch (error) {
     await stopSource();
     setStatus(error.message, true);
+    return false;
   }
 }
 
@@ -1031,6 +1592,7 @@ function settingsHash() {
     style: elements.charset.value,
     glyphs: elements.charset.value === "custom" ? elements.customCharset.value : "",
     columns: elements.columns.value,
+    rows: elements.rows.value,
     size: elements.sizePreset.value,
     outputWidth: elements.outputWidth.value,
     outputHeight: elements.outputHeight.value,
@@ -1191,6 +1753,7 @@ function restoreSettings() {
   assign(elements.charset, "style", (value) => [...elements.charset.options].some((option) => option.value === value));
   assign(elements.customCharset, "glyphs");
   assign(elements.columns, "columns", (value) => Number(value) >= 32 && Number(value) <= 480);
+  assign(elements.rows, "rows", (value) => Number(value) >= 1 && Number(value) <= 1000);
   const legacyResolution = values.get("resolution");
   const legacySizes = { "720": "720p", "1080": "1080p", "2160": "4k" };
   const requestedSize = values.get("size") || legacySizes[legacyResolution] || legacyResolution;
@@ -1231,6 +1794,8 @@ function rerender() {
   invalidateOptions();
   syncControlLabels();
   if (state.source && !isDynamicSource()) renderCurrent();
+  if (!state.syncingProject) state.requestControlsDirty = true;
+  scheduleProjectCapture();
 }
 
 function standaloneMode() {
@@ -1337,6 +1902,52 @@ function bindEvents() {
     elements.fileInput.value = "";
     void openFile(file);
   });
+  elements.newProject.addEventListener("click", createBrowserProject);
+  elements.openProject.addEventListener("click", () => elements.projectFile.click());
+  elements.projectFile.addEventListener("change", () => {
+    const [file] = elements.projectFile.files;
+    elements.projectFile.value = "";
+    void importProjectFile(file);
+  });
+  elements.saveProject.addEventListener("click", saveBrowserProject);
+  elements.projectName.addEventListener("change", renameProject);
+  elements.variant.addEventListener("change", () => {
+    if (!state.projectSession || state.syncingProject) return;
+    try {
+      state.projectSession.selectVariant(elements.variant.value);
+      applyRenderRequest(state.projectSession.active.request);
+      autosaveProject();
+      refreshProjectUi();
+    } catch (error) {
+      setStatus(`Could not select variant: ${error.message}`, true);
+    }
+  });
+  elements.addVariant.addEventListener("click", addProjectVariant);
+  elements.variantName.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") addProjectVariant();
+  });
+  elements.removeVariant.addEventListener("click", removeProjectVariant);
+  elements.undoProject.addEventListener("click", projectUndo);
+  elements.redoProject.addEventListener("click", projectRedo);
+  elements.importPreset.addEventListener("click", () => elements.presetFile.click());
+  elements.presetFile.addEventListener("change", () => {
+    const [file] = elements.presetFile.files;
+    elements.presetFile.value = "";
+    void importPresetFile(file);
+  });
+  elements.exportPreset.addEventListener("click", exportBrowserPreset);
+  elements.openRecent.addEventListener("click", openRecentProject);
+  elements.addBatch.addEventListener("click", () => elements.batchFile.click());
+  elements.batchFile.addEventListener("change", () => {
+    addBatchFiles(elements.batchFile.files);
+    elements.batchFile.value = "";
+  });
+  elements.clearBatch.addEventListener("click", () => {
+    state.batchFiles = [];
+    refreshBatchUi();
+  });
+  elements.runBatch.addEventListener("click", () => void runBrowserBatch());
+  elements.cancelBatch.addEventListener("click", () => state.batchController?.abort());
   elements.webcam.addEventListener("click", () => void openLive("webcam"));
   elements.screen.addEventListener("click", () => void openLive("screen"));
   elements.stop.addEventListener("click", () => void stopSource());
@@ -1376,6 +1987,7 @@ function bindEvents() {
 
   for (const control of [
     elements.mode, elements.charset, elements.customCharset, elements.font, elements.columns,
+    elements.rows,
     elements.colorMode, elements.foreground, elements.background,
     elements.brightness, elements.contrast, elements.invert,
   ]) {
@@ -1399,7 +2011,32 @@ function bindEvents() {
     event.preventDefault();
     dragDepth = 0;
     elements.dropOverlay.classList.remove("visible");
-    void openFile(event.dataTransfer.files[0]);
+    const files = [...event.dataTransfer.files];
+    if (files.length > 1) addBatchFiles(files);
+    void openFile(files[0]);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key === "s" && state.projectSession) {
+      event.preventDefault();
+      saveBrowserProject();
+      return;
+    }
+    const editing = event.target instanceof Element
+      && event.target.matches("input, textarea, select");
+    if (!state.projectSession || editing) return;
+    if (key === "z" && event.shiftKey) {
+      event.preventDefault();
+      projectRedo();
+    } else if (key === "z") {
+      event.preventDefault();
+      projectUndo();
+    } else if (key === "y") {
+      event.preventDefault();
+      projectRedo();
+    }
   });
 
   window.addEventListener("pagehide", () => void stopSource({ reset: false, saveRecording: false }));
@@ -1412,6 +2049,9 @@ syncCapabilities();
 bindEvents();
 bindInstallability();
 bindLaunchQueue();
+refreshRecentProjects();
+refreshBatchUi();
+setStatus("Ready. Nothing is uploaded.");
+restoreProjectRecovery();
 void registerServiceWorker();
 void loadStudioConfig();
-setStatus("Ready. Nothing is uploaded.");

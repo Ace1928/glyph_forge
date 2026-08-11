@@ -37,6 +37,12 @@ same selected size drives PNG, SVG, sharing, and recording. Requests beyond a
 device's reported canvas/GPU limit are fitted proportionally and shown in the
 controls instead of failing during export.
 
+The installed app also registers portable `.glyphforge.json` projects and
+`.glyphpreset.json` presets where browser file handling is supported. Projects
+autosave settings locally and restore after an interrupted session, but source
+media is deliberately excluded from browser storage; reselect it when opening
+a project and keep it at the project's documented relative path when sharing.
+
 ## Fast isolated install
 
 With [uv](https://docs.astral.sh/uv/getting-started/installation/):

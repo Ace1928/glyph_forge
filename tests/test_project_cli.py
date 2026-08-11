@@ -10,7 +10,13 @@ from typer.testing import CliRunner
 
 from glyph_forge.cli import app
 from glyph_forge.contracts import RenderRequest
-from glyph_forge.projects import ProjectSession, load_project, recovery_path
+from glyph_forge.projects import (
+    ProjectPersistenceError,
+    ProjectSession,
+    RecentProjectStore,
+    load_project,
+    recovery_path,
+)
 
 runner = CliRunner()
 
@@ -187,3 +193,23 @@ def test_reference_only_rejects_external_media_without_leaving_a_project(
     assert result.exit_code == 2
     assert "inside the project directory" in result.output
     assert not project.exists()
+
+
+def test_cli_project_success_is_not_reversed_by_optional_recent_history(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    source = tmp_path / "source.png"
+    source_image(source)
+    project = tmp_path / "workspace" / "art.glyphforge.json"
+
+    def fail_recent(*args, **kwargs):
+        raise ProjectPersistenceError("read-only config")
+
+    monkeypatch.setattr(RecentProjectStore, "touch", fail_recent)
+
+    result = invoke(tmp_path, ["project", "new", str(project), str(source)])
+
+    assert result.exit_code == 0, result.output
+    assert project.is_file()
+    assert "recent history was not updated" in result.output

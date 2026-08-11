@@ -1,10 +1,22 @@
 import { readFile, stat } from "node:fs/promises";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import {
+  ProjectSessionModel,
+  encodeDocument,
+  parseDocument,
+} from "../../src/glyph_forge/ui/web/project-contract.js";
 import { mapPixelGrid } from "../../src/glyph_forge/ui/web/studio-renderers.js";
 
 const renderContract = JSON.parse(
   await readFile("tests/fixtures/render-contract-v1.json", "utf8"),
+);
+const projectContractText = await readFile("tests/fixtures/project-contract-v1.json", "utf8");
+const projectContract = JSON.parse(projectContractText);
+const sourceSvg = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="3">'
+  + '<rect width="4" height="3" fill="#ffffff"/><circle cx="2" cy="1.5" r="1"/>'
+  + "</svg>",
 );
 
 const seriousViolations = (violations) => violations.filter(
@@ -119,11 +131,20 @@ test("ships an accessible installable app shell", async ({ page }) => {
     const studioCache = names.find((name) => name.startsWith("glyph-forge-studio-"));
     const cache = studioCache ? await caches.open(studioCache) : null;
     const script = cache ? await cache.match(new URL("studio.js", document.baseURI)) : null;
-    return { active: Boolean(registration.active), studioCache, script: Boolean(script) };
+    const contract = cache
+      ? await cache.match(new URL("project-contract.js", document.baseURI))
+      : null;
+    return {
+      active: Boolean(registration.active),
+      studioCache,
+      script: Boolean(script),
+      contract: Boolean(contract),
+    };
   });
   expect(offlineShell.active).toBeTruthy();
   expect(offlineShell.studioCache).toMatch(/^glyph-forge-studio-/u);
   expect(offlineShell.script).toBeTruthy();
+  expect(offlineShell.contract).toBeTruthy();
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(seriousViolations(results.violations)).toEqual([]);
@@ -150,11 +171,131 @@ test("keeps the dependency-free app shell within its performance budget", async 
     "src/glyph_forge/ui/web/studio.css",
     "src/glyph_forge/ui/web/studio.js",
     "src/glyph_forge/ui/web/studio-renderers.js",
+    "src/glyph_forge/ui/web/project-contract.js",
     "src/glyph_forge/ui/web/service-worker.js",
     "src/glyph_forge/ui/web/manifest.webmanifest",
   ];
   const sizes = await Promise.all(files.map(async (path) => (await stat(path)).size));
   expect(sizes.reduce((total, size) => total + size, 0)).toBeLessThan(160_000);
+});
+
+test("shares a strict portable project contract with native interfaces", async ({}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-chromium",
+    "The pure document model only needs one JavaScript runtime",
+  );
+  const project = parseDocument(projectContractText, "project");
+  expect(JSON.parse(encodeDocument(project, "project"))).toEqual(projectContract);
+
+  const session = new ProjectSessionModel(project, 3);
+  session.addVariant("bright", "Bright");
+  session.replaceActiveRequest({ ...session.active.request, brightness: 1.4 });
+  expect(session.project.variants).toHaveLength(2);
+  expect(session.active.request.brightness).toBe(1.4);
+  session.undo();
+  expect(session.active.request.brightness).toBe(1.12);
+  session.redo();
+  expect(session.active.request.brightness).toBe(1.4);
+
+  expect(() => parseDocument(JSON.stringify({
+    ...projectContract,
+    source: { kind: "image", path: "../escape.png" },
+  }), "project")).toThrow(/portable|relative/u);
+  expect(() => parseDocument(JSON.stringify({
+    ...projectContract,
+    surprise: true,
+  }), "project")).toThrow(/unknown fields/u);
+  expect(() => parseDocument(projectContractText, "unknown")).toThrow(/document kind/u);
+  expect(() => parseDocument(JSON.stringify({
+    ...projectContract,
+    variants: [{
+      ...projectContract.variants[0],
+      request: {
+        ...projectContract.variants[0].request,
+        output_format: "html",
+        style: "bold",
+        output_width: null,
+        output_height: null,
+      },
+    }],
+  }), "project")).toThrow(/text styles/u);
+});
+
+test("autosaves, restores, variants, and exports browser projects", async ({ page }) => {
+  await page.locator("#fileInput").setInputFiles({
+    name: "fixture.svg",
+    mimeType: "image/svg+xml",
+    buffer: sourceSvg,
+  });
+  await expect(page.locator("#sourceName")).toHaveText("fixture.svg");
+  await page.locator("#projectNameInput").fill("Browser fixture");
+  await page.getByRole("button", { name: "New project" }).click();
+  await expect(page.locator("#projectStatus")).toContainText("autosaved");
+
+  await page.locator("#brightnessRange").evaluate((input) => {
+    input.value = "1.35";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator("#brightnessValue")).toHaveText("1.35");
+  await page.locator("#variantNameInput").fill("Bright poster");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.locator("#variantSelect")).toHaveValue("bright-poster");
+
+  const projectDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  const downloadedProject = JSON.parse(
+    await readFile(await (await projectDownload).path(), "utf8"),
+  );
+  expect(downloadedProject.name).toBe("Browser fixture");
+  expect(downloadedProject.source.path).toBe("assets/fixture.svg");
+  expect(downloadedProject.variants).toHaveLength(2);
+  expect(downloadedProject.variants[1].request.brightness).toBe(1.35);
+
+  const presetDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export preset" }).click();
+  const downloadedPreset = JSON.parse(
+    await readFile(await (await presetDownload).path(), "utf8"),
+  );
+  expect(downloadedPreset.schema).toBe("glyph-forge-preset");
+  expect(downloadedPreset.request.brightness).toBe(1.35);
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("#projectNameInput")).toHaveValue("Browser fixture");
+  await expect(page.locator("#variantSelect")).toHaveValue("bright-poster");
+  await expect(page.locator("#projectStatus")).toContainText(/Restored|Recovered/u);
+
+  await page.locator("#projectFileInput").setInputFiles({
+    name: "portable.glyphforge.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(projectContractText),
+  });
+  await expect(page.locator("#projectNameInput")).toHaveValue("Portable fixture");
+  const roundTripDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save project" }).click();
+  const roundTripped = JSON.parse(
+    await readFile(await (await roundTripDownload).path(), "utf8"),
+  );
+  expect(roundTripped.variants[0].request).toEqual(
+    projectContract.variants[0].request,
+  );
+});
+
+test("processes a bounded browser image batch", async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-chromium",
+    "Multiple automatic downloads are verified in one browser engine",
+  );
+  const downloads = [];
+  page.on("download", (download) => downloads.push(download));
+  await page.locator("#batchFileInput").setInputFiles([
+    { name: "same.svg", mimeType: "image/svg+xml", buffer: sourceSvg },
+    { name: "same.png.svg", mimeType: "image/svg+xml", buffer: sourceSvg },
+  ]);
+  await expect(page.locator("#batchQueueStatus")).toContainText("2 queued");
+  await page.getByRole("button", { name: "Run batch" }).click();
+  await expect(page.locator("#batchQueueStatus")).toContainText("Batch complete");
+  expect(downloads).toHaveLength(2);
+  expect(new Set(downloads.map((download) => download.suggestedFilename())).size).toBe(2);
 });
 
 test("matches the shared native/browser render contract", async ({}, testInfo) => {

@@ -1,12 +1,13 @@
 "use strict";
 
-const CACHE_NAME = "glyph-forge-studio-v3";
+const CACHE_NAME = "glyph-forge-studio-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./studio.css",
   "./studio.js",
   "./studio-renderers.js",
+  "./project-contract.js",
   "./manifest.webmanifest",
   "./icon.svg",
   "./icon-192.png",

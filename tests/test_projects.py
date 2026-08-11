@@ -8,15 +8,18 @@ from pathlib import Path
 import pytest
 
 from glyph_forge.contracts import RenderRequest
+from glyph_forge.persistence import AtomicWriteError
 from glyph_forge.projects import (
     MAX_HISTORY,
     AssetReference,
     GlyphProject,
+    ProjectError,
     ProjectRecoveryError,
     ProjectSession,
     ProjectValidationError,
     RecentProjectStore,
     RenderPreset,
+    create_portable_project,
     load_preset,
     load_project,
     recovery_path,
@@ -54,6 +57,46 @@ def test_project_round_trips_as_stable_bounded_json(tmp_path: Path) -> None:
     assert payload["source"] == {"kind": "image", "path": "assets/source.png"}
     assert path.read_text(encoding="utf-8").endswith("\n")
     assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_project_contract_fixture_matches_the_browser_runtime(tmp_path: Path) -> None:
+    fixture = Path(__file__).parent / "fixtures" / "project-contract-v1.json"
+    destination = tmp_path / "fixture.glyphforge.json"
+    destination.write_bytes(fixture.read_bytes())
+
+    project = load_project(destination)
+
+    assert project.to_dict() == json.loads(fixture.read_text(encoding="utf-8"))
+
+
+def test_portable_project_creation_copies_external_media_once(tmp_path: Path) -> None:
+    source = tmp_path / "outside" / "CON.png"
+    source.parent.mkdir()
+    source.write_bytes(b"source bytes")
+    destination = tmp_path / "work" / "art.glyphforge.json"
+
+    project = create_portable_project(destination, source)
+
+    assert project.source.path == "assets/_CON.png"
+    assert project.source.resolve(destination).read_bytes() == b"source bytes"
+    assert load_project(destination) == project
+
+
+def test_portable_project_creation_wraps_copy_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.png"
+    source.write_bytes(b"source")
+    destination = tmp_path / "work" / "art.glyphforge.json"
+
+    def fail_copy(source_path: Path, destination_path: Path) -> Path:
+        raise AtomicWriteError("storage unavailable")
+
+    monkeypatch.setattr("glyph_forge.projects.atomic_copy_file", fail_copy)
+
+    with pytest.raises(ProjectError, match="storage unavailable"):
+        create_portable_project(destination, source)
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize(

@@ -22,7 +22,7 @@ from typing import Any, Callable, Mapping, Sequence, cast
 
 from .config.settings import user_config_directory
 from .contracts import RenderContractError, RenderRequest
-from .persistence import AtomicWriteError, atomic_write_text
+from .persistence import AtomicWriteError, atomic_copy_file, atomic_write_text
 
 PROJECT_SCHEMA = "glyph-forge-project"
 PROJECT_SCHEMA_VERSION = 1
@@ -535,6 +535,90 @@ def save_project(project: GlyphProject, destination: str | os.PathLike[str]) -> 
     )
 
 
+def _portable_asset_name(name: str) -> str:
+    selected = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", name).rstrip(" .")
+    if not selected:
+        selected = "source"
+    if Path(selected).stem.casefold() in _WINDOWS_RESERVED:
+        selected = f"_{selected}"
+    return selected[:240].rstrip(" .") or "source"
+
+
+def _available_asset_path(directory: Path, name: str) -> Path:
+    candidate = directory / _portable_asset_name(name)
+    stem = candidate.stem
+    suffix = candidate.suffix
+    index = 2
+    existing = (
+        {item.name.casefold() for item in directory.iterdir()}
+        if directory.is_dir()
+        else set()
+    )
+    while candidate.name.casefold() in existing:
+        candidate = directory / f"{stem}-{index}{suffix}"
+        index += 1
+    return candidate
+
+
+def create_portable_project(
+    project_path: str | os.PathLike[str],
+    source: str | os.PathLike[str],
+    *,
+    name: str | None = None,
+    request: RenderRequest | None = None,
+    copy_external: bool = True,
+) -> GlyphProject:
+    """Create a project, atomically copying external media into ``assets/``.
+
+    This shared application operation is used by the API, CLI, and TUI.  A
+    failed project write removes only the new asset copy made by this call.
+    """
+
+    destination = Path(project_path).expanduser()
+    source_path = Path(source).expanduser()
+    copied_asset: Path | None = None
+    try:
+        if destination.exists():
+            raise ProjectValidationError(f"project already exists: {destination}")
+        if not source_path.is_file():
+            raise ProjectValidationError(f"source is not a file: {source_path}")
+        try:
+            reference = AssetReference.from_path(source_path, destination)
+        except ProjectError:
+            if not copy_external:
+                raise
+            copied_asset = _available_asset_path(
+                destination.parent / "assets", source_path.name
+            )
+            atomic_copy_file(source_path, copied_asset)
+            reference = AssetReference.from_path(copied_asset, destination)
+        project_name = name
+        if project_name is None:
+            project_name = (
+                destination.name[: -len(PROJECT_SUFFIX)]
+                if destination.name.endswith(PROJECT_SUFFIX)
+                else destination.stem
+            )
+        project = GlyphProject.create(
+            project_name or "Untitled",
+            reference,
+            request,
+        )
+        save_project(project, destination)
+    except (ProjectError, AtomicWriteError, OSError) as exc:
+        if copied_asset is not None:
+            try:
+                copied_asset.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if isinstance(exc, ProjectError):
+            raise
+        raise ProjectPersistenceError(
+            f"Could not create project {destination}: {exc}"
+        ) from exc
+    return project
+
+
 def load_project(source: str | os.PathLike[str]) -> GlyphProject:
     """Load and validate one project without requiring its asset to exist."""
 
@@ -1023,6 +1107,7 @@ __all__ = [
     "RenderVariant",
     "load_preset",
     "load_project",
+    "create_portable_project",
     "recovery_path",
     "save_preset",
     "save_project",

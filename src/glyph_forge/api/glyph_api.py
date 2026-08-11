@@ -25,6 +25,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _remember_project(path: str | os.PathLike[str]) -> None:
+    """Keep convenience-history failures separate from operation success."""
+
+    from ..projects import ProjectError, RecentProjectStore
+
+    try:
+        RecentProjectStore().touch(path)
+    except ProjectError as exc:
+        logger.warning("Project succeeded, but recent history was not updated: %s", exc)
+
+
 class GlyphForgeAPI:
     """Stable application API backed by the canonical rendering pipeline."""
 
@@ -113,24 +124,21 @@ class GlyphForgeAPI:
         *,
         name: str | None = None,
         request: RenderRequest | None = None,
+        copy_external: bool = True,
     ) -> "GlyphProject":
-        """Create a portable project for an asset inside its project directory."""
+        """Create a portable project, copying external media by default."""
 
-        from ..projects import (
-            AssetReference,
-            GlyphProject,
-            RecentProjectStore,
-            save_project,
-        )
+        from ..projects import create_portable_project
 
         destination = Path(project_path).expanduser()
-        project = GlyphProject.create(
-            name or destination.name.removesuffix(".glyphforge.json") or "Untitled",
-            AssetReference.from_path(source, destination),
-            request,
+        project = create_portable_project(
+            destination,
+            source,
+            name=name,
+            request=request,
+            copy_external=copy_external,
         )
-        save_project(project, destination)
-        RecentProjectStore().touch(destination)
+        _remember_project(destination)
         return project
 
     def open_project(
@@ -142,14 +150,14 @@ class GlyphForgeAPI:
     ) -> "ProjectSession":
         """Open a project session with recovery, history, and autosave."""
 
-        from ..projects import ProjectSession, RecentProjectStore
+        from ..projects import ProjectSession
 
         session = ProjectSession.open(
             project_path,
             recover=recover,
             autosave_delay=autosave_delay,
         )
-        RecentProjectStore().touch(project_path)
+        _remember_project(project_path)
         return session
 
     def render_project(

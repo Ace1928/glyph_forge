@@ -196,8 +196,11 @@ Projects have bounded undo/redo, atomic debounced autosave, stale-recovery
 protection, non-destructive variants, and a platform-native recent list. Batch
 queues are bounded, keep only one job per worker in flight, preserve input
 order, isolate failures, avoid output collisions, and can emit complete JSON
-reports. See [the project workflow guide](docs/projects.md) for recovery,
-schema, CLI, and Python API details.
+reports. The TUI exposes the same workflow in its Project tab; Studio adds
+browser-local recovery, recent projects, variants, preset/project downloads,
+file launch, and a sequential image queue. See
+[the project workflow guide](docs/projects.md) for interface behavior,
+recovery, sharing, schema, CLI, and Python API details.
 
 ## Rendering modes
 
@@ -322,6 +325,13 @@ Its versioned offline shell caches only the Studio code, manifest, and brand
 assets—never selected media, generated output, API responses, or temporary
 shares. After one online visit, the installed editor can reopen offline and
 continue processing local files and text.
+
+Studio projects and presets use the same strict version-one documents as the
+CLI, TUI, and Python API. Project edits autosave locally with bounded recents,
+variants, undo/redo, startup recovery, and keyboard shortcuts; project and
+preset JSON can also launch the installed app directly. Browser security keeps
+source bytes separate, so a shared project bundle must place its media at the
+relative `assets/` path recorded in the downloaded project.
 
 Phone and tablet layouts keep a compact live preview docked above the controls,
 honour notches and safe areas, use coarse-pointer touch targets of at least 44
@@ -456,7 +466,9 @@ glyph-forge interactive
 
 The TUI combines a filtered media browser, image and text previews, live
 sources, output saving, runtime diagnostics, and one-key handoff to Studio. Its
-preview work runs outside the UI event loop.
+Project tab adds portable create/open/save, autosave recovery, recents,
+variants, undo/redo, preset import/export, and cancellable bounded batches. Its
+preview and batch work run outside the UI event loop.
 
 ## Adaptive performance
 

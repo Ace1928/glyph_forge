@@ -293,6 +293,49 @@ select:focus-visible,
   min-height: 38px;
 }
 
+.project-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.preset-actions {
+  grid-template-columns: 1fr 1fr;
+}
+
+.project-status {
+  min-height: 2.8em;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.compact-source {
+  margin-top: 2px;
+}
+
+.recent-source {
+  grid-template-columns: minmax(0, 1fr) 62px;
+}
+
+.batch-panel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.batch-panel .project-actions {
+  grid-template-columns: 1fr 1fr;
+}
+
+.field-label {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .button {
   min-height: 36px;
   padding: 8px 12px;

@@ -275,6 +275,10 @@ _LAZY_EXPORTS: Final[Dict[str, Tuple[str, str]]] = {
     "RenderVariant": ("glyph_forge.projects", "RenderVariant"),
     "load_preset": ("glyph_forge.projects", "load_preset"),
     "load_project": ("glyph_forge.projects", "load_project"),
+    "create_portable_project": (
+        "glyph_forge.projects",
+        "create_portable_project",
+    ),
     "save_preset": ("glyph_forge.projects", "save_preset"),
     "save_project": ("glyph_forge.projects", "save_project"),
     "BatchCancelled": ("glyph_forge.batch", "BatchCancelled"),
@@ -494,6 +498,7 @@ __all__ = [
     "RenderPreset",
     "RenderVariant",
     "items_for_sources",
+    "create_portable_project",
     "load_preset",
     "load_project",
     "render_batch",

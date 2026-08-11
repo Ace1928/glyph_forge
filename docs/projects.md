@@ -58,6 +58,35 @@ glyph-forge batch poster.glyphpreset.json images/*.jpg \
   --output-dir exports --json > batch-report.json
 ```
 
+## TUI and browser Studio
+
+Run `glyph-forge interactive` and open the **Project** tab for the same
+workflow without composing commands. The TUI can create or open a project,
+select and edit variants, undo and redo, import or export presets, and run or
+cancel a bounded image queue. Opening a project hydrates the existing image
+controls and preview; preview changes update the active variant through the
+same autosaving `ProjectSession` used by the API.
+
+The installable browser Studio offers **Keep a project** after a local image or
+video is selected. It provides local autosave and startup recovery, a bounded
+recent list, non-destructive variants, undo and redo, project and preset JSON
+downloads, direct project/preset file launch, and a collision-safe sequential
+image queue. `Ctrl`/`Command`+`S` saves a project; `Ctrl`/`Command`+`Z`,
+`Shift`+`Ctrl`/`Command`+`Z`, and `Ctrl`/`Command`+`Y` operate project history
+when focus is outside an editable field.
+
+Browsers never gain silent filesystem access. A Studio project therefore
+references `assets/<source-name>` but cannot copy the selected source into that
+folder automatically. When sharing the download, place the source at that
+relative path beside the JSON. When reopening it, reselect the referenced
+media after the project settings load. Source bytes are not stored in browser
+autosave, recent history, presets, or the offline app shell.
+
+Native CLI and TUI batches use bounded worker concurrency. Studio processes
+one image at a time because browsers gate automatic downloads; it still caps
+the queue at 1,000 files, isolates decode/export failures, supports
+cancellation, and gives colliding names stable numeric suffixes.
+
 ## Recovery and history
 
 Long-lived interfaces use `ProjectSession`, which provides:
@@ -125,6 +154,9 @@ Lower-level applications can import `GlyphProject`, `RenderVariant`,
 Project and preset roots are strict JSON objects. Unknown fields are rejected
 so misspellings never silently alter output. Documents are limited to 4 MiB,
 projects to 256 variants, and metadata to bounded finite JSON values.
+Python and browser implementations share a checked-in golden project fixture,
+so a document accepted and normalized by one runtime is continuously verified
+against the other.
 
 A version-one project contains:
 

@@ -1,0 +1,49 @@
+{
+  "active_variant": "default",
+  "created_at": "2026-08-11T10:00:00.000Z",
+  "metadata": {
+    "fixture": "cross-runtime"
+  },
+  "name": "Portable fixture",
+  "schema": "glyph-forge-project",
+  "schema_version": 1,
+  "source": {
+    "kind": "image",
+    "path": "assets/source.png"
+  },
+  "updated_at": "2026-08-11T10:00:00.000Z",
+  "variants": [
+    {
+      "id": "default",
+      "name": "Default",
+      "request": {
+        "alignment": "center",
+        "background": "#07110f",
+        "brightness": 1.12,
+        "cell_aspect": 0.5,
+        "charset": "general",
+        "contract_version": 1,
+        "contrast": 1.08,
+        "dither": false,
+        "edge_algorithm": "sobel",
+        "edge_threshold": 48,
+        "fit": "contain",
+        "font": null,
+        "foreground": "#e8fff7",
+        "height": 45,
+        "invert": false,
+        "max_height": null,
+        "max_width": null,
+        "mode": "glyph",
+        "optimize": false,
+        "output_format": "svg",
+        "output_height": 720,
+        "output_width": 1280,
+        "resample": "bilinear",
+        "style": null,
+        "threshold": 128,
+        "width": 80
+      }
+    }
+  ]
+}

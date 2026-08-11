@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Optional
 
@@ -13,22 +12,20 @@ from rich.table import Table
 
 from ..batch import BatchError, BatchProgress, items_for_sources, render_batch
 from ..contracts import GlyphForgeRenderError, RenderRequest
-from ..persistence import AtomicWriteError, atomic_copy_file
 from ..projects import (
     PRESET_SUFFIX,
     PROJECT_SUFFIX,
-    AssetReference,
     GlyphProject,
     ProjectError,
     ProjectSession,
     RecentProjectStore,
     RenderPreset,
     RenderVariant,
+    create_portable_project,
     load_preset,
     load_project,
     recovery_path,
     save_preset,
-    save_project,
 )
 from ..rendering import render_image
 
@@ -48,46 +45,6 @@ preset_app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
-_WINDOWS_RESERVED = {
-    "con",
-    "prn",
-    "aux",
-    "nul",
-    *(f"com{index}" for index in range(1, 10)),
-    *(f"lpt{index}" for index in range(1, 10)),
-}
-
-
-def _portable_asset_name(name: str) -> str:
-    selected = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", name).rstrip(" .")
-    if not selected:
-        selected = "source"
-    if Path(selected).stem.casefold() in _WINDOWS_RESERVED:
-        selected = f"_{selected}"
-    return selected[:240].rstrip(" .") or "source"
-
-
-def _available_asset_path(directory: Path, name: str) -> Path:
-    candidate = directory / _portable_asset_name(name)
-    stem = candidate.stem
-    suffix = candidate.suffix
-    index = 2
-    existing = (
-        {item.name.casefold() for item in directory.iterdir()}
-        if directory.is_dir()
-        else set()
-    )
-    while candidate.name.casefold() in existing:
-        candidate = directory / f"{stem}-{index}{suffix}"
-        index += 1
-    return candidate
-
-
-def _project_name(path: Path) -> str:
-    if path.name.endswith(PROJECT_SUFFIX):
-        return path.name[: -len(PROJECT_SUFFIX)] or "Untitled"
-    return path.stem or "Untitled"
-
 
 def _variant(project: GlyphProject, identifier: str | None) -> RenderVariant:
     if identifier is None:
@@ -101,6 +58,17 @@ def _variant(project: GlyphProject, identifier: str | None) -> RenderVariant:
         f"Unknown variant {identifier!r}; choose {choices}",
         param_hint="--variant",
     )
+
+
+def _remember_project(path: Path) -> None:
+    """Update optional recent history without changing command success."""
+
+    try:
+        RecentProjectStore().touch(path)
+    except ProjectError as exc:
+        error_console.print(
+            f"[yellow]Project succeeded, but recent history was not updated:[/yellow] {exc}"
+        )
 
 
 @project_app.command("new")
@@ -142,37 +110,21 @@ def new_project_command(
 
     if project_path.exists():
         raise typer.BadParameter("Project already exists", param_hint="project_path")
-    copied_asset: Path | None = None
     try:
         request = load_preset(preset).request if preset is not None else RenderRequest()
-        try:
-            reference = AssetReference.from_path(source, project_path)
-        except ProjectError:
-            if not copy_asset:
-                raise
-            asset_path = _available_asset_path(
-                project_path.parent / "assets", source.name
-            )
-            atomic_copy_file(source, asset_path)
-            copied_asset = asset_path
-            reference = AssetReference.from_path(asset_path, project_path)
-        project = GlyphProject.create(
-            name or _project_name(project_path),
-            reference,
-            request,
+        project = create_portable_project(
+            project_path,
+            source,
+            name=name,
+            request=request,
+            copy_external=copy_asset,
         )
-        save_project(project, project_path)
-        RecentProjectStore().touch(project_path)
-    except (ProjectError, AtomicWriteError) as exc:
-        if copied_asset is not None:
-            try:
-                copied_asset.unlink(missing_ok=True)
-            except OSError:
-                pass
+        _remember_project(project_path)
+    except ProjectError as exc:
         error_console.print(f"[bold red]Could not create project:[/bold red] {exc}")
         raise typer.Exit(2) from exc
     error_console.print(
-        f"[green]Created[/green] {project_path} · source {reference.path} · "
+        f"[green]Created[/green] {project_path} · source {project.source.path} · "
         f"{request.width} columns"
     )
 
@@ -196,7 +148,7 @@ def project_info_command(
     try:
         project = load_project(project_path)
         asset = project.source.resolve(project_path)
-        RecentProjectStore().touch(project_path)
+        _remember_project(project_path)
     except ProjectError as exc:
         error_console.print(f"[bold red]Could not open project:[/bold red] {exc}")
         raise typer.Exit(2) from exc
@@ -283,7 +235,7 @@ def render_project_command(
             selected.request,
             destination=output,
         )
-        RecentProjectStore().touch(project_path)
+        _remember_project(project_path)
         session.close(checkpoint=False)
     except (ProjectError, GlyphForgeRenderError) as exc:
         error_console.print(f"[bold red]Project render failed:[/bold red] {exc}")
@@ -334,7 +286,7 @@ def add_variant_command(
                 identifier, name or identifier, request, activate=activate
             )
             session.save()
-        RecentProjectStore().touch(project_path)
+        _remember_project(project_path)
     except ProjectError as exc:
         raise typer.BadParameter(str(exc), param_hint="identifier") from exc
     error_console.print(f"[green]Added variant[/green] {identifier}")

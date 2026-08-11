@@ -197,6 +197,90 @@ def _validated_items(items: Iterable[BatchRenderItem]) -> tuple[BatchRenderItem,
     return selected
 
 
+class _BatchRunner:
+    """Small scheduler keeping queue bounds and progress bookkeeping explicit."""
+
+    def __init__(
+        self,
+        items: tuple[BatchRenderItem, ...],
+        workers: int,
+        token: CancellationToken,
+        progress: ProgressCallback | None,
+        fail_fast: bool,
+        started: float,
+    ) -> None:
+        self.items = items
+        self.workers = workers
+        self.token = token
+        self.progress = progress
+        self.fail_fast = fail_fast
+        self.started = started
+        self.completed: dict[int, BatchItemResult] = {}
+        self.pending: dict[Future[BatchItemResult], int] = {}
+        self.next_index = 0
+        self.succeeded = 0
+        self.stopped = False
+
+    @property
+    def can_submit(self) -> bool:
+        return self.next_index < len(self.items) and not self.stopped
+
+    def submit_available(self, executor: ThreadPoolExecutor) -> None:
+        while (
+            self.can_submit
+            and not self.token.cancelled
+            and len(self.pending) < self.workers
+        ):
+            future = executor.submit(
+                _render_one,
+                self.next_index,
+                self.items[self.next_index],
+            )
+            self.pending[future] = self.next_index
+            self.next_index += 1
+
+    def request_stop(self) -> None:
+        self.stopped = True
+        for future in self.pending:
+            future.cancel()
+
+    def collect(self, finished: set[Future[BatchItemResult]]) -> None:
+        for future in finished:
+            index = self.pending.pop(future)
+            if future.cancelled():
+                continue
+            result = future.result()
+            self.completed[index] = result
+            self.succeeded += result.succeeded
+            if self.fail_fast and not result.succeeded:
+                self.stopped = True
+            self.report_progress()
+
+    def report_progress(self) -> None:
+        if self.progress is None:
+            return
+        self.progress(
+            BatchProgress(
+                completed=len(self.completed),
+                total=len(self.items),
+                succeeded=self.succeeded,
+                failed=len(self.completed) - self.succeeded,
+                elapsed=perf_counter() - self.started,
+            )
+        )
+
+    def run(self, executor: ThreadPoolExecutor) -> dict[int, BatchItemResult]:
+        while self.pending or self.can_submit:
+            self.submit_available(executor)
+            if self.token.cancelled:
+                self.request_stop()
+            if not self.pending:
+                break
+            finished, _ = wait(tuple(self.pending), return_when=FIRST_COMPLETED)
+            self.collect(finished)
+        return self.completed
+
+
 def render_batch(
     items: Iterable[BatchRenderItem],
     *,
@@ -220,52 +304,20 @@ def render_batch(
     active_workers = min(workers, len(selected))
     token = cancellation or CancellationToken()
     started = perf_counter()
-    completed: dict[int, BatchItemResult] = {}
-    next_index = 0
-    stopped = False
-
     executor = ThreadPoolExecutor(
         max_workers=active_workers,
         thread_name_prefix="glyph-forge-batch",
     )
-    pending: dict[Future[BatchItemResult], int] = {}
+    runner = _BatchRunner(
+        selected,
+        active_workers,
+        token,
+        progress,
+        fail_fast,
+        started,
+    )
     try:
-        while pending or (next_index < len(selected) and not stopped):
-            while (
-                not stopped
-                and not token.cancelled
-                and next_index < len(selected)
-                and len(pending) < active_workers
-            ):
-                future = executor.submit(_render_one, next_index, selected[next_index])
-                pending[future] = next_index
-                next_index += 1
-            if token.cancelled:
-                stopped = True
-                for future in pending:
-                    future.cancel()
-            if not pending:
-                break
-            finished, _ = wait(tuple(pending), return_when=FIRST_COMPLETED)
-            for future in finished:
-                index = pending.pop(future)
-                if future.cancelled():
-                    continue
-                result = future.result()
-                completed[index] = result
-                if fail_fast and not result.succeeded:
-                    stopped = True
-                if progress is not None:
-                    succeeded = sum(item.succeeded for item in completed.values())
-                    progress(
-                        BatchProgress(
-                            completed=len(completed),
-                            total=len(selected),
-                            succeeded=succeeded,
-                            failed=len(completed) - succeeded,
-                            elapsed=perf_counter() - started,
-                        )
-                    )
+        completed = runner.run(executor)
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
 

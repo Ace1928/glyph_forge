@@ -154,6 +154,48 @@ Button.-success {
     width: 1fr;
 }
 
+.compact-actions Button {
+    min-width: 6;
+}
+
+.status-block {
+    min-height: 2;
+    padding: 0 1;
+}
+
+.project-panel {
+    width: 1fr;
+    padding: 1 2;
+    background: $background;
+    overflow-y: auto;
+}
+
+.project-summary {
+    height: auto;
+    min-height: 8;
+    padding: 1;
+    border: solid $line;
+    background: #030706;
+}
+
+.section-heading {
+    margin-top: 2;
+}
+
+.queue-list {
+    height: auto;
+    min-height: 5;
+    max-height: 16;
+    padding: 1;
+    border: solid $line;
+    background: #030706;
+    overflow-y: auto;
+}
+
+.queue-actions Button:first-child {
+    width: 2fr;
+}
+
 .preview-heading {
     height: 2;
 }

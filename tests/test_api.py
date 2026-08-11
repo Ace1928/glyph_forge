@@ -7,6 +7,7 @@ Every feature is validated with atomic tests and crystal-clear assertions.
 """
 
 import importlib
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -17,7 +18,11 @@ from PIL import Image
 
 from glyph_forge.api.glyph_api import GlyphForgeAPI, get_api
 from glyph_forge.contracts import RenderArtifact, RenderFormat, RenderRequest
-from glyph_forge.projects import RenderPreset
+from glyph_forge.projects import (
+    ProjectPersistenceError,
+    RecentProjectStore,
+    RenderPreset,
+)
 
 
 def test_top_level_image_helper_resolves_to_callable() -> None:
@@ -151,6 +156,29 @@ class TestGlyphForgeAPI:
         assert report.succeeded == 1
         assert report.results[0].destination.suffix == ".svg"
         assert (tmp_path / "config" / "recent_projects.json").is_file()
+
+    def test_project_creation_succeeds_when_optional_recents_are_unavailable(
+        self,
+        api,
+        tmp_path,
+        monkeypatch,
+        caplog,
+    ):
+        source = tmp_path / "source.png"
+        Image.new("RGB", (4, 2), "white").save(source)
+        project_path = tmp_path / "work" / "project.glyphforge.json"
+
+        def fail_recent(*args, **kwargs):
+            raise ProjectPersistenceError("read-only config")
+
+        monkeypatch.setattr(RecentProjectStore, "touch", fail_recent)
+        caplog.set_level(logging.WARNING, logger="glyph_forge.api.glyph_api")
+
+        project = api.create_project(project_path, source)
+
+        assert project_path.is_file()
+        assert project.name == "project"
+        assert "recent history was not updated" in caplog.text
 
     # ──── Banner Generation Tests ───────────────────────────────────────
 
