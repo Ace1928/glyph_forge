@@ -733,6 +733,7 @@ input[type="range"] {
 
 @media (pointer: coarse) {
   .button,
+  .text-source .button,
   .field select,
   .field input[type="text"],
   .color-field input {

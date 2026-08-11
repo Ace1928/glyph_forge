@@ -59,12 +59,24 @@ test("ships an accessible installable app shell", async ({ page }) => {
   expect(manifest.start_url).toBe("./");
   expect(manifest.icons.some(({ sizes }) => sizes === "512x512")).toBeTruthy();
 
+  const offlineShell = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    const names = await caches.keys();
+    const studioCache = names.find((name) => name.startsWith("glyph-forge-studio-"));
+    const cache = studioCache ? await caches.open(studioCache) : null;
+    const script = cache ? await cache.match(new URL("studio.js", document.baseURI)) : null;
+    return { active: Boolean(registration.active), studioCache, script: Boolean(script) };
+  });
+  expect(offlineShell.active).toBeTruthy();
+  expect(offlineShell.studioCache).toMatch(/^glyph-forge-studio-/u);
+  expect(offlineShell.script).toBeTruthy();
+
   const results = await new AxeBuilder({ page }).analyze();
   expect(seriousViolations(results.violations)).toEqual([]);
 });
 
 test("recovers its app shell while offline", async ({ page, context, browserName }) => {
-  test.skip(browserName === "firefox", "Playwright Firefox does not expose service workers reliably");
+  test.skip(browserName !== "chromium", "Playwright offline navigation is reliable only in Chromium");
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
