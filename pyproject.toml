@@ -39,7 +39,7 @@ dependencies = [
     "pyfiglet>=0.8.0",
     "PyYAML>=6.0",
     "rich>=13.7.0",
-    "typer>=0.9.0",
+    "typer>=0.27.1",
 ]
 
 [project.optional-dependencies]
