@@ -44,6 +44,8 @@ from .renderers import (
     RenderResult,
     normalize_render_mode,
     render_svg,
+    render_text_png,
+    render_text_svg,
 )
 from .session import (
     LiveSessionStats,
@@ -122,6 +124,8 @@ __all__ = [
     "map_pointer_to_capture",
     "normalize_render_mode",
     "render_svg",
+    "render_text_png",
+    "render_text_svg",
     "resolve_network_source",
     "run_terminal_session",
     "virtual_display",

@@ -211,7 +211,13 @@ class TestGlyphForgeAPI:
 
                 # Verify correct ImageGlyphConverter instantiation
                 mock_constructor.assert_called_with(
-                    charset="minimal", width=80, height=40, invert=True, dithering=False
+                    charset="minimal",
+                    width=80,
+                    height=40,
+                    invert=True,
+                    dithering=False,
+                    brightness=1.0,
+                    contrast=1.0,
                 )
 
     # ──── Utility Method Tests ───────────────────────────────────────

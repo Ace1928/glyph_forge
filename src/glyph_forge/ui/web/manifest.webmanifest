@@ -39,13 +39,13 @@
       "name": "Braille forge",
       "short_name": "Braille",
       "description": "Open Glyph Forge in 2×4 Braille subpixel mode.",
-      "url": "./#mode=braille&style=detailed&columns=160&resolution=auto&color=source&ink=e8fff7&canvas=07110f&brightness=1&contrast=1&invert=0&font=0"
+      "url": "./#mode=braille&style=detailed&columns=160&size=auto&outputWidth=1280&outputHeight=720&aspectLock=1&color=source&ink=e8fff7&canvas=07110f&brightness=1.12&contrast=1.08&invert=0&font=0"
     },
     {
       "name": "Full-colour blocks",
       "short_name": "Colour blocks",
       "description": "Open Glyph Forge in high-fidelity half-block mode.",
-      "url": "./#mode=half-block&style=detailed&columns=160&resolution=auto&color=source&ink=e8fff7&canvas=07110f&brightness=1&contrast=1&invert=0&font=0"
+      "url": "./#mode=half-block&style=detailed&columns=160&size=auto&outputWidth=1280&outputHeight=720&aspectLock=1&color=source&ink=e8fff7&canvas=07110f&brightness=1.12&contrast=1.08&invert=0&font=0"
     }
   ],
   "file_handlers": [

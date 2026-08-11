@@ -218,7 +218,7 @@ export class WebGLGlyphRenderer {
 
       vec3 adjusted_color(vec2 uv) {
         vec3 color = texture(u_source, clamp(uv, vec2(0.0), vec2(1.0))).rgb;
-        color = clamp((color - 0.5) * u_contrast + 0.5, 0.0, 1.0);
+        color = (color - 0.5) * u_contrast + 0.5;
         return clamp(color * u_brightness, 0.0, 1.0);
       }
 

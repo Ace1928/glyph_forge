@@ -8,6 +8,7 @@ resolution and performs pixel math in NumPy instead of per-pixel Python loops.
 from __future__ import annotations
 
 import html
+import math
 from dataclasses import dataclass, replace
 from enum import Enum
 from functools import lru_cache
@@ -15,16 +16,18 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from PIL import Image
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 from ..runtime import RuntimeProfile, detect_runtime_profile
 from ..utils.alphabet_manager import AlphabetManager
+from ..visual import DEFAULT_BRIGHTNESS, DEFAULT_CONTRAST, apply_tone, normalize_tone
 from .edges import EdgeAlgorithm, detect_edges, directional_glyphs, normalize_algorithm
 
 if TYPE_CHECKING:
     from ..plugins import PluginRegistry, RendererExtension
 
 RGBFrame = NDArray[np.uint8]
+MAX_RASTER_PIXELS = 7680 * 4320
 
 
 class RenderMode(str, Enum):
@@ -68,6 +71,8 @@ class RenderConfig:
     edge_threshold: int = 48
     cell_aspect: float = 0.5
     resample: str = "bilinear"
+    brightness: float = DEFAULT_BRIGHTNESS
+    contrast: float = DEFAULT_CONTRAST
 
     @classmethod
     def adaptive(
@@ -380,6 +385,17 @@ class FrameRenderer:
             raise ValueError("cell_aspect must be positive")
         if not 0 <= config.edge_threshold <= 255:
             raise ValueError("edge_threshold must be between 0 and 255")
+        normalized_brightness = normalize_tone(config.brightness, name="brightness")
+        normalized_contrast = normalize_tone(config.contrast, name="contrast")
+        if (
+            normalized_brightness != config.brightness
+            or normalized_contrast != config.contrast
+        ):
+            config = replace(
+                config,
+                brightness=normalized_brightness,
+                contrast=normalized_contrast,
+            )
         self.config = config
         self.mode = normalize_render_mode(config.mode)
         self.color = _normalize_color(config.color)
@@ -471,7 +487,11 @@ class FrameRenderer:
         return self._render_glyph(normalized, width, height)
 
     def _render_glyph(self, frame: RGBFrame, width: int, height: int) -> RenderResult:
-        resized = _resize(frame, width, height, self.config.resample)
+        resized = apply_tone(
+            _resize(frame, width, height, self.config.resample),
+            self.config.brightness,
+            self.config.contrast,
+        )
         gray = _grayscale(resized)
         indices = (gray.astype(np.uint16) * len(self._glyphs) // 256).clip(
             max=len(self._glyphs) - 1
@@ -482,7 +502,11 @@ class FrameRenderer:
         return RenderResult(text, width, height, self.mode)
 
     def _render_edge(self, frame: RGBFrame, width: int, height: int) -> RenderResult:
-        resized = _resize(frame, width, height, self.config.resample)
+        resized = apply_tone(
+            _resize(frame, width, height, self.config.resample),
+            self.config.brightness,
+            self.config.contrast,
+        )
         gray = _grayscale(resized)
         indices = (gray.astype(np.uint16) * len(self._glyphs) // 256).clip(
             max=len(self._glyphs) - 1
@@ -500,11 +524,15 @@ class FrameRenderer:
         return RenderResult(text, width, height, self.mode)
 
     def _render_braille(self, frame: RGBFrame, width: int, height: int) -> RenderResult:
-        resized = _resize(
-            frame,
-            width * 2,
-            height * 4,
-            self.config.resample,
+        resized = apply_tone(
+            _resize(
+                frame,
+                width * 2,
+                height * 4,
+                self.config.resample,
+            ),
+            self.config.brightness,
+            self.config.contrast,
         )
         on = _binary_pixels(_grayscale(resized), self.config)
         blocks = on.reshape(height, 4, width, 2)
@@ -533,19 +561,18 @@ class FrameRenderer:
         width: int,
         height: int,
     ) -> RenderResult:
-        resized = _resize(
-            frame,
-            width,
-            height * 2,
-            self.config.resample,
-        )
         if self.color is ColorOutput.NONE:
-            fallback = replace(self.config, mode=RenderMode.GLYPH)
-            return FrameRenderer(fallback).render(
+            return self._render_glyph(frame, width, height)
+        resized = apply_tone(
+            _resize(
                 frame,
-                max_width=width,
-                max_height=height,
-            )
+                width,
+                height * 2,
+                self.config.resample,
+            ),
+            self.config.brightness,
+            self.config.contrast,
+        )
 
         upper = resized[0::2]
         lower = resized[1::2]
@@ -555,11 +582,15 @@ class FrameRenderer:
     def _render_quadrant(
         self, frame: RGBFrame, width: int, height: int
     ) -> RenderResult:
-        resized = _resize(
-            frame,
-            width * 2,
-            height * 2,
-            self.config.resample,
+        resized = apply_tone(
+            _resize(
+                frame,
+                width * 2,
+                height * 2,
+                self.config.resample,
+            ),
+            self.config.brightness,
+            self.config.contrast,
         )
         on = _binary_pixels(_grayscale(resized), self.config)
         blocks = on.reshape(height, 2, width, 2)
@@ -588,6 +619,8 @@ def render_svg(
     foreground: str = "#e8fff7",
     background: str = "#07110f",
     font_family: str = "ui-monospace, SFMono-Regular, Consolas, monospace",
+    output_width: int | None = None,
+    output_height: int | None = None,
 ) -> str:
     """Render a still frame as scalable SVG text.
 
@@ -597,13 +630,69 @@ def render_svg(
 
     selected = config or RenderConfig()
     result = FrameRenderer(replace(selected, color=ColorOutput.NONE)).render(frame)
+    return render_text_svg(
+        result.text,
+        font_size=font_size,
+        foreground=foreground,
+        background=background,
+        font_family=font_family,
+        output_width=output_width,
+        output_height=output_height,
+    )
+
+
+def _text_canvas_dimensions(
+    text: str,
+    font_size: float,
+    output_width: int | None,
+    output_height: int | None,
+) -> tuple[list[str], float, float, float, float]:
+    lines = text.splitlines() or [""]
+    columns = max(1, *(len(line) for line in lines))
     line_height = font_size * 1.05
-    width = max(1.0, result.width * font_size * 0.62)
-    height = max(line_height, result.height * line_height)
+    intrinsic_width = max(1.0, columns * font_size * 0.62)
+    intrinsic_height = max(line_height, len(lines) * line_height)
+    if output_width is not None and output_height is None:
+        output_height = max(1, round(output_width * intrinsic_height / intrinsic_width))
+    elif output_height is not None and output_width is None:
+        output_width = max(1, round(output_height * intrinsic_width / intrinsic_height))
+    width = float(output_width) if output_width is not None else intrinsic_width
+    height = float(output_height) if output_height is not None else intrinsic_height
+    if width <= 0 or height <= 0:
+        raise ValueError("Output width and height must be positive")
+    return lines, intrinsic_width, intrinsic_height, width, height
+
+
+def render_text_svg(
+    text: str,
+    *,
+    font_size: float = 10.0,
+    foreground: str = "#e8fff7",
+    background: str = "#07110f",
+    font_family: str = "ui-monospace, SFMono-Regular, Consolas, monospace",
+    output_width: int | None = None,
+    output_height: int | None = None,
+) -> str:
+    """Render text glyph art as an exact-size, infinitely scalable SVG."""
+
+    lines, intrinsic_width, intrinsic_height, width, height = _text_canvas_dimensions(
+        text,
+        font_size,
+        output_width,
+        output_height,
+    )
+    line_height = font_size * 1.05
+    scale_x = width / intrinsic_width
+    scale_y = height / intrinsic_height
     rows = []
-    for index, line in enumerate(result.text.splitlines(), start=1):
+    for index, line in enumerate(lines, start=1):
+        sizing = ""
+        if line:
+            text_length = len(line) * font_size * 0.62
+            sizing = f' textLength="{text_length:.2f}" lengthAdjust="spacingAndGlyphs"'
         rows.append(
-            f'<text x="0" y="{index * line_height:.2f}">{html.escape(line)}</text>'
+            f'<text x="0" y="{index * line_height:.2f}"{sizing}>'
+            f"{html.escape(line)}</text>"
         )
     family = html.escape(font_family, quote=True)
     return (
@@ -612,11 +701,101 @@ def render_svg(
         f'height="{height:.2f}" viewBox="0 0 {width:.2f} {height:.2f}" '
         'role="img" aria-label="Glyph Forge render">\n'
         f'<rect width="100%" height="100%" fill="{html.escape(background)}"/>\n'
-        f'<g fill="{html.escape(foreground)}" font-family="{family}" '
+        f'<g transform="scale({scale_x:.8f} {scale_y:.8f})" '
+        f'fill="{html.escape(foreground)}" font-family="{family}" '
         f'font-size="{font_size:.2f}" xml:space="preserve">\n'
         + "\n".join(rows)
         + "\n</g>\n</svg>\n"
     )
+
+
+@lru_cache(maxsize=8)
+def _raster_font(
+    size: int, explicit: str | None
+) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    candidates = ([explicit] if explicit else []) + [
+        "DejaVuSansMono.ttf",
+        "LiberationMono-Regular.ttf",
+    ]
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        try:
+            return ImageFont.truetype(candidate, size)
+        except OSError:
+            continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:  # Pillow < 10.1
+        return ImageFont.load_default()
+
+
+def render_text_png(
+    text: str,
+    *,
+    foreground: str = "#e8fff7",
+    background: str = "#07110f",
+    font: str | None = None,
+    output_width: int | None = None,
+    output_height: int | None = None,
+) -> Image.Image:
+    """Rasterize text glyph art once at an explicit final pixel size."""
+
+    preview_lines = text.splitlines() or [""]
+    columns = max(1, *(len(line) for line in preview_lines))
+    rows = len(preview_lines)
+    width_font = (
+        math.ceil(output_width / (columns * 0.62)) if output_width is not None else 0
+    )
+    height_font = (
+        math.ceil(output_height / (rows * 1.05)) if output_height is not None else 0
+    )
+    # Rasterize at or above the requested density for normal layouts.  The
+    # ceiling prevents pathological canvases from creating an enormous
+    # intermediate; SVG remains the unbounded lossless option.
+    font_size = min(4096, max(32, width_font, height_font))
+    lines, intrinsic_width, intrinsic_height, width, height = _text_canvas_dimensions(
+        text,
+        font_size,
+        output_width,
+        output_height,
+    )
+    if width * height > MAX_RASTER_PIXELS:
+        raise ValueError(
+            "PNG output exceeds the safe 8K pixel budget; use SVG for larger art"
+        )
+    intrinsic_pixels = intrinsic_width * intrinsic_height
+    if intrinsic_pixels > MAX_RASTER_PIXELS:
+        scale = math.sqrt(MAX_RASTER_PIXELS / intrinsic_pixels)
+        font_size = max(8, math.floor(font_size * scale))
+        lines, intrinsic_width, intrinsic_height, width, height = (
+            _text_canvas_dimensions(
+                text,
+                font_size,
+                output_width,
+                output_height,
+            )
+        )
+    raster_width = max(1, math.ceil(intrinsic_width))
+    raster_height = max(1, math.ceil(intrinsic_height))
+    image = Image.new(
+        "RGB", (raster_width, raster_height), ImageColor.getrgb(background)
+    )
+    draw = ImageDraw.Draw(image)
+    selected_font = _raster_font(font_size, font)
+    line_height = font_size * 1.05
+    top_offset = draw.textbbox((0, 0), "Mg", font=selected_font)[1]
+    for index, line in enumerate(lines):
+        draw.text(
+            (0, index * line_height - top_offset),
+            line,
+            fill=ImageColor.getrgb(foreground),
+            font=selected_font,
+        )
+    requested = (max(1, round(width)), max(1, round(height)))
+    if image.size != requested:
+        image = image.resize(requested, Image.Resampling.LANCZOS)
+    return image
 
 
 __all__ = [
@@ -628,4 +807,6 @@ __all__ = [
     "RenderResult",
     "normalize_render_mode",
     "render_svg",
+    "render_text_png",
+    "render_text_svg",
 ]

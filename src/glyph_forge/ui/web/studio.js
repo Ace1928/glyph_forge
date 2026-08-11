@@ -19,6 +19,17 @@ const CHARSETS = Object.freeze({
   cosmic: " ·˚。✧⋆✦✩★",
 });
 
+const OUTPUT_PRESETS = Object.freeze({
+  "720p": [1280, 720],
+  "1080p": [1920, 1080],
+  "1440p": [2560, 1440],
+  "4k": [3840, 2160],
+  "8k": [7680, 4320],
+});
+const MIN_OUTPUT_DIMENSION = 64;
+const MAX_OUTPUT_DIMENSION = 8192;
+const MAX_OUTPUT_PIXELS = 7680 * 4320;
+
 const $ = (id) => document.getElementById(id);
 const elements = {
   canvas: $("outputCanvas"),
@@ -47,7 +58,11 @@ const elements = {
   font: $("fontSelect"),
   columns: $("columnsRange"),
   columnsValue: $("columnsValue"),
-  resolution: $("resolutionSelect"),
+  sizePreset: $("sizePreset"),
+  outputWidth: $("outputWidth"),
+  outputHeight: $("outputHeight"),
+  outputSizeValue: $("outputSizeValue"),
+  aspectLock: $("aspectLock"),
   colorMode: $("colorMode"),
   foreground: $("foregroundColor"),
   background: $("backgroundColor"),
@@ -87,6 +102,8 @@ const state = {
   optionsDirty: true,
   installPrompt: null,
   dimensions: { width: 1280, height: 720, rows: 72 },
+  outputAspect: 16 / 9,
+  outputEditTimer: null,
   recording: null,
   audioBridge: null,
   gifFrames: null,
@@ -163,23 +180,111 @@ function adaptiveColumns() {
   return { workstation: 240, balanced: 160, modest: 96 }[performanceTier()];
 }
 
-function targetDimensions() {
+function hardwareOutputLimit() {
+  const gl = state.renderer?.gl;
+  if (!gl) return performanceTier() === "modest" ? 4096 : MAX_OUTPUT_DIMENSION;
+  const viewport = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+  const renderbuffer = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
+  return Math.min(MAX_OUTPUT_DIMENSION, renderbuffer, viewport[0], viewport[1]);
+}
+
+function constrainedOutputSize(requestedWidth, requestedHeight) {
+  const maximum = hardwareOutputLimit();
+  let width = Math.max(1, Math.round(requestedWidth) || 1280);
+  let height = Math.max(1, Math.round(requestedHeight) || 720);
+  const minimumScale = Math.max(1, MIN_OUTPUT_DIMENSION / width, MIN_OUTPUT_DIMENSION / height);
+  if (minimumScale > 1) {
+    width = Math.ceil(width * minimumScale);
+    height = Math.ceil(height * minimumScale);
+  }
+  const dimensionScale = Math.min(1, maximum / width, maximum / height);
+  if (dimensionScale < 1) {
+    width = Math.max(MIN_OUTPUT_DIMENSION, Math.floor(width * dimensionScale));
+    height = Math.max(MIN_OUTPUT_DIMENSION, Math.floor(height * dimensionScale));
+  }
+  const pixels = width * height;
+  if (pixels > MAX_OUTPUT_PIXELS) {
+    const scale = Math.sqrt(MAX_OUTPUT_PIXELS / pixels);
+    width = Math.max(MIN_OUTPUT_DIMENSION, Math.floor(width * scale));
+    height = Math.max(MIN_OUTPUT_DIMENSION, Math.floor(height * scale));
+  }
+  return { width, height };
+}
+
+function sourceAspect() {
   const source = sourceSize();
-  const aspect = Math.max(0.1, source.width / Math.max(1, source.height));
+  return Math.max(0.1, source.width / Math.max(1, source.height));
+}
+
+function writeOutputSize(width, height, { updateAspect = true } = {}) {
+  const fitted = constrainedOutputSize(width, height);
+  elements.outputWidth.value = String(fitted.width);
+  elements.outputHeight.value = String(fitted.height);
+  if (updateAspect) state.outputAspect = fitted.width / fitted.height;
+  elements.outputSizeValue.textContent = `${fitted.width}×${fitted.height} px`;
+  return fitted;
+}
+
+function applySizePreset({ sourceChanged = false, render = true } = {}) {
+  const preset = elements.sizePreset.value;
+  if (preset === "custom" && sourceChanged) return;
+  let width;
   let height;
-  if (elements.resolution.value === "source") {
-    height = source.height;
-  } else if (elements.resolution.value === "auto") {
+  if (preset === "source") {
+    ({ width, height } = sourceSize());
+  } else if (preset === "auto") {
+    const source = sourceSize();
+    const aspect = sourceAspect();
     height = Math.min(source.height || 720, adaptiveHeight());
+    width = height * aspect;
+  } else if (OUTPUT_PRESETS[preset]) {
+    [width, height] = OUTPUT_PRESETS[preset];
   } else {
-    height = Number(elements.resolution.value);
+    width = Number(elements.outputWidth.value);
+    height = Number(elements.outputHeight.value);
   }
-  height = Math.max(180, Math.min(2160, Math.round(height / 2) * 2));
-  let width = Math.max(320, Math.round((height * aspect) / 2) * 2);
-  if (width > 4096) {
-    width = 4096;
-    height = Math.max(180, Math.round((width / aspect) / 2) * 2);
+  const fitted = writeOutputSize(width, height);
+  if (render && (fitted.width !== Math.round(width) || fitted.height !== Math.round(height))) {
+    setStatus(`Output fitted to this device's safe limit · ${fitted.width}×${fitted.height}.`);
   }
+  if (render) rerender();
+}
+
+function editOutputDimension(axis) {
+  if (state.outputEditTimer) window.clearTimeout(state.outputEditTimer);
+  state.outputEditTimer = null;
+  const width = Number(elements.outputWidth.value);
+  const height = Number(elements.outputHeight.value);
+  let requestedWidth = width;
+  let requestedHeight = height;
+  if (elements.aspectLock.checked) {
+    if (axis === "width") requestedHeight = width / state.outputAspect;
+    else requestedWidth = height * state.outputAspect;
+  }
+  elements.sizePreset.value = "custom";
+  const fitted = writeOutputSize(requestedWidth, requestedHeight, {
+    updateAspect: !elements.aspectLock.checked,
+  });
+  if (fitted.width !== Math.round(requestedWidth) || fitted.height !== Math.round(requestedHeight)) {
+    setStatus(`Output fitted to this device's safe limit · ${fitted.width}×${fitted.height}.`);
+  }
+  rerender();
+}
+
+function scheduleOutputDimensionEdit(axis) {
+  if (state.outputEditTimer) window.clearTimeout(state.outputEditTimer);
+  const input = axis === "width" ? elements.outputWidth : elements.outputHeight;
+  if (!input.value || !input.validity.valid) return;
+  state.outputEditTimer = window.setTimeout(() => editOutputDimension(axis), 140);
+}
+
+function targetDimensions() {
+  const { width, height } = writeOutputSize(
+    Number(elements.outputWidth.value),
+    Number(elements.outputHeight.value),
+    { updateAspect: false },
+  );
+  const aspect = sourceAspect();
   const columns = Number(elements.columns.value);
   const rows = Math.max(1, Math.round((columns * 0.5) / aspect));
   state.dimensions = { width, height, rows };
@@ -344,6 +449,7 @@ function beginRenderLoop() {
 }
 
 function describeSource(name) {
+  applySizePreset({ sourceChanged: true, render: false });
   invalidateOptions();
   const size = sourceSize();
   elements.sourceName.textContent = name;
@@ -890,7 +996,8 @@ function canvasBlob(type = "image/png") {
 async function savePng() {
   try {
     download(await canvasBlob(), outputName("png"));
-    setStatus("PNG saved.");
+    const { width, height } = currentOptions();
+    setStatus(`PNG saved · ${width}×${height} pixels.`);
   } catch (error) {
     setStatus(error.message, true);
   }
@@ -904,15 +1011,18 @@ function saveText() {
 
 function saveSvg() {
   const { lines, options } = sampleTextFrame();
-  const fontSize = 12;
-  const lineHeight = fontSize * 1.05;
-  const width = options.columns * fontSize * 0.62;
-  const height = options.rows * lineHeight;
+  const width = options.width;
+  const height = options.height;
+  const cellHeight = height / options.rows;
+  const fontSize = cellHeight * 0.88;
   const family = escapeXml(options.font);
-  const texts = lines.map((line, index) => `<text x="0" y="${((index + 1) * lineHeight).toFixed(2)}">${escapeXml(line)}</text>`).join("\n");
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width.toFixed(2)}" height="${height.toFixed(2)}" viewBox="0 0 ${width.toFixed(2)} ${height.toFixed(2)}" role="img" aria-label="Glyph Forge render">\n<rect width="100%" height="100%" fill="${elements.background.value}"/>\n<g fill="${elements.foreground.value}" font-family="${family}" font-size="${fontSize}" xml:space="preserve">\n${texts}\n</g>\n</svg>\n`;
+  const texts = lines.map((line, index) => (
+    `<text x="0" y="${((index + 0.82) * cellHeight).toFixed(4)}" `
+    + `textLength="${width}" lengthAdjust="spacingAndGlyphs">${escapeXml(line)}</text>`
+  )).join("\n");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Glyph Forge render">\n<rect width="100%" height="100%" fill="${elements.background.value}"/>\n<g fill="${elements.foreground.value}" font-family="${family}" font-size="${fontSize.toFixed(4)}" xml:space="preserve">\n${texts}\n</g>\n</svg>\n`;
   download(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), outputName("svg"));
-  setStatus("Scalable SVG saved with real text glyphs.");
+  setStatus(`SVG saved · ${width}×${height} viewBox · lossless vector glyphs.`);
 }
 
 function settingsHash() {
@@ -921,7 +1031,10 @@ function settingsHash() {
     style: elements.charset.value,
     glyphs: elements.charset.value === "custom" ? elements.customCharset.value : "",
     columns: elements.columns.value,
-    resolution: elements.resolution.value,
+    size: elements.sizePreset.value,
+    outputWidth: elements.outputWidth.value,
+    outputHeight: elements.outputHeight.value,
+    aspectLock: elements.aspectLock.checked ? "1" : "0",
     color: elements.colorMode.value,
     ink: elements.foreground.value.slice(1),
     canvas: elements.background.value.slice(1),
@@ -1066,6 +1179,7 @@ async function toggleFullscreen() {
 function restoreSettings() {
   if (!window.location.hash) {
     elements.columns.value = String(adaptiveColumns());
+    applySizePreset({ render: false });
     return;
   }
   const values = new URLSearchParams(window.location.hash.slice(1));
@@ -1077,7 +1191,15 @@ function restoreSettings() {
   assign(elements.charset, "style", (value) => [...elements.charset.options].some((option) => option.value === value));
   assign(elements.customCharset, "glyphs");
   assign(elements.columns, "columns", (value) => Number(value) >= 32 && Number(value) <= 480);
-  assign(elements.resolution, "resolution", (value) => [...elements.resolution.options].some((option) => option.value === value));
+  const legacyResolution = values.get("resolution");
+  const legacySizes = { "720": "720p", "1080": "1080p", "2160": "4k" };
+  const requestedSize = values.get("size") || legacySizes[legacyResolution] || legacyResolution;
+  if ([...elements.sizePreset.options].some((option) => option.value === requestedSize)) {
+    elements.sizePreset.value = requestedSize;
+  }
+  assign(elements.outputWidth, "outputWidth", (value) => Number(value) >= 64 && Number(value) <= 8192);
+  assign(elements.outputHeight, "outputHeight", (value) => Number(value) >= 64 && Number(value) <= 8192);
+  elements.aspectLock.checked = values.get("aspectLock") !== "0";
   assign(elements.colorMode, "color");
   const ink = values.get("ink");
   const canvas = values.get("canvas");
@@ -1088,12 +1210,18 @@ function restoreSettings() {
   elements.invert.checked = values.get("invert") === "1";
   const fontIndex = Number(values.get("font"));
   if (Number.isInteger(fontIndex) && elements.font.options[fontIndex]) elements.font.selectedIndex = fontIndex;
+  if (values.has("outputWidth") && values.has("outputHeight")) {
+    writeOutputSize(Number(elements.outputWidth.value), Number(elements.outputHeight.value));
+  } else {
+    applySizePreset({ render: false });
+  }
 }
 
 function syncControlLabels() {
   elements.columnsValue.textContent = elements.columns.value;
   elements.brightnessValue.textContent = Number(elements.brightness.value).toFixed(2);
   elements.contrastValue.textContent = Number(elements.contrast.value).toFixed(2);
+  elements.outputSizeValue.textContent = `${elements.outputWidth.value}×${elements.outputHeight.value} px`;
   const densityMode = ["glyph", "edge"].includes(elements.mode.value);
   elements.charsetField.classList.toggle("hidden", !densityMode);
   elements.customField.classList.toggle("hidden", !densityMode || elements.charset.value !== "custom");
@@ -1234,9 +1362,21 @@ function bindEvents() {
     if (!document.hidden && state.source && !isDynamicSource()) renderCurrent();
   });
 
+  elements.sizePreset.addEventListener("change", () => applySizePreset());
+  elements.outputWidth.addEventListener("input", () => scheduleOutputDimensionEdit("width"));
+  elements.outputHeight.addEventListener("input", () => scheduleOutputDimensionEdit("height"));
+  elements.outputWidth.addEventListener("change", () => editOutputDimension("width"));
+  elements.outputHeight.addEventListener("change", () => editOutputDimension("height"));
+  elements.aspectLock.addEventListener("change", () => {
+    if (elements.aspectLock.checked) {
+      state.outputAspect = Number(elements.outputWidth.value) / Number(elements.outputHeight.value);
+    }
+    rerender();
+  });
+
   for (const control of [
     elements.mode, elements.charset, elements.customCharset, elements.font, elements.columns,
-    elements.resolution, elements.colorMode, elements.foreground, elements.background,
+    elements.colorMode, elements.foreground, elements.background,
     elements.brightness, elements.contrast, elements.invert,
   ]) {
     control.addEventListener("input", rerender);

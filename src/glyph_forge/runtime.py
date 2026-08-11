@@ -19,7 +19,7 @@ from importlib import metadata
 from typing import Any, Iterable
 
 PYTHON_DISTRIBUTION = "glyphforge"
-STABLE_RELEASE_VERSION = "0.3.0"
+STABLE_RELEASE_VERSION = "0.3.1"
 STABLE_SOURCE_URL = (
     "https://github.com/Ace1928/glyph_forge/archive/refs/tags/"
     f"v{STABLE_RELEASE_VERSION}.zip"
@@ -367,7 +367,7 @@ def package_version() -> str:
     try:
         return metadata.version("glyphforge")
     except metadata.PackageNotFoundError:
-        return "0.3.0.dev0"
+        return "0.3.1.dev0"
 
 
 def runtime_report(preference: str | PerformanceTier | None = None) -> dict[str, Any]:

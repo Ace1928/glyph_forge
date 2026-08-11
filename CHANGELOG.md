@@ -5,11 +5,6 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
-### Security
-
-- Future release assets are assembled as drafts before publication so GitHub
-  can lock their tag and files through enforced immutable releases
-
 ### Planned
 
 - Native capture adapters and optional compiled rendering hot paths
@@ -17,6 +12,53 @@ the project uses semantic versioning.
 - One-time PyPI owner setup for the unambiguous `glyphforge` distribution;
   versioned GitHub wheels and portable archives remain the canonical release
   path until then
+
+## [0.3.1] - 2026-08-11
+
+### Added
+
+- Exact, independent output dimensions throughout Studio: adaptive, source,
+  720p, 1080p, 1440p, 4K, 8K, and custom width/height presets, with optional
+  aspect locking and device-safe GPU/canvas bounds
+- First-class CLI PNG and real-text SVG still exports inferred from the output
+  suffix, with `--output-width` and `--output-height` kept separate from glyph
+  columns and rows, automatic one-axis aspect preservation, and configurable
+  foreground/background colours
+- Public lazy `render_text_png` and `render_text_svg` APIs for exact-size
+  application exports
+- Browser acceptance coverage proving exact custom canvas/SVG dimensions stay
+  unchanged when glyph density changes
+
+### Changed
+
+- Brighter, clearer visual defaults (`1.12` brightness and `1.08` contrast)
+  are now consistent across grayscale and colour stills, live renderers,
+  Studio, video exports, configuration, and style links
+- Studio SVG exports now use the selected pixel dimensions as their exact
+  viewBox and stretch real text rows across that vector surface
+- Native video pixel dimensions no longer need to divide evenly by glyph rows
+  and columns; divisible configurations retain the direct fast path and custom
+  fractional cells receive a high-quality exact-size fit
+- The Studio offline shell is versioned to v2 so installed apps receive the
+  new sizing controls and visual defaults immediately
+
+### Fixed
+
+- Colour image conversion now applies brightness and contrast instead of
+  silently bypassing both controls
+- API converter overrides preserve configured tone values and correctly accept
+  an explicit zero brightness or contrast value
+
+### Performance
+
+- Native still, live, and video tone adjustment shares one cached 256-entry
+  NumPy lookup table and runs after spatial downsampling, avoiding full-source
+  per-pixel tone math in latency-sensitive paths
+
+### Security
+
+- Future release assets are assembled as drafts before publication so GitHub
+  can lock their tag and files through enforced immutable releases
 
 ## [0.3.0] - 2026-08-11
 

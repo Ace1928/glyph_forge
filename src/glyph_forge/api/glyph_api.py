@@ -7,6 +7,7 @@ from ..core.banner_generator import BannerGenerator
 from ..core.style_manager import get_available_styles
 from ..services.image_to_glyph import ImageGlyphConverter
 from ..utils.alphabet_manager import AlphabetManager
+from ..visual_defaults import DEFAULT_BRIGHTNESS, DEFAULT_CONTRAST
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,15 @@ class GlyphForgeAPI:
             # Default image converter settings
             default_charset = self.config.get("image", "default_charset", "general")
             default_width = self.config.get("image", "default_width", 100)
+            default_brightness = self.config.get(
+                "image", "brightness", DEFAULT_BRIGHTNESS
+            )
+            default_contrast = self.config.get("image", "contrast", DEFAULT_CONTRAST)
             self._image_converter = ImageGlyphConverter(
-                charset=default_charset, width=default_width
+                charset=default_charset,
+                width=default_width,
+                brightness=default_brightness,
+                contrast=default_contrast,
             )
             logger.debug(
                 f"Image converter initialized with charset='{default_charset}', width={default_width}"
@@ -147,13 +155,17 @@ class GlyphForgeAPI:
                 height=height,
                 invert=invert,
                 dithering=dithering,
+                brightness=converter.brightness,
+                contrast=converter.contrast,
             )
 
         # Set optional brightness and contrast
         if brightness is not None or contrast is not None:
             converter.set_image_params(
-                brightness=brightness or converter.brightness,
-                contrast=contrast or converter.contrast,
+                brightness=(
+                    brightness if brightness is not None else converter.brightness
+                ),
+                contrast=contrast if contrast is not None else converter.contrast,
             )
 
         # Convert with or without color

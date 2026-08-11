@@ -21,6 +21,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
+from ..visual_defaults import DEFAULT_BRIGHTNESS, DEFAULT_CONTRAST
+
 logger = logging.getLogger(__name__)
 
 # Type definitions for configuration values
@@ -66,8 +68,8 @@ class ConfigManager:
             "default_charset": "general",
             "default_width": 100,
             "max_width": 500,
-            "brightness": 1.0,
-            "contrast": 1.0,
+            "brightness": DEFAULT_BRIGHTNESS,
+            "contrast": DEFAULT_CONTRAST,
             "dithering": False,
             "parallel_processing": True,
             "max_threads": 4,

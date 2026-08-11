@@ -25,6 +25,7 @@ from ..runtime import (
     reexec_clean_android_environment,
     runtime_report,
 )
+from ..visual_defaults import DEFAULT_BRIGHTNESS, DEFAULT_CONTRAST
 from .live import app as live_app
 from .live import camera_command, screen_command, source_command
 from .plugins import app as plugins_app
@@ -278,7 +279,7 @@ def image_command(
         file_okay=True,
         dir_okay=False,
         resolve_path=True,
-        help="Save the glyph art to this file.",
+        help="Save text/ANSI/HTML, or use a .png/.svg suffix for an image.",
     ),
     width: Optional[int] = typer.Option(
         None,
@@ -292,6 +293,30 @@ def image_command(
         "--height",
         min=1,
         help="Target height in rows; computed from the aspect ratio when omitted.",
+    ),
+    output_width: Optional[int] = typer.Option(
+        None,
+        "--output-width",
+        min=1,
+        max=8192,
+        help="Exact PNG/SVG width in pixels, independent from glyph columns.",
+    ),
+    output_height: Optional[int] = typer.Option(
+        None,
+        "--output-height",
+        min=1,
+        max=8192,
+        help="Exact PNG/SVG height in pixels, independent from glyph rows.",
+    ),
+    foreground: str = typer.Option(
+        "#e8fff7",
+        "--foreground",
+        help="PNG/SVG glyph colour (CSS hex/name).",
+    ),
+    background: str = typer.Option(
+        "#07110f",
+        "--background",
+        help="PNG/SVG canvas colour (CSS hex/name).",
     ),
     charset: str = typer.Option(
         "general",
@@ -334,10 +359,18 @@ def image_command(
         False, "--invert", help="Invert light and dark glyph mapping."
     ),
     brightness: float = typer.Option(
-        1.0, "--brightness", min=0.0, max=2.0, help="Brightness multiplier (0.0–2.0)."
+        DEFAULT_BRIGHTNESS,
+        "--brightness",
+        min=0.0,
+        max=2.0,
+        help="Brightness multiplier (0.0–2.0; brighter default 1.12).",
     ),
     contrast: float = typer.Option(
-        1.0, "--contrast", min=0.0, max=2.0, help="Contrast multiplier (0.0–2.0)."
+        DEFAULT_CONTRAST,
+        "--contrast",
+        min=0.0,
+        max=2.0,
+        help="Contrast multiplier (0.0–2.0; clearer default 1.08).",
     ),
     optimize: bool = typer.Option(
         False,
@@ -426,6 +459,20 @@ def image_command(
     color_mode = color.casefold()
     if color_mode not in {"none", "ansi", "html"}:
         raise typer.BadParameter("Choose none, ansi, or html", param_hint="--color")
+    graphical_output = output is not None and output.suffix.casefold() in {
+        ".png",
+        ".svg",
+    }
+    if (output_width is not None or output_height is not None) and not graphical_output:
+        raise typer.BadParameter(
+            "--output-width and --output-height require a .png or .svg --output",
+            param_hint="--output",
+        )
+    if graphical_output and color_mode != "none":
+        raise typer.BadParameter(
+            "PNG/SVG exports use --foreground and --background; choose --color none",
+            param_hint="--color",
+        )
     try:
         selected_render_mode = normalize_render_mode(render_mode)
     except (PluginError, ValueError) as exc:
@@ -448,7 +495,7 @@ def image_command(
     selected_height = height
     if aspect is not None and selected_height is None:
         selected_height = max(1, round(selected_width / aspect))
-    destination = str(output) if output is not None else None
+    destination = str(output) if output is not None and not graphical_output else None
     prepared_source: str | Any = str(source)
     if optimize:
         from PIL import Image, ImageOps
@@ -463,7 +510,7 @@ def image_command(
             invert=invert,
             brightness=brightness,
             contrast=contrast,
-            auto_scale=fit_terminal,
+            auto_scale=fit_terminal and not graphical_output,
             dithering=dithering,
             threads=profile.workers,
         )
@@ -477,12 +524,12 @@ def image_command(
             )
     else:
         import numpy as np
-        from PIL import Image, ImageEnhance
+        from PIL import Image
 
         from ..core.style_manager import apply_style
         from ..live.renderers import FrameRenderer, RenderConfig
 
-        if fit_terminal:
+        if fit_terminal and not graphical_output:
             selected_width = min(
                 selected_width,
                 max(20, shutil.get_terminal_size((selected_width, 24)).columns - 2),
@@ -494,10 +541,6 @@ def image_command(
                 prepared = image.convert("RGB")
         if not isinstance(prepared_source, Image.Image):
             prepared = prepared.copy()
-        if brightness != 1:
-            prepared = ImageEnhance.Brightness(prepared).enhance(brightness)
-        if contrast != 1:
-            prepared = ImageEnhance.Contrast(prepared).enhance(contrast)
         pixels = np.asarray(prepared, dtype=np.uint8)
         try:
             result = (
@@ -513,6 +556,8 @@ def image_command(
                         edge_algorithm=edge_algorithm,
                         edge_threshold=edge_threshold,
                         resample=profile.resample,
+                        brightness=brightness,
+                        contrast=contrast,
                     )
                 )
                 .render(pixels)
@@ -523,12 +568,50 @@ def image_command(
             raise typer.Exit(2) from exc
         if style:
             result = apply_style(result, style_name=style)
-        if output is not None:
+        if output is not None and not graphical_output:
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(result, encoding="utf-8")
     if result.startswith("Error"):
         console.print(f"[bold red]{result}[/bold red]")
         raise typer.Exit(1)
+    if graphical_output and output is not None:
+        from PIL import ImageColor
+
+        from ..live.renderers import render_text_png, render_text_svg
+
+        try:
+            # Validate both colours once so CLI errors are concise and uniform.
+            ImageColor.getrgb(foreground)
+            ImageColor.getrgb(background)
+        except ValueError as exc:
+            raise typer.BadParameter(
+                f"Invalid PNG/SVG colour: {exc}", param_hint="--foreground/--background"
+            ) from exc
+        output.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if output.suffix.casefold() == ".svg":
+                output.write_text(
+                    render_text_svg(
+                        result,
+                        foreground=foreground,
+                        background=background,
+                        output_width=output_width,
+                        output_height=output_height,
+                    ),
+                    encoding="utf-8",
+                )
+            else:
+                render_text_png(
+                    result,
+                    foreground=foreground,
+                    background=background,
+                    output_width=output_width,
+                    output_height=output_height,
+                ).save(output, format="PNG", optimize=True)
+        except (OSError, ValueError) as exc:
+            raise typer.BadParameter(
+                f"Could not create graphical output: {exc}", param_hint="--output"
+            ) from exc
     if preview or output is None:
         typer.echo(result)
     if output is not None:
@@ -669,6 +752,20 @@ def video_command(
         max=64,
         help="Ordered render workers; adaptive by default.",
     ),
+    brightness: Optional[float] = typer.Option(
+        None,
+        "--brightness",
+        min=0.0,
+        max=2.0,
+        help="Brightness multiplier; defaults to the brighter balanced curve.",
+    ),
+    contrast: Optional[float] = typer.Option(
+        None,
+        "--contrast",
+        min=0.0,
+        max=2.0,
+        help="Contrast multiplier; defaults to the clearer balanced curve.",
+    ),
     performance: str = typer.Option(
         "auto",
         "--performance",
@@ -711,6 +808,8 @@ def video_command(
             preset=preset,
             ffmpeg=ffmpeg,
             workers=workers,
+            brightness=brightness,
+            contrast=contrast,
         ).validated()
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc

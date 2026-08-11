@@ -44,7 +44,7 @@ Register that function in the plugin package's `pyproject.toml`:
 name = "my-glyph-plugin"
 version = "1.0.0"
 dependencies = [
-  "glyphforge @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip",
+  "glyphforge @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip",
 ] # Pin to the first release your plugin tests.
 
 [project.entry-points."glyph_forge.plugins"]

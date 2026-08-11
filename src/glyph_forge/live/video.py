@@ -30,6 +30,12 @@ from ..runtime import (
     subprocess_environment,
 )
 from ..utils.alphabet_manager import AlphabetCategory, AlphabetManager
+from ..visual import (
+    DEFAULT_BRIGHTNESS,
+    DEFAULT_CONTRAST,
+    apply_tone,
+    normalize_tone,
+)
 
 RGBFrame = NDArray[np.uint8]
 ProgressCallback = Callable[["VideoExportProgress"], None]
@@ -59,6 +65,8 @@ class VideoExportConfig:
     preset: str = "veryfast"
     ffmpeg: str = "ffmpeg"
     workers: int = 1
+    brightness: float = DEFAULT_BRIGHTNESS
+    contrast: float = DEFAULT_CONTRAST
 
     @classmethod
     def adaptive(
@@ -87,11 +95,17 @@ class VideoExportConfig:
 
     @property
     def cell_width(self) -> int:
-        return self.width // self.columns
+        return math.ceil(self.width / self.columns)
 
     @property
     def cell_height(self) -> int:
-        return self.height // self.rows
+        return math.ceil(self.height / self.rows)
+
+    @property
+    def uses_integral_cells(self) -> bool:
+        """Whether glyph cells map to output pixels without a final resize."""
+
+        return self.width % self.columns == 0 and self.height % self.rows == 0
 
     def validated(self) -> "VideoExportConfig":
         """Validate all constraints and return this immutable configuration."""
@@ -102,10 +116,6 @@ class VideoExportConfig:
             raise ValueError("Video width and height must be even for yuv420p output")
         if self.columns < 1 or self.rows < 1:
             raise ValueError("Glyph columns and rows must be positive")
-        if self.width % self.columns or self.height % self.rows:
-            raise ValueError(
-                "width/columns and height/rows must produce whole-pixel cells"
-            )
         if self.start < 0:
             raise ValueError("Start time cannot be negative")
         if self.duration is not None and self.duration <= 0:
@@ -118,8 +128,19 @@ class VideoExportConfig:
             raise ValueError("FFmpeg executable cannot be empty")
         if not 1 <= self.workers <= 64:
             raise ValueError("Worker count must be between 1 and 64")
+        normalized_brightness = normalize_tone(self.brightness, name="brightness")
+        normalized_contrast = normalize_tone(self.contrast, name="contrast")
         if not _resolve_charset(self.charset):
             raise ValueError("Charset cannot be empty")
+        if (
+            normalized_brightness != self.brightness
+            or normalized_contrast != self.contrast
+        ):
+            return replace(
+                self,
+                brightness=normalized_brightness,
+                contrast=normalized_contrast,
+            )
         return self
 
 
@@ -360,7 +381,7 @@ class GlyphVideoRenderer:
             )
         if rgb.dtype != np.uint8:
             rgb = np.clip(rgb, 0, 255).astype(np.uint8)
-        rgb = np.ascontiguousarray(rgb)
+        rgb = apply_tone(rgb, self.config.brightness, self.config.contrast)
 
         pixels = rgb.astype(np.uint16, copy=False)
         gray = (
@@ -374,11 +395,27 @@ class GlyphVideoRenderer:
         coloured = (
             masks[..., None].astype(np.uint16) * pixels[:, :, None, None, :]
         ) // 255
-        return cast(
+        rendered = cast(
             RGBFrame,
             coloured.transpose(0, 2, 1, 3, 4)
-            .reshape(self.config.height, self.config.width, 3)
+            .reshape(
+                self.config.rows * self.config.cell_height,
+                self.config.columns * self.config.cell_width,
+                3,
+            )
             .astype(np.uint8),
+        )
+        if self.config.uses_integral_cells:
+            return rendered
+        # Arbitrary output pixels remain independent from the sampling grid.
+        # Divisible configurations keep the zero-copy hot path; uncommon
+        # fractional cell sizes receive one high-quality final resample.
+        return np.asarray(
+            Image.fromarray(rendered, mode="RGB").resize(
+                (self.config.width, self.config.height),
+                Image.Resampling.LANCZOS,
+            ),
+            dtype=np.uint8,
         )
 
     def render_bgr(self, frame: NDArray[Any], cv2: Any | None = None) -> RGBFrame:

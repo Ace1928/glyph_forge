@@ -222,7 +222,7 @@ def test_package_import_is_lazy_and_has_no_home_side_effects(tmp_path: Path) -> 
     )
     result = json.loads(completed.stdout)
 
-    assert result == {"pil": False, "numpy": False, "version": "0.3.0"}
+    assert result == {"pil": False, "numpy": False, "version": "0.3.1"}
     assert not (tmp_path / ".glyph_forge").exists()
 
 
@@ -233,7 +233,7 @@ def test_cli_home_and_version_json() -> None:
     assert home.exit_code == 0
     assert "Quick start" in home.stdout
     assert version.exit_code == 0
-    assert json.loads(version.stdout)["glyph_forge"] == "0.3.0"
+    assert json.loads(version.stdout)["glyph_forge"] == "0.3.1"
 
 
 def test_cli_doctor_json() -> None:

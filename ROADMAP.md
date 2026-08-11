@@ -9,13 +9,13 @@ tested pipeline behind the CLI, TUI, browser Studio, and Python API.
 |---|---|---|
 | Portable core | Install, import, diagnose, and run on small or large systems | Wheels and portable app archives complete |
 | Unified experiences | Friendly CLI, TUI, multimode recording Studio, and compatibility launchers | Complete in 0.2 |
-| Installable web app | Offline-capable, touch-first PWA across Chromium, Firefox, WebKit, Android, and Apple devices | Complete in Unreleased |
+| Installable web app | Offline-capable, touch-first PWA across Chromium, Firefox, WebKit, Android, and Apple devices | Complete in 0.3 |
 | Live media | Stream files, cameras, screens, and URLs with bounded latency | Complete in 0.2 |
 | Desktop viewing | Render a desktop or isolated X11 app through glyph modes | Viewer complete in 0.2 |
 | Desktop control | Opt-in focused keyboard and pointer forwarding | Isolated X11 complete; native host adapters active |
 | Sharing | Exports, style links, and ephemeral seekable LAN links | Local/LAN complete; hosted relay optional later |
 | Native acceleration | Browser GPU atlas and bounded parallel NumPy video path now; compiled kernels later | Active |
-| Extension SDK | Third-party source, renderer, transform, and exporter plugins | API v1 complete in Unreleased |
+| Extension SDK | Third-party source, renderer, transform, and exporter plugins | API v1 complete in 0.3 |
 | Production assurance | Native OS, browser, touch, accessibility, package, dependency, and security gates | Active; automated baseline complete |
 
 ## Fidelity and performance
@@ -30,6 +30,12 @@ changed-row and complete-frame updates from their measured payload sizes. Live
 views preserve their aspect ratio inside the current terminal and re-evaluate
 the viewport on every frame, so window resizing does not require a restart or
 render detail that cannot be displayed.
+
+As of 0.3.1, final PNG/SVG/video pixels are independent from glyph columns and
+rows. Studio offers exact dimensions through 8K with aspect locking and
+hardware-safe limits, while native video retains a direct fast path for
+integral cells. A shared cached tone lookup runs after downsampling, providing
+brighter defaults without adding full-frame work to live rendering.
 
 Benchmark automation is available now through `glyph-forge benchmark`. Future
 optimization work must use repeatable before/after measurements and retain the
@@ -53,7 +59,8 @@ rejected because injected input can feed back into the focused terminal.
 
 ## Delivery sequence
 
-1. Complete 0.2 packaging, cross-platform CI, documentation, and release checks.
+1. ~~Complete 0.2 packaging, cross-platform CI, documentation, and release
+   checks.~~ Completed.
 2. ~~Add an input-routing protocol with a no-op default and platform capability
    reporting.~~ Completed.
 3. ~~Implement and test isolated X11 routing first, including coordinate

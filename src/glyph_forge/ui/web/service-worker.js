@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "glyph-forge-studio-v1";
+const CACHE_NAME = "glyph-forge-studio-v2";
 const APP_SHELL = [
   "./",
   "./index.html",

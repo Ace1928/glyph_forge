@@ -42,7 +42,6 @@ def test_named_language_charsets_are_resolved() -> None:
     ("changes", "message"),
     [
         ({"width": 7}, "even"),
-        ({"width": 10, "columns": 3}, "whole-pixel"),
         ({"duration": 0}, "Duration"),
         ({"start": -1}, "Start"),
         ({"crf": 52}, "CRF"),
@@ -83,6 +82,39 @@ def test_full_colour_renderer_maps_brightness_and_preserves_colour() -> None:
     assert rendered[:, :8].sum() == 0
     assert rendered[:, 8:, 0].sum() > 0
     assert rendered[:, 8:, 1:].sum() == 0
+
+
+def test_video_output_pixels_are_independent_from_glyph_grid() -> None:
+    config = VideoExportConfig(
+        width=10,
+        height=8,
+        columns=3,
+        rows=3,
+        charset="@",
+        brightness=1.0,
+        contrast=1.0,
+    ).validated()
+    renderer = GlyphVideoRenderer(config)
+
+    rendered = renderer.render_sampled_rgb(np.full((3, 3, 3), 128, dtype=np.uint8))
+
+    assert not config.uses_integral_cells
+    assert rendered.shape == (8, 10, 3)
+
+
+def test_video_tone_is_normalized_once_during_validation() -> None:
+    selected = VideoExportConfig(
+        width=16,
+        height=16,
+        columns=2,
+        rows=2,
+        charset="@",
+        brightness=3.0,
+        contrast=-1.0,
+    ).validated()
+
+    assert selected.brightness == 2.0
+    assert selected.contrast == 0.0
 
 
 def test_ffmpeg_command_retains_script_audio_and_quality_options() -> None:
@@ -371,6 +403,10 @@ def test_cli_video_preserves_every_standalone_script_option(
             "custom-ffmpeg",
             "--workers",
             "3",
+            "--brightness",
+            "1.25",
+            "--contrast",
+            "1.15",
             "--quiet",
         ],
     )
@@ -392,6 +428,8 @@ def test_cli_video_preserves_every_standalone_script_option(
     assert config.preset == "fast"
     assert config.ffmpeg == "custom-ffmpeg"
     assert config.workers == 3
+    assert config.brightness == 1.25
+    assert config.contrast == 1.15
 
 
 def test_cli_video_chooses_a_shareable_default_filename(

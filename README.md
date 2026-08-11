@@ -53,11 +53,11 @@ Termux/Android too).
 
 | OS | Fastest path |
 |---|---|
-| **Windows** | `py -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
-| **macOS / Linux** | `python3 -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
-| **Any OS, isolated** | `pipx install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
-| **Any OS, fastest** | `uv tool install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"` |
-| **No install at all** | `uvx --from "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip" glyph-forge launch` |
+| **Windows** | `py -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
+| **macOS / Linux** | `python3 -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
+| **Any OS, isolated** | `pipx install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
+| **Any OS, fastest** | `uv tool install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
+| **No install at all** | `uvx --from "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip" glyph-forge launch` |
 | **Small core** | Install the same release URL without `[all]` — images, text, Studio, demo |
 | **Portable binaries** | Tagged releases ship no-Python one-directory archives for all three OSes |
 
@@ -150,6 +150,14 @@ glyph-forge image photo.jpg --mode edge --edge-algorithm canny --edge-threshold 
 glyph-forge image photo.jpg --mode braille --output photo.txt
 glyph-forge image photo.jpg --mode half-block --color ansi
 
+# Choose glyph detail and final pixels independently
+glyph-forge image photo.jpg --width 160 --height 90 \
+  --output photo-1080p.png --output-width 1920 --output-height 1080
+
+# Real text glyphs in an exact-size, losslessly scalable vector canvas
+glyph-forge image photo.jpg --width 240 --output photo-4k.svg \
+  --output-width 3840 --output-height 2160
+
 # Browse before choosing
 glyph-forge image --list-charsets
 glyph-forge image --preview-charset detailed --sample photo.jpg
@@ -161,9 +169,14 @@ glyph-forge text --list-styles
 glyph-forge text "SHARE THIS" --output banner.txt
 ```
 
-Image outputs support plain text, ANSI colour, and HTML. Still frames can also
-be rendered as real-text SVG through the Python API, retaining sharp glyphs at
-arbitrary zoom levels.
+The `--width`/`--height` pair controls the glyph grid; `--output-width` and
+`--output-height` control PNG/SVG pixels without changing that grid. Supplying
+one output dimension preserves the glyph canvas aspect ratio, while supplying
+both produces that exact size. The output suffix selects PNG or SVG; SVG keeps
+real text glyphs sharp at arbitrary zoom levels. Plain text, ANSI colour, and
+HTML remain available for terminal and web output. All visual paths start from
+the brighter, clearer `1.12` brightness and `1.08` contrast curve, with both
+values directly overridable.
 
 ## Rendering modes
 
@@ -201,6 +214,10 @@ glyph-forge live url "https://example.com/video-page" --mode edge
 glyph-forge video clip.mp4
 glyph-forge video clip.mp4 output.mp4 --performance workstation --crf 16
 
+# Video pixels are independent from sampling density too
+glyph-forge video clip.mp4 output.mp4 --width 2560 --height 1440 \
+  --columns 220 --rows 124 --brightness 1.18 --contrast 1.1
+
 # Override bounded ordered workers or capture complete render metrics
 glyph-forge video clip.mp4 output.mp4 --workers 8
 glyph-forge video clip.mp4 output.mp4 --json > render-metrics.json
@@ -212,6 +229,10 @@ is replaced only after encoding succeeds. Hardware-adaptive workers render a
 bounded number of frames concurrently, then write them in exact source order;
 this scales on workstations without allowing memory use or audio timing to
 drift. `--workers 1` provides the minimum-memory serial path.
+Output width and height accept any even H.264 dimensions; glyph columns and
+rows no longer need to divide them evenly. Divisible grids retain the direct
+zero-resize hot path, while fractional cell layouts receive one final
+high-quality fit to the exact requested frame.
 
 Live terminal views default to adaptive redraws. Glyph Forge compares the
 actual UTF-8 payload for a complete frame with cursor-addressed changed rows,
@@ -237,12 +258,12 @@ On an X11 host, Glyph Forge can launch one application in an isolated virtual
 display and render that display through the same pipeline:
 
 ```bash
-python -m pip install "glyphforge[media,virtual] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
+python -m pip install "glyphforge[media,virtual] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"
 glyph-forge live launch -- xterm
 glyph-forge live launch --display-width 1600 --display-height 900 -- firefox
 
 # Explicit interactive mode (install media, virtual, and control extras)
-python -m pip install "glyphforge[media,virtual,control] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
+python -m pip install "glyphforge[media,virtual,control] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"
 glyph-forge live launch --control -- xterm
 ```
 
@@ -288,6 +309,14 @@ cleanly: for example, iPhone browsers without screen capture still retain file,
 text, camera (where permitted), styling, and export workflows. Adaptive defaults
 start at 96, 160, or 240 glyph columns for modest, balanced, and workstation
 hardware; every quality control remains manually overridable.
+
+Output size is a separate control from glyph columns. Choose adaptive, source,
+720p, 1080p, 1440p, 4K, or 8K; type an exact width and height; and toggle aspect
+locking without altering glyph density. Studio fits unsafe requests to the
+browser/GPU limit it actually reports instead of risking a failed canvas.
+The same dimensions drive preview, PNG, sharing, and recording. SVG uses the
+exact requested viewBox with real text glyphs, so it remains lossless when
+scaled or zoomed.
 
 For uploaded videos, **Render full video** restarts at frame zero and saves the
 whole processed result when playback ends. Webcam and screen sources use a
@@ -400,7 +429,7 @@ implementation is in [`examples/plugin_example.py`](examples/plugin_example.py).
 ## Full-screen terminal UI
 
 ```bash
-python -m pip install "glyphforge[tui] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.0.zip"
+python -m pip install "glyphforge[tui] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"
 glyph-forge interactive
 ```
 
@@ -433,14 +462,19 @@ camera / video / screen / URL
               │
   normalized NumPy RGB frame
               │
+ downsample → cached tone LUT
+              │
    glyph / edge / subpixel renderer
        ┌──────┼─────────┐
    terminal  Studio   SVG/text
 ```
 
-This architecture prevents capture speed from determining memory use. Higher
-resolution still increases sampling, terminal output, and encoding costs, so
-the adaptive profiles favor stable frame pacing over nominal resolution.
+This architecture prevents capture speed from determining memory use. Tone
+mapping happens after downsampling through a cached 256-entry lookup table, so
+clearer defaults do not add full-frame per-pixel math to native live and video
+paths. Higher glyph density still increases sampling, terminal output, and
+encoding costs, so adaptive profiles favor stable frame pacing over nominal
+resolution. Final pixel size remains independently selectable.
 
 ## Python API
 
@@ -448,10 +482,19 @@ The top-level package is lazy: importing `glyph_forge` does not load video or
 UI backends and performs no filesystem writes.
 
 ```python
+from pathlib import Path
+
 import numpy as np
 from PIL import Image
 
-from glyph_forge import FrameRenderer, RenderConfig, image_to_glyph, text_to_banner
+from glyph_forge import (
+    FrameRenderer,
+    RenderConfig,
+    image_to_glyph,
+    render_text_png,
+    render_text_svg,
+    text_to_banner,
+)
 
 print(text_to_banner("HELLO", font="small", style="boxed"))
 print(image_to_glyph("photo.jpg", width=72, auto_scale=False))
@@ -461,6 +504,12 @@ result = FrameRenderer(
     RenderConfig(width=80, mode="braille", color="none")
 ).render(frame)
 print(result.text)
+
+render_text_png(result.text, output_width=1920, output_height=1080).save("frame.png")
+Path("frame.svg").write_text(
+    render_text_svg(result.text, output_width=3840, output_height=2160),
+    encoding="utf-8",
+)
 ```
 
 For low-level capture, video export, and live presentation, the public package
@@ -514,7 +563,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite has 401 passing tests (plus one platform-dependent skip) and
+The current suite has 429 passing tests (plus one platform-dependent skip) and
 measures at least 70% branch-aware coverage.
 CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
 macOS smoke matrices, optional-extra installation, and installed-wheel resource

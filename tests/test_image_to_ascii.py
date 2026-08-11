@@ -87,8 +87,8 @@ class TestImageGlyphConverter:
 
         assert converter.width == 100
         assert converter.height is None
-        assert converter.brightness == 1.0
-        assert converter.contrast == 1.0
+        assert converter.brightness == 1.12
+        assert converter.contrast == 1.08
         assert converter.auto_scale is True
         assert converter.dithering is False
         assert converter.threads >= 1

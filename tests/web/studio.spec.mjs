@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
@@ -62,6 +62,41 @@ test("forges text responsively in every render mode", async ({ page, isMobile })
     ));
     expect(targets.filter(({ height }) => height < 44)).toEqual([]);
   }
+});
+
+test("keeps exact output pixels independent from glyph density", async ({ page }) => {
+  await expect(page.locator("#brightnessRange")).toHaveValue("1.12");
+  await expect(page.locator("#contrastRange")).toHaveValue("1.08");
+  await page.getByLabel("Or forge text").fill("Exact pixels");
+  await page.getByRole("button", { name: "Use text" }).click();
+
+  const setControl = (selector, value, eventName = "change") => (
+    page.locator(selector).evaluate((input, parameters) => {
+      input.value = parameters.value;
+      input.dispatchEvent(new Event(parameters.eventName, { bubbles: true }));
+    }, { value, eventName })
+  );
+  await setControl("#outputWidth", "1440");
+  await expect(page.locator("#outputHeight")).toHaveValue("810");
+  await page.locator("#aspectLock").uncheck();
+  await setControl("#outputWidth", "777");
+  await setControl("#outputHeight", "333");
+
+  const canvas = page.locator("#outputCanvas");
+  await expect.poll(() => canvas.evaluate(({ width, height }) => `${width}x${height}`)).toBe("777x333");
+  await expect(page.locator("#outputSizeValue")).toHaveText("777×333 px");
+  const gridBefore = await page.locator("#gridMetric").textContent();
+  await setControl("#columnsRange", "64", "input");
+  await expect(page.locator("#gridMetric")).not.toHaveText(gridBefore);
+  expect(await canvas.evaluate(({ width, height }) => [width, height])).toEqual([777, 333]);
+
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save SVG" }).click();
+  const download = await downloadEvent;
+  const svg = await readFile(await download.path(), "utf8");
+  expect(svg).toContain('viewBox="0 0 777 333"');
+  expect(svg).toContain('textLength="777"');
+  expect(svg).toContain("<text");
 });
 
 test("ships an accessible installable app shell", async ({ page }) => {

@@ -13,6 +13,8 @@ from glyph_forge.live.renderers import (
     RenderConfig,
     RenderMode,
     render_svg,
+    render_text_png,
+    render_text_svg,
 )
 
 
@@ -134,6 +136,15 @@ def test_ordered_dither_is_deterministic() -> None:
     assert renderer.render(frame).text == renderer.render(frame).text
 
 
+def test_renderer_normalizes_tone_configuration_once() -> None:
+    renderer = FrameRenderer(
+        RenderConfig(width=1, height=1, brightness=3.0, contrast=-1.0)
+    )
+
+    assert renderer.config.brightness == 2.0
+    assert renderer.config.contrast == 0.0
+
+
 def test_svg_is_valid_scalable_text_and_escapes_glyphs() -> None:
     svg = render_svg(
         np.zeros((1, 1, 3), dtype=np.uint8),
@@ -144,6 +155,29 @@ def test_svg_is_valid_scalable_text_and_escapes_glyphs() -> None:
     assert root.tag.endswith("svg")
     assert "viewBox" in root.attrib
     assert "&amp;" in svg
+
+
+def test_text_exports_use_exact_pixels_independent_from_glyph_grid() -> None:
+    svg = render_text_svg("@ @\n@@@", output_width=641, output_height=359)
+    root = ET.fromstring(svg)
+    png = render_text_png("@ @\n@@@", output_width=641, output_height=359)
+
+    assert root.attrib["width"] == "641.00"
+    assert root.attrib["height"] == "359.00"
+    assert root.attrib["viewBox"] == "0 0 641.00 359.00"
+    assert png.size == (641, 359)
+
+
+def test_svg_infers_missing_output_dimension_without_distortion() -> None:
+    root = ET.fromstring(render_text_svg("@@@@\n@@@@", output_width=620))
+
+    assert root.attrib["width"] == "620.00"
+    assert float(root.attrib["height"]) > 0
+
+
+def test_png_recommends_vector_output_beyond_safe_8k_budget() -> None:
+    with pytest.raises(ValueError, match="use SVG"):
+        render_text_png("@", output_width=8192, output_height=8192)
 
 
 @pytest.mark.parametrize("mode", list(RenderMode))

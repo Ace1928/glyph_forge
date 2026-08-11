@@ -10,6 +10,12 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from ..utils.alphabet_manager import AlphabetManager
+from ..visual import (
+    DEFAULT_BRIGHTNESS,
+    DEFAULT_CONTRAST,
+    apply_tone,
+    normalize_tone,
+)
 
 # Type definitions for clarity and precision
 PixelArray: TypeAlias = NDArray[np.uint8]  # Type for grayscale/RGB pixel arrays
@@ -53,8 +59,8 @@ class ImageGlyphConverter:
         width: int = 100,
         height: Optional[int] = None,
         invert: bool = False,
-        brightness: float = 1.0,
-        contrast: float = 1.0,
+        brightness: float = DEFAULT_BRIGHTNESS,
+        contrast: float = DEFAULT_CONTRAST,
         auto_scale: bool = True,
         dithering: bool = False,
         threads: int = 0,
@@ -84,8 +90,8 @@ class ImageGlyphConverter:
         # Configure core attributes with bounds checking
         self.width = max(1, width)
         self.height = max(1, height) if height is not None else None
-        self.brightness = max(0.0, min(2.0, brightness))
-        self.contrast = max(0.0, min(2.0, contrast))
+        self.brightness = normalize_tone(brightness, name="brightness")
+        self.contrast = normalize_tone(contrast, name="contrast")
         self.auto_scale = auto_scale
         self.dithering = dithering
         self.threads = threads if threads > 0 else max(1, os.cpu_count() or 1)
@@ -229,22 +235,9 @@ class ImageGlyphConverter:
 
     def _apply_image_adjustments(self, img: Image.Image) -> Image.Image:
         """Apply brightness and contrast adjustments to the image."""
-        pixels = np.array(img)
-        pixels = pixels.astype(np.float32)
-
-        # Apply contrast first
-        if self.contrast != 1.0:
-            pixels = (pixels - 128) * self.contrast + 128
-
-        # Then brightness
-        if self.brightness != 1.0:
-            pixels = pixels * self.brightness
-
-        # Clip values to valid range
-        pixels = np.clip(pixels, 0, 255).astype(np.uint8)
-
-        # Create new image from adjusted array
-        return Image.fromarray(pixels)
+        return Image.fromarray(
+            apply_tone(np.asarray(img), self.brightness, self.contrast)
+        )
 
     def _convert_pixels(self, pixels: PixelArray) -> str:
         """
@@ -343,10 +336,10 @@ class ImageGlyphConverter:
             self.height = max(1, height) if height > 0 else None
 
         if brightness is not None:
-            self.brightness = max(0.0, min(2.0, brightness))
+            self.brightness = normalize_tone(brightness, name="brightness")
 
         if contrast is not None:
-            self.contrast = max(0.0, min(2.0, contrast))
+            self.contrast = normalize_tone(contrast, name="contrast")
 
         if dithering is not None:
             self.dithering = dithering
@@ -407,6 +400,11 @@ class ImageGlyphConverter:
 
             # Resize image
             img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+            # Apply the same tone curve to colour and grayscale paths.  This
+            # keeps glyph density and source-colour output visually aligned.
+            if self.brightness != 1.0 or self.contrast != 1.0:
+                img = self._apply_image_adjustments(img)
 
             # Convert to grayscale for character selection
             gray_img = img.convert("L")

@@ -157,15 +157,37 @@
           </label>
 
           <label class="field">
-            <span>Output resolution</span>
-            <select id="resolutionSelect">
-              <option value="auto">Adaptive</option>
-              <option value="source">Match source</option>
-              <option value="720">720p</option>
-              <option value="1080">1080p</option>
-              <option value="2160">4K</option>
+            <span>Output size <output id="outputSizeValue">1280×720 px</output></span>
+            <select id="sizePreset">
+              <option value="auto">Adaptive to this device</option>
+              <option value="source">Match source pixels</option>
+              <option value="720p">HD · 1280×720</option>
+              <option value="1080p">Full HD · 1920×1080</option>
+              <option value="1440p">QHD · 2560×1440</option>
+              <option value="4k">4K UHD · 3840×2160</option>
+              <option value="8k">8K UHD · 7680×4320</option>
+              <option value="custom">Custom</option>
             </select>
           </label>
+
+          <div class="dimension-grid" role="group" aria-label="Exact output dimensions">
+            <label class="field">
+              <span>Width · px</span>
+              <input id="outputWidth" type="number" min="64" max="8192" step="1" inputmode="numeric" value="1280">
+            </label>
+            <span class="dimension-mark" aria-hidden="true">×</span>
+            <label class="field">
+              <span>Height · px</span>
+              <input id="outputHeight" type="number" min="64" max="8192" step="1" inputmode="numeric" value="720">
+            </label>
+          </div>
+
+          <label class="toggle-field compact-toggle">
+            <input id="aspectLock" type="checkbox" checked>
+            <span class="toggle" aria-hidden="true"></span>
+            <span>Lock output aspect ratio</span>
+          </label>
+          <p class="field-help">Pixel size is independent from glyph columns. SVG stays sharp at any scale.</p>
 
           <div class="field-grid">
             <label class="field">
@@ -186,13 +208,13 @@
           </div>
 
           <label class="field range-field">
-            <span>Brightness <output id="brightnessValue">1.00</output></span>
-            <input id="brightnessRange" type="range" min="0.25" max="2" step="0.05" value="1">
+            <span>Brightness <output id="brightnessValue">1.12</output></span>
+            <input id="brightnessRange" type="range" min="0.25" max="2" step="0.01" value="1.12">
           </label>
 
           <label class="field range-field">
-            <span>Contrast <output id="contrastValue">1.00</output></span>
-            <input id="contrastRange" type="range" min="0.25" max="2" step="0.05" value="1">
+            <span>Contrast <output id="contrastValue">1.08</output></span>
+            <input id="contrastRange" type="range" min="0.25" max="2" step="0.01" value="1.08">
           </label>
 
           <label class="toggle-field">

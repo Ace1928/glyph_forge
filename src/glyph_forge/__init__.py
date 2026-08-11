@@ -28,7 +28,7 @@ from typing import (
     Union,
 )
 
-VERSION: Final[Tuple[int, int, int]] = (0, 3, 0)
+VERSION: Final[Tuple[int, int, int]] = (0, 3, 1)
 __version__ = ".".join(map(str, VERSION))
 __author__ = "Lloyd Handyside"
 __license__ = "MIT"
@@ -281,6 +281,9 @@ _LAZY_EXPORTS: Final[Dict[str, Tuple[str, str]]] = {
     "VideoExportResult": ("glyph_forge.live", "VideoExportResult"),
     "export_glyph_video": ("glyph_forge.live", "export_glyph_video"),
     "FrameRenderer": ("glyph_forge.live", "FrameRenderer"),
+    "render_svg": ("glyph_forge.live", "render_svg"),
+    "render_text_png": ("glyph_forge.live", "render_text_png"),
+    "render_text_svg": ("glyph_forge.live", "render_text_svg"),
     "PluginRenderMode": ("glyph_forge.live", "PluginRenderMode"),
     "InputRouter": ("glyph_forge.live", "InputRouter"),
     "KeyInput": ("glyph_forge.live", "KeyInput"),
@@ -384,6 +387,9 @@ __all__ = [
     "setup_logger",
     "text_to_banner",
     "run_terminal_session",
+    "render_svg",
+    "render_text_png",
+    "render_text_svg",
     "update_eidos_profile",
     "export_glyph_video",
     "video_to_glyph_frames",

@@ -370,8 +370,16 @@ select:focus-visible,
   text-transform: uppercase;
 }
 
+.field > span output {
+  float: right;
+  color: var(--mint);
+  font-family: ui-monospace, monospace;
+  text-transform: none;
+}
+
 .field select,
-.field input[type="text"] {
+.field input[type="text"],
+.field input[type="number"] {
   width: 100%;
   min-height: 38px;
   padding: 8px 10px;
@@ -383,9 +391,32 @@ select:focus-visible,
 
 @media (hover: hover) {
   .field select:hover,
-  .field input[type="text"]:hover {
+  .field input[type="text"]:hover,
+  .field input[type="number"]:hover {
     border-color: var(--line-bright);
   }
+}
+
+.dimension-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.dimension-mark {
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font: 700 12px/1 ui-monospace, monospace;
+}
+
+.field-help {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .range-field span {
@@ -736,6 +767,7 @@ input[type="range"] {
   .text-source .button,
   .field select,
   .field input[type="text"],
+  .field input[type="number"],
   .color-field input {
     min-height: 46px;
   }
@@ -803,7 +835,8 @@ input[type="range"] {
   }
 
   .field select,
-  .field input[type="text"] {
+  .field input[type="text"],
+  .field input[type="number"] {
     font-size: 16px;
   }
 
