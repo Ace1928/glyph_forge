@@ -37,7 +37,7 @@ dependencies = [
     "numpy>=1.26.0",
     "pillow>=9.0.0",
     "pyfiglet>=0.8.0",
-    "PyYAML>=6.0",
+    "PyYAML>=6.0.3",
     "rich>=13.7.0",
     "typer>=0.9.0",
 ]
