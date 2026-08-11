@@ -20,10 +20,24 @@ test.beforeEach(async ({ page }) => {
 
 test("forges text responsively in every render mode", async ({ page, isMobile }) => {
   await page.getByLabel("Or forge text").fill("Glyph Forge");
-  const started = await page.evaluate(() => performance.now());
-  await page.getByRole("button", { name: "Use text" }).click();
+  const elapsed = await page.evaluate(() => new Promise((resolve, reject) => {
+    const button = document.querySelector("#textSourceButton");
+    const grid = document.querySelector("#gridMetric");
+    const started = performance.now();
+    const timeout = window.setTimeout(() => {
+      observer.disconnect();
+      reject(new Error("The first text frame did not render within 2 seconds"));
+    }, 2_000);
+    const observer = new MutationObserver(() => {
+      if (grid.textContent === "—") return;
+      window.clearTimeout(timeout);
+      observer.disconnect();
+      resolve(performance.now() - started);
+    });
+    observer.observe(grid, { childList: true, characterData: true, subtree: true });
+    button.click();
+  }));
   await expect(page.locator("#sourceName")).toContainText("Text · Glyph Forge");
-  const elapsed = await page.evaluate((value) => performance.now() - value, started);
   expect(elapsed).toBeLessThan(1_000);
 
   for (const mode of ["glyph", "edge", "braille", "half-block", "quadrant"]) {
