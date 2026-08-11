@@ -43,7 +43,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-tui = ["textual>=0.80.0"]
+tui = ["textual>=8.2.8"]
 media = [
     "mss>=9.0.1",
     "opencv-python>=4.8.0",
@@ -57,7 +57,7 @@ all = [
     "opencv-python>=4.8.0",
     "pynput>=1.8.2",
     "PyVirtualDisplay>=3.0",
-    "textual>=0.80.0",
+    "textual>=8.2.8",
     "yt-dlp>=2025.1.15",
 ]
 dev = [
