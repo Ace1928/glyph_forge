@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from click import unstyle
 from PIL import Image
 from typer.testing import CliRunner
 
@@ -14,6 +14,8 @@ from glyph_forge.cli import app
 from glyph_forge.contracts import RenderRequest
 from glyph_forge.rendering import render_image
 from glyph_forge.services.image_to_glyph import ImageGlyphConverter
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def _source(path: Path) -> None:
@@ -102,7 +104,7 @@ def test_cli_rejects_conflicting_pixel_size_options(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 2
-    message = unstyle(result.output)
+    message = _ANSI_ESCAPE.sub("", result.output)
     assert "--size" in message
     assert "not both" in message
 
