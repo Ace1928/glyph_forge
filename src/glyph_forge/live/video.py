@@ -29,6 +29,14 @@ from ..runtime import (
     python_install_hint,
     subprocess_environment,
 )
+from ..temporal import (
+    AudioPolicy,
+    FrameRate,
+    FrameRounding,
+    ResolvedTimeline,
+    TemporalContractError,
+    TemporalRenderRequest,
+)
 from ..utils.alphabet_manager import AlphabetManager
 from ..visual import (
     DEFAULT_BRIGHTNESS,
@@ -67,6 +75,9 @@ class VideoExportConfig:
     workers: int = 1
     brightness: float = DEFAULT_BRIGHTNESS
     contrast: float = DEFAULT_CONTRAST
+    frame_rate: FrameRate | str | int | float | None = None
+    audio: AudioPolicy | str = AudioPolicy.PRESERVE
+    rounding: FrameRounding | str = FrameRounding.NEAREST
 
     @classmethod
     def adaptive(
@@ -116,10 +127,11 @@ class VideoExportConfig:
             raise ValueError("Video width and height must be even for yuv420p output")
         if self.columns < 1 or self.rows < 1:
             raise ValueError("Glyph columns and rows must be positive")
-        if self.start < 0:
-            raise ValueError("Start time cannot be negative")
-        if self.duration is not None and self.duration <= 0:
-            raise ValueError("Duration must be greater than zero")
+        try:
+            timeline = self.temporal_request()
+        except TemporalContractError as exc:
+            message = str(exc)
+            raise ValueError(message[:1].upper() + message[1:]) from exc
         if not 0 <= self.crf <= 51:
             raise ValueError("CRF must be between 0 and 51")
         if not self.preset.strip():
@@ -132,16 +144,39 @@ class VideoExportConfig:
         normalized_contrast = normalize_tone(self.contrast, name="contrast")
         if not _resolve_charset(self.charset):
             raise ValueError("Charset cannot be empty")
-        if (
-            normalized_brightness != self.brightness
-            or normalized_contrast != self.contrast
+        if any(
+            (
+                normalized_brightness != self.brightness,
+                normalized_contrast != self.contrast,
+                timeline.start != self.start,
+                timeline.duration != self.duration,
+                timeline.frame_rate != self.frame_rate,
+                timeline.audio != self.audio,
+                timeline.rounding != self.rounding,
+            )
         ):
             return replace(
                 self,
                 brightness=normalized_brightness,
                 contrast=normalized_contrast,
+                start=timeline.start,
+                duration=timeline.duration,
+                frame_rate=timeline.selected_frame_rate,
+                audio=timeline.audio_policy,
+                rounding=timeline.rounding_policy,
             )
         return self
+
+    def temporal_request(self) -> TemporalRenderRequest:
+        """Return the canonical portable timeline represented by this config."""
+
+        return TemporalRenderRequest(
+            start=self.start,
+            duration=self.duration,
+            frame_rate=self.frame_rate,
+            audio=self.audio,
+            rounding=self.rounding,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +211,7 @@ class VideoExportResult:
     source: Path | None = None
     source_bytes: int = 0
     output_bytes: int = 0
+    timeline: ResolvedTimeline | None = None
 
     @property
     def rendered_seconds(self) -> float:
@@ -243,6 +279,7 @@ class VideoExportResult:
             "output_bytes": self.output_bytes,
             "output_source_ratio": self.output_source_ratio,
             "raw_rgb_bytes": self.raw_rgb_bytes,
+            "timeline": self.timeline.to_dict() if self.timeline is not None else None,
         }
 
 
@@ -429,13 +466,17 @@ def build_ffmpeg_command(
     input_path: str | os.PathLike[str],
     output_path: str | os.PathLike[str],
     config: VideoExportConfig,
-    fps: float,
+    fps: float | FrameRate,
+    *,
+    timeline: ResolvedTimeline | None = None,
 ) -> list[str]:
     """Build the shell-free FFmpeg command used by the streaming exporter."""
 
     selected = config.validated()
-    if not math.isfinite(fps) or fps <= 0:
-        raise ValueError("FPS must be a positive finite number")
+    rate = FrameRate.parse(fps)
+    resolved = timeline or selected.temporal_request().resolve(rate)
+    if resolved.frame_rate != rate:
+        raise ValueError("Timeline frame rate must match the encoded frame rate")
     command = [
         selected.ffmpeg,
         "-hide_banner",
@@ -449,35 +490,50 @@ def build_ffmpeg_command(
         "-video_size",
         f"{selected.width}x{selected.height}",
         "-framerate",
-        f"{fps:.6f}",
+        rate.ffmpeg_value,
         "-i",
         "pipe:0",
-        "-ss",
-        f"{selected.start:.6f}",
-        "-i",
-        os.fspath(input_path),
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0?",
-        "-c:v",
-        "libx264",
-        "-preset",
-        selected.preset,
-        "-crf",
-        str(selected.crf),
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-shortest",
-        "-movflags",
-        "+faststart",
     ]
-    if selected.duration is not None:
-        command.extend(["-t", f"{selected.duration:.6f}"])
+    if resolved.audio is AudioPolicy.PRESERVE:
+        command.extend(
+            [
+                "-ss",
+                resolved.ffmpeg_start,
+                "-i",
+                os.fspath(input_path),
+            ]
+        )
+    command.extend(
+        [
+            "-map",
+            "0:v:0",
+            "-c:v",
+            "libx264",
+            "-preset",
+            selected.preset,
+            "-crf",
+            str(selected.crf),
+            "-pix_fmt",
+            "yuv420p",
+        ]
+    )
+    if resolved.audio is AudioPolicy.PRESERVE:
+        command.extend(
+            [
+                "-map",
+                "1:a:0?",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-shortest",
+            ]
+        )
+    else:
+        command.append("-an")
+    if resolved.ffmpeg_duration is not None:
+        command.extend(["-t", resolved.ffmpeg_duration])
+    command.extend(["-movflags", "+faststart"])
     command.append(os.fspath(output_path))
     return command
 
@@ -581,24 +637,31 @@ def export_glyph_video(
     partial = _partial_output_path(output)
     rendered = 0
     try:
-        source_fps = float(capture.get(cv2.CAP_PROP_FPS))
-        fps = (
-            source_fps if math.isfinite(source_fps) and 1 <= source_fps <= 120 else 30.0
+        captured_fps = float(capture.get(cv2.CAP_PROP_FPS))
+        source_rate = (
+            FrameRate.parse(captured_fps)
+            if math.isfinite(captured_fps) and 0 < captured_fps <= 1_000
+            else FrameRate(30)
         )
         total_source_frames = max(0, int(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
-        start_frame = max(0, int(round(selected.start * fps)))
-        capture.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-        if selected.duration is not None:
-            total_frames: int | None = max(1, int(round(selected.duration * fps)))
-        elif total_source_frames > 0:
-            total_frames = max(0, total_source_frames - start_frame)
-        else:
-            total_frames = None
+        timeline = selected.temporal_request().resolve(
+            source_rate,
+            total_source_frames if total_source_frames > 0 else None,
+        )
+        fps = timeline.frame_rate.fps
+        capture.set(cv2.CAP_PROP_POS_FRAMES, timeline.start_frame)
+        total_frames = timeline.frame_count
 
         output.parent.mkdir(parents=True, exist_ok=True)
         partial.unlink(missing_ok=True)
         renderer = GlyphVideoRenderer(selected)
-        command = build_ffmpeg_command(source, partial, selected, fps)
+        command = build_ffmpeg_command(
+            source,
+            partial,
+            selected,
+            timeline.frame_rate,
+            timeline=timeline,
+        )
         try:
             encoder = subprocess.Popen(
                 command,
@@ -679,6 +742,7 @@ def export_glyph_video(
         source=source,
         source_bytes=source_bytes,
         output_bytes=output.stat().st_size,
+        timeline=timeline,
     )
 
 

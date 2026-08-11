@@ -673,6 +673,22 @@ def video_command(
         min=0.001,
         help="Seconds to render; the rest of the video is used when omitted.",
     ),
+    frame_rate: Optional[str] = typer.Option(
+        None,
+        "--frame-rate",
+        "--fps",
+        help="Exact output cadence, for example 30 or 30000/1001; source by default.",
+    ),
+    audio: bool = typer.Option(
+        True,
+        "--audio/--no-audio",
+        help="Preserve and align source audio, or create a silent video.",
+    ),
+    frame_rounding: str = typer.Option(
+        "nearest",
+        "--frame-rounding",
+        help="Time-to-frame alignment: nearest, floor, or ceil.",
+    ),
     crf: int = typer.Option(
         18,
         "--crf",
@@ -741,6 +757,9 @@ def video_command(
             font=font,
             start=start,
             duration=duration,
+            frame_rate=frame_rate,
+            audio="preserve" if audio else "discard",
+            rounding=frame_rounding,
             crf=crf,
             preset=preset,
             ffmpeg=ffmpeg,

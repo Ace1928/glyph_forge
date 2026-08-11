@@ -13,6 +13,7 @@ from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -507,6 +508,69 @@ class GlyphForgeApp(App[str | None]):
         self._refresh_project_status()
         self._refresh_recent_projects()
         self._refresh_batch_queue()
+
+    def _update_static(
+        self,
+        selector: str,
+        content: str | Text,
+        *,
+        layout: bool = True,
+    ) -> None:
+        """Publish worker output only while the app's widgets still exist."""
+
+        if not self.is_running:
+            return
+        try:
+            self.query_one(selector, Static).update(content, layout=layout)
+        except NoMatches:
+            # A worker can finish during the narrow unmount/shutdown window.
+            pass
+
+    def _publish_image_failure(self, message: str) -> None:
+        if not self.is_running:
+            return
+        self._update_static("#image-preview", f"Could not render image:\n{message}")
+        self.notify(message, severity="error")
+
+    def _publish_image_preview(
+        self,
+        path: str,
+        request: RenderRequest,
+        artifact: RenderArtifact,
+        result: str,
+        renderable: str | Text,
+        *,
+        update_project: bool,
+    ) -> None:
+        from ..projects import ProjectError
+
+        if not self.is_running:
+            return
+        self.image_result = result
+        self._image_source = path
+        self._image_request = request
+        self._image_artifact = artifact
+        if update_project and self._project_session is not None:
+            try:
+                self._project_session.update_active_request(request)
+            except ProjectError as exc:
+                self.notify(
+                    f"Preview ready, but project autosave failed: {exc}",
+                    severity="error",
+                )
+        self._update_static("#image-preview", renderable)
+        try:
+            self._refresh_project_status()
+        except NoMatches:
+            return
+        self.notify("Image preview ready")
+
+    def _publish_text_preview(self, result: str) -> None:
+        if not self.is_running:
+            return
+        self.text_result = result
+        self._update_static("#text-preview", result)
+        self.notify("Banner ready")
 
     def selected_value(self, widget_id: str, fallback: str) -> str:
         value = self.query_one(widget_id, Select).value
@@ -1062,7 +1126,8 @@ class GlyphForgeApp(App[str | None]):
 
         def progress(update: BatchProgress) -> None:
             self.app.call_from_thread(
-                self.query_one("#batch-status", Static).update,
+                self._update_static,
+                "#batch-status",
                 f"{update.completed}/{update.total} · {update.succeeded} saved · "
                 f"{update.failed} failed",
             )
@@ -1076,14 +1141,16 @@ class GlyphForgeApp(App[str | None]):
             )
         except BatchError as exc:
             self.app.call_from_thread(
-                self.query_one("#batch-status", Static).update,
+                self._update_static,
+                "#batch-status",
                 f"Batch failed: {exc}",
             )
             self.app.call_from_thread(self._batch_finished)
             return
         state = "cancelled" if report.cancelled else "complete"
         self.app.call_from_thread(
-            self.query_one("#batch-status", Static).update,
+            self._update_static,
+            "#batch-status",
             f"Batch {state} · {report.succeeded} saved · {report.failed} failed · "
             f"{report.skipped} skipped · {report.elapsed:.2f}s",
         )
@@ -1097,8 +1164,13 @@ class GlyphForgeApp(App[str | None]):
 
     def _batch_finished(self) -> None:
         self._batch_cancellation = None
-        self.query_one("#batch-cancel", Button).disabled = True
-        self.query_one("#batch-run", Button).disabled = not self._batch_sources
+        if not self.is_running:
+            return
+        try:
+            self.query_one("#batch-cancel", Button).disabled = True
+            self.query_one("#batch-run", Button).disabled = not self._batch_sources
+        except NoMatches:
+            pass
 
     @on(Button.Pressed, "#image-convert")
     def request_image_conversion(self) -> None:
@@ -1169,17 +1241,12 @@ class GlyphForgeApp(App[str | None]):
         update_project: bool,
     ) -> None:
         from ..contracts import GlyphForgeRenderError
-        from ..projects import ProjectError
         from ..rendering import render_image
 
         try:
             artifact = render_image(path, request)
         except GlyphForgeRenderError as exc:
-            self.app.call_from_thread(
-                self.query_one("#image-preview", Static).update,
-                f"Could not render image:\n{exc}",
-            )
-            self.app.call_from_thread(self.notify, str(exc), severity="error")
+            self.app.call_from_thread(self._publish_image_failure, str(exc))
             return
         result = (
             artifact.data if isinstance(artifact.data, str) else artifact.glyph_text
@@ -1191,27 +1258,17 @@ class GlyphForgeApp(App[str | None]):
             # HTML is saved as HTML but previewed as glyphs rather than markup.
             renderable = artifact.glyph_text
         worker = get_current_worker()
-        if not worker.is_cancelled:
-            self.image_result = result
-            self._image_source = path
-            self._image_request = request
-            self._image_artifact = artifact
-            if update_project and self._project_session is not None:
-                try:
-                    self._project_session.update_active_request(request)
-                except ProjectError as exc:
-                    # Surface autosave failures without losing the preview.
-                    self.app.call_from_thread(
-                        self.notify,
-                        f"Preview ready, but project autosave failed: {exc}",
-                        severity="error",
-                    )
-            self.app.call_from_thread(
-                self.query_one("#image-preview", Static).update,
-                renderable,
-            )
-            self.app.call_from_thread(self._refresh_project_status)
-            self.app.call_from_thread(self.notify, "Image preview ready")
+        if worker.is_cancelled:
+            return
+        self.app.call_from_thread(
+            self._publish_image_preview,
+            path,
+            request,
+            artifact,
+            result,
+            renderable,
+            update_project=update_project,
+        )
 
     @on(Button.Pressed, "#text-convert")
     def request_text_conversion(self) -> None:
@@ -1229,12 +1286,7 @@ class GlyphForgeApp(App[str | None]):
         result = text_to_banner(text, font=font, style=style, width=width)
         worker = get_current_worker()
         if not worker.is_cancelled:
-            self.text_result = result
-            self.app.call_from_thread(
-                self.query_one("#text-preview", Static).update,
-                result,
-            )
-            self.app.call_from_thread(self.notify, "Banner ready")
+            self.app.call_from_thread(self._publish_text_preview, result)
 
     def save_result(self, result: str, destination: str) -> None:
         if not result:
@@ -1261,10 +1313,13 @@ class GlyphForgeApp(App[str | None]):
         if not destination:
             self.notify("Choose an output path", severity="warning")
             return
-        self.export_image(destination)
+        self.export_image(
+            destination,
+            self.query_one("#image-output-size", Input).value,
+        )
 
     @work(thread=True, exclusive=True, group="image-export")
-    def export_image(self, destination: str) -> None:
+    def export_image(self, destination: str, output_size: str) -> None:
         from ..contracts import (
             GlyphForgeRenderError,
             RenderFormat,
@@ -1289,9 +1344,7 @@ class GlyphForgeApp(App[str | None]):
         output_height: int | None = None
         if output_format in {RenderFormat.PNG, RenderFormat.SVG}:
             try:
-                output_width, output_height = parse_pixel_dimensions(
-                    self.query_one("#image-output-size", Input).value
-                )
+                output_width, output_height = parse_pixel_dimensions(output_size)
             except ValueError as exc:
                 self.app.call_from_thread(self.notify, str(exc), severity="error")
                 return
@@ -1321,7 +1374,7 @@ class GlyphForgeApp(App[str | None]):
         detail = f"{artifact.columns}×{artifact.rows} cells"
         if artifact.pixel_width is not None and artifact.pixel_height is not None:
             detail += f" · {artifact.pixel_width}×{artifact.pixel_height} px"
-        self.app.call_from_thread(self._refresh_project_status)
+        self.app.call_from_thread(self._refresh_project_status_if_running)
         self.app.call_from_thread(self.notify, f"Saved {path} · {detail}")
 
     @on(Button.Pressed, "#text-save")
@@ -1384,17 +1437,20 @@ class GlyphForgeApp(App[str | None]):
                 result = renderer.render(frame.pixels)
                 preview = Text.from_ansi(result.text)
                 self.app.call_from_thread(
-                    self.query_one("#live-preview", Static).update,
+                    self._update_static,
+                    "#live-preview",
                     preview,
                     layout=False,
                 )
                 self.app.call_from_thread(
-                    self.query_one("#live-metrics", Static).update,
+                    self._update_static,
+                    "#live-metrics",
                     f"{displayed} shown · {dropped} dropped",
                 )
         except (CaptureError, ValueError) as exc:
             self.app.call_from_thread(
-                self.query_one("#live-preview", Static).update,
+                self._update_static,
+                "#live-preview",
                 f"Could not start live view:\n{exc}",
             )
             self.app.call_from_thread(self.notify, str(exc), severity="error")
@@ -1404,8 +1460,21 @@ class GlyphForgeApp(App[str | None]):
             self.app.call_from_thread(self._live_finished)
 
     def _live_finished(self) -> None:
-        self.query_one("#live-start", Button).disabled = False
-        self.query_one("#live-stop", Button).disabled = True
+        if not self.is_running:
+            return
+        try:
+            self.query_one("#live-start", Button).disabled = False
+            self.query_one("#live-stop", Button).disabled = True
+        except NoMatches:
+            pass
+
+    def _refresh_project_status_if_running(self) -> None:
+        if not self.is_running:
+            return
+        try:
+            self._refresh_project_status()
+        except NoMatches:
+            pass
 
     @on(Button.Pressed, "#runtime-refresh")
     def refresh_runtime(self) -> None:

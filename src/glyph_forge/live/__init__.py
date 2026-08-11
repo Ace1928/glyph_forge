@@ -1,5 +1,13 @@
 """Low-latency capture and subpixel glyph rendering."""
 
+from ..temporal import (
+    AudioPolicy,
+    FrameRate,
+    FrameRounding,
+    ResolvedTimeline,
+    TemporalContractError,
+    TemporalRenderRequest,
+)
 from .capture import (
     CaptureBackendUnavailable,
     CapturedFrame,
@@ -69,6 +77,7 @@ from .video import (
 from .virtual import VirtualDisplayError, VirtualDisplaySession, virtual_display
 
 __all__ = [
+    "AudioPolicy",
     "CaptureError",
     "CaptureBackendUnavailable",
     "CapturedFrame",
@@ -78,6 +87,8 @@ __all__ = [
     "EdgeMap",
     "FrameSource",
     "FrameRenderer",
+    "FrameRate",
+    "FrameRounding",
     "GlyphVideoRenderer",
     "InputBackendUnavailable",
     "InputEvent",
@@ -100,11 +111,14 @@ __all__ = [
     "RenderConfig",
     "RenderMode",
     "RenderResult",
+    "ResolvedTimeline",
     "RenderViewport",
     "ResolvedNetworkSource",
     "TerminalPresenter",
     "TerminalRedraw",
     "TerminalSessionConfig",
+    "TemporalContractError",
+    "TemporalRenderRequest",
     "VideoExportConfig",
     "VideoExportError",
     "VideoExportProgress",

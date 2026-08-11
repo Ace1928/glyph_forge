@@ -245,6 +245,11 @@ glyph-forge video clip.mp4 output.mp4 --width 2560 --height 1440 \
 # Override bounded ordered workers or capture complete render metrics
 glyph-forge video clip.mp4 output.mp4 --workers 8
 glyph-forge video clip.mp4 output.mp4 --json > render-metrics.json
+
+# Exact fractional cadence, deterministic frame alignment, or silent output
+glyph-forge video clip.mp4 output.mp4 --frame-rate 30000/1001 \
+  --start 2.5 --duration 4.25 --frame-rounding nearest
+glyph-forge video clip.mp4 output.mp4 --no-audio
 ```
 
 The exporter streams OpenCV frames directly through a vectorized glyph atlas
@@ -257,6 +262,10 @@ Output width and height accept any even H.264 dimensions; glyph columns and
 rows no longer need to divide them evenly. Divisible grids retain the direct
 zero-resize hot path, while fractional cell layouts receive one final
 high-quality fit to the exact requested frame.
+The versioned temporal contract represents fractional frame rates exactly,
+aligns video and audio to one deterministic integer-frame slice, and includes
+that resolved timeline in JSON metrics. See
+[temporal rendering contract v1](docs/temporal-rendering.md).
 
 Live terminal views default to adaptive redraws. Glyph Forge compares the
 actual UTF-8 payload for a complete frame with cursor-addressed changed rows,
@@ -561,8 +570,8 @@ pixel geometry, media type, and phase timings. See the
 
 For low-level capture, video export, and live presentation, the public package
 also lazily exports `create_frame_source`, `LatestFramePump`,
-`VideoExportConfig`, `VideoExportResult`, `export_glyph_video`, `InputRouter`, and
-`run_terminal_session`.
+`TemporalRenderRequest`, `FrameRate`, `VideoExportConfig`, `VideoExportResult`,
+`export_glyph_video`, `InputRouter`, and `run_terminal_session`.
 [`examples/api_examples.py`](examples/api_examples.py) is a complete runnable
 example that uses only generated in-memory media.
 

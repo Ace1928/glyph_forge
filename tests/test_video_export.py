@@ -20,6 +20,7 @@ from glyph_forge.live.video import (
     build_ffmpeg_command,
     export_glyph_video,
 )
+from glyph_forge.temporal import AudioPolicy, FrameRate
 
 
 def test_adaptive_video_profiles_scale_cleanly() -> None:
@@ -135,20 +136,46 @@ def test_ffmpeg_command_retains_script_audio_and_quality_options() -> None:
         preset="slow",
     )
 
-    command = build_ffmpeg_command("source.mov", "output.mp4", config, 29.97)
+    rate = FrameRate.parse(29.97)
+    timeline = config.temporal_request().resolve(rate)
+    command = build_ffmpeg_command(
+        "source.mov",
+        "output.mp4",
+        config,
+        rate,
+        timeline=timeline,
+    )
 
     assert command[:2] == ["ffmpeg", "-hide_banner"]
     assert ["-video_size", "1920x1080"] == command[
         command.index("-video_size") : command.index("-video_size") + 2
     ]
-    assert command[command.index("-ss") + 1] == "2.500000"
-    assert command[command.index("-t") + 1] == "4.250000"
+    assert command[command.index("-framerate") + 1] == "2997/100"
+    assert command[command.index("-ss") + 1] == timeline.ffmpeg_start
+    assert command[command.index("-t") + 1] == timeline.ffmpeg_duration
     assert command[command.index("-preset") + 1] == "slow"
     assert command[command.index("-crf") + 1] == "12"
     assert "1:a:0?" in command
     assert "-shortest" in command
     assert "+faststart" in command
     assert command[-1] == "output.mp4"
+
+
+def test_ffmpeg_command_can_create_a_silent_video_without_source_muxing() -> None:
+    config = VideoExportConfig(
+        width=16,
+        height=16,
+        columns=2,
+        rows=2,
+        audio="discard",
+    )
+
+    command = build_ffmpeg_command("source.mov", "output.mp4", config, 30)
+
+    assert "source.mov" not in command
+    assert "-an" in command
+    assert "-ss" not in command
+    assert "1:a:0?" not in command
 
 
 class _FakeCapture:
@@ -320,6 +347,10 @@ def test_export_streams_frames_atomically_without_an_image_sequence(
     assert result.source == source
     assert result.source_bytes == len(b"source")
     assert result.output_bytes == len(b"encoded-video")
+    assert result.timeline is not None
+    assert result.timeline.frame_rate == FrameRate(10)
+    assert result.timeline.frame_count == 2
+    assert result.timeline.audio is AudioPolicy.PRESERVE
     assert result.raw_rgb_bytes == 2 * 16 * 16 * 3
     assert result.to_dict()["render_fps"] > 0
     assert destination.read_bytes() == b"encoded-video"
@@ -401,6 +432,11 @@ def test_cli_video_preserves_every_standalone_script_option(
             "1.5",
             "--duration",
             "2",
+            "--frame-rate",
+            "30000/1001",
+            "--no-audio",
+            "--frame-rounding",
+            "floor",
             "--crf",
             "20",
             "--preset",
@@ -430,6 +466,9 @@ def test_cli_video_preserves_every_standalone_script_option(
     assert config.font == str(font)
     assert config.start == 1.5
     assert config.duration == 2
+    assert config.frame_rate == FrameRate(30_000, 1_001)
+    assert config.audio is AudioPolicy.DISCARD
+    assert config.rounding.value == "floor"
     assert config.crf == 20
     assert config.preset == "fast"
     assert config.ffmpeg == "custom-ffmpeg"

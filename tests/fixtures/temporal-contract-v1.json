@@ -1,0 +1,65 @@
+{
+  "contract_version": 1,
+  "cases": [
+    {
+      "name": "ntsc-nearest-slice",
+      "request": {
+        "start": 2.5,
+        "duration": 4.25,
+        "frame_rate": {"numerator": 30000, "denominator": 1001},
+        "audio": "preserve",
+        "rounding": "nearest",
+        "contract_version": 1
+      },
+      "source_rate": {"numerator": 24, "denominator": 1},
+      "source_frames": 500,
+      "expected": {
+        "start_frame": 75,
+        "frame_count": 127,
+        "end_frame": 202,
+        "aligned_start_seconds": 2.5025,
+        "encoded_seconds": 4.237566666666667
+      }
+    },
+    {
+      "name": "source-rate-floor",
+      "request": {
+        "start": 0.25,
+        "duration": 0.25,
+        "frame_rate": null,
+        "audio": "discard",
+        "rounding": "floor",
+        "contract_version": 1
+      },
+      "source_rate": {"numerator": 10, "denominator": 1},
+      "source_frames": 100,
+      "expected": {
+        "start_frame": 2,
+        "frame_count": 2,
+        "end_frame": 4,
+        "aligned_start_seconds": 0.2,
+        "encoded_seconds": 0.2
+      }
+    },
+    {
+      "name": "slice-clamped-at-source-end",
+      "request": {
+        "start": 9.8,
+        "duration": 4.0,
+        "frame_rate": null,
+        "audio": "preserve",
+        "rounding": "nearest",
+        "contract_version": 1
+      },
+      "source_rate": {"numerator": 10, "denominator": 1},
+      "source_frames": 100,
+      "expected": {
+        "start_frame": 98,
+        "frame_count": 2,
+        "end_frame": 100,
+        "aligned_start_seconds": 9.8,
+        "encoded_seconds": 0.2
+      }
+    }
+  ]
+}

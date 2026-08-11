@@ -19,12 +19,24 @@ the project uses semantic versioning.
 - Studio file-handler and offline-shell support for project/preset documents,
   browser-local autosave, keyboard shortcuts, collision-safe batch downloads,
   and startup session restoration
+- Backend-free temporal contract v1 with exact rational frame rates,
+  deterministic frame alignment, strict JSON round-trips, source-end clamping,
+  explicit audio policy, and resolved timeline metrics
 
 ### Changed
 
 - Portable project creation and external-asset copying now use one shared
   application operation across CLI, TUI, and API instead of interface-local
   filename and copy implementations
+- Video decode seeking, audio seeking, duration bounds, progress totals, and
+  export metrics now derive from one resolved integer-frame timeline; the CLI
+  accepts exact `--frame-rate`, alignment policy, and silent-export controls
+
+### Fixed
+
+- TUI image, text, batch, export, and live workers now publish widget updates
+  on the application thread and tolerate the unmount window, preventing a
+  Windows teardown race after a completed project preview
 
 ### Performance
 
