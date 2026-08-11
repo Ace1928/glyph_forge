@@ -8,8 +8,9 @@ receive a fix when practical but are not actively supported.
 ## Report a vulnerability
 
 Do not open a public issue for a vulnerability that could put users at risk.
-Send a private report to <lloyd.handyside@neuroforge.io> or
-<ace1928@gmail.com> with:
+Prefer a [private GitHub security advisory](https://github.com/Ace1928/glyph_forge/security/advisories/new),
+or send a private report to <lloyd.handyside@neuroforge.io> or
+<ace1928@gmail.com>, with:
 
 - affected version and platform;
 - a minimal reproduction or proof of concept;
@@ -37,6 +38,10 @@ promise a timeline it may be unable to meet.
   networks, not the public Internet. Glyph Forge has no hosted relay.
 - Webcam and screen access remain subject to browser and operating-system
   permission prompts.
+- Installing the public Studio as a PWA does not grant additional media or file
+  permissions. Its versioned service worker caches only the static app shell
+  and explicitly bypasses `/api/` and `/s/` responses, so private shares and
+  live server capabilities do not enter offline storage.
 - `live url` contacts the supplied URL and services used by yt-dlp. Treat URLs
   as network operations and use a current yt-dlp release.
 - `live launch` executes the exact command supplied by the local user. It does
@@ -67,4 +72,6 @@ File links are path-resolved, limited to regular files, and revoked if the file
 identity, size, or modification time changes. Live buffers are bounded, and
 video output uses a temporary destination before atomic replacement. CI checks
 formatting, linting, typing, tests, package metadata, optional dependency
-installation, and installed wheel resources.
+installation, installed wheel resources, and Chromium/Firefox/WebKit desktop
+and touch behavior. CodeQL scans both Python and browser JavaScript, while
+Dependabot monitors Python, npm, and GitHub Actions dependencies.

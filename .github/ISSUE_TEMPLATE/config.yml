@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/Ace1928/glyph_forge/security/advisories/new
+    about: Report vulnerabilities privately instead of opening a public issue.
+  - name: Usage and installation guide
+    url: https://github.com/Ace1928/glyph_forge#readme
+    about: Check the quick start, diagnostics, and platform notes first.

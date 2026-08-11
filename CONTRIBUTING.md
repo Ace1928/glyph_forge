@@ -17,6 +17,11 @@ python -m venv .venv
 
 python -m pip install --editable ".[dev,tui]"
 python -m pytest
+
+# Browser Studio acceptance suite
+npm ci
+npx playwright install chromium firefox webkit
+npm run test:web
 ```
 
 The repository has one long-lived branch: `main`. Maintainers land tested,
@@ -48,9 +53,19 @@ ruff check src tests examples tools
 python -m mypy src/glyph_forge
 python -m pytest
 python -m pytest --cov=glyph_forge --cov-fail-under=70
+npm ci
+npm audit --audit-level=high
+npm run test:web
 SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python -m build
 python -m twine check dist/*
 ```
+
+The browser suite starts the static Studio at its production project path and
+checks Chromium, Firefox, WebKit, Pixel-class touch, and iPhone-class touch
+profiles. It covers every render mode, accessibility, responsive geometry,
+install metadata, offline app-shell behavior, and the source-size budget. On a
+fresh Linux machine, `npx playwright install --with-deps chromium firefox
+webkit` also installs the engines' system libraries.
 
 New behavior needs focused tests. Tests should be deterministic, independent,
 fast by default, and should not require a physical webcam, display, network

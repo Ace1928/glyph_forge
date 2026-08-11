@@ -1,0 +1,69 @@
+name: Bug report
+description: Report a reproducible problem in the CLI, TUI, Studio, or API.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping make Glyph Forge dependable across platforms.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Browser Studio or installed PWA
+        - CLI
+        - TUI
+        - Python API
+        - Video, webcam, or screen capture
+        - Installation or portable bundle
+        - Sharing
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Glyph Forge version
+      description: Run `glyph-forge version` if possible.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Device and environment
+      description: Include OS/version, browser or terminal, Python version, CPU/GPU, and install method when relevant.
+      placeholder: Windows 11, Chrome 140, Python 3.14, Intel UHD; installed with pipx
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Give the smallest exact sequence that demonstrates the problem.
+      placeholder: Commands, input type, settings, taps/clicks, and what happens
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics and logs
+      description: Paste `glyph-forge doctor --json`, console errors, or a short screen recording. Remove private paths or media first.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checklist
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I can share the test media, or the issue reproduces with non-private media.
+          required: false
+        - label: This is not a security vulnerability.
+          required: true

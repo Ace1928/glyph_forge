@@ -1,33 +1,10 @@
-# Eidosian Forge - Universal Ownership Matrix
+# The repository has one canonical owner and one long-lived branch.
+* @Ace1928
 
-## Core Architectural Ownership
-
-- @Ace1928 @eidos # Primary custodians of all architectural elements
-
-## System Components
-
-/tools/ @Ace1928 @eidos # Core toolkit implementations
-/libs/ @Ace1928 @eidos # Foundational libraries
-/src/ @Ace1928 @eidos # Source implementation
-\*.toml @Ace1928 @eidos # Configuration specifications
-/scripts/ @Ace1928 @eidos # Automation primitives
-/api/ @Ace1928 @eidos # Interface contracts
-
-## Pipeline Architecture
-
-/.github/workflows/ @Ace1928 @eidos # Integration pathways
-/tests/ @Ace1928 @eidos # Verification frameworks
-/.ci/ @Ace1928 @eidos # Continuous integration structures
-
-## Knowledge Systems
-
-\*.md @Ace1928 @eidos # Information structures
-/docs/ @Ace1928 @eidos # Documentation architecture
-/examples/ @Ace1928 @eidos # Implementation patterns
-
-## Resolution Protocol
-
-> Path resolution follows the principle of precision dominance
-> More specific paths override general paths—like water finding the most direct route
-> The machine applies the same logic you would: specific beats general, every time
-> Remember: With great ownership comes recursive responsibility
+# Keep release, dependency, and security automation under explicit review.
+/.github/ @Ace1928
+/pyproject.toml @Ace1928
+/package.json @Ace1928
+/package-lock.json @Ace1928
+/src/glyph_forge/studio.py @Ace1928
+/src/glyph_forge/sharing.py @Ace1928

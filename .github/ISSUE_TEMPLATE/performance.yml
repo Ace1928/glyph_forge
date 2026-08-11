@@ -1,0 +1,55 @@
+name: Performance report
+description: Report latency, throughput, memory, output size, or battery regressions with measurements.
+title: "[Performance]: "
+body:
+  - type: dropdown
+    id: workload
+    attributes:
+      label: Workload
+      options:
+        - Still image
+        - Offline video export
+        - Webcam or screen stream
+        - Browser Studio or installed PWA
+        - Terminal presentation
+        - Startup or installation
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command or Studio settings
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: media
+    attributes:
+      label: Input characteristics
+      description: Include format, dimensions, frame rate, duration, and size without uploading private media.
+    validations:
+      required: true
+  - type: textarea
+    id: measurements
+    attributes:
+      label: Measurements
+      description: Include repeated timing, FPS or real-time factor, peak memory, output size, and expected baseline where available.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Runtime report
+      description: Paste `glyph-forge doctor --json` and `glyph-forge benchmark --json` when available.
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Measurement checklist
+      options:
+        - label: I reproduced this after a warm-up run and without unrelated heavy workloads.
+          required: true
+        - label: I included enough information for another person to repeat the measurement.
+          required: true

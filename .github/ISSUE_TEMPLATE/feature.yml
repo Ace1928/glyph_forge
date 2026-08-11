@@ -1,0 +1,52 @@
+name: Feature request
+description: Propose a focused user-facing or extension-platform improvement.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe who is blocked and what they are trying to accomplish.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the behavior and experience, without prescribing internals unless necessary.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Primary surface
+      options:
+        - Rendering engine
+        - Browser Studio or installed PWA
+        - CLI
+        - TUI
+        - Python or plugin API
+        - Capture or video export
+        - Packaging or portability
+        - Sharing
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and prior art
+      description: Note current workarounds or related tools if any.
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Compatibility and performance constraints
+      description: Mention modest hardware, mobile/touch, accessibility, offline use, privacy, or formats that matter.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and the roadmap for this request.
+          required: true
+        - label: I have described the user outcome separately from the implementation.
+          required: true

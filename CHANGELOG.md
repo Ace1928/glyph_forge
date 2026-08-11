@@ -12,6 +12,15 @@ the project uses semantic versioning.
 
 ### Added
 
+- Installable cross-device Studio PWA with branded icons, standalone display,
+  safe-area-aware mobile layout, offline app shell, file launch integration,
+  project-relative hosting, and platform-specific install guidance
+- Automated Chromium, Firefox, and WebKit acceptance checks with Pixel and
+  iPhone touch profiles, accessibility scanning, responsive geometry, offline
+  operation, manifest validation, and a browser source-size budget
+- CodeQL scanning for Python and browser JavaScript, grouped Dependabot updates,
+  structured bug/feature/performance reports, and a production pull-request
+  checklist
 - Portable glyph codes: encode any image, banner, or animated GIF into one
   printable ASCII string (`glyph:v1:…`) that regenerates the original artwork
   with no hosting or server — `glyph-forge link code|banner|decode`, lossless
@@ -84,6 +93,8 @@ the project uses semantic versioning.
 
 ### Fixed
 
+- Studio file input naming and coarse-pointer text controls now meet the same
+  accessible-name and minimum touch-target gates as visible controls
 - Redirected and frozen Windows commands switch their existing text streams to
   UTF-8 before emitting Braille, block, or international glyphs
 
