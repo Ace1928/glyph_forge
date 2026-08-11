@@ -53,11 +53,11 @@ Termux/Android too).
 
 | OS | Fastest path |
 |---|---|
-| **Windows** | `py -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
-| **macOS / Linux** | `python3 -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
-| **Any OS, isolated** | `pipx install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
-| **Any OS, fastest** | `uv tool install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"` |
-| **No install at all** | `uvx --from "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip" glyph-forge launch` |
+| **Windows** | `py -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip"` |
+| **macOS / Linux** | `python3 -m pip install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip"` |
+| **Any OS, isolated** | `pipx install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip"` |
+| **Any OS, fastest** | `uv tool install "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip"` |
+| **No install at all** | `uvx --from "glyphforge[all] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip" glyph-forge launch` |
 | **Small core** | Install the same release URL without `[all]` — images, text, Studio, demo |
 | **Portable binaries** | Tagged releases ship no-Python one-directory archives for all three OSes |
 
@@ -152,7 +152,7 @@ glyph-forge image photo.jpg --mode half-block --color ansi
 
 # Choose glyph detail and final pixels independently
 glyph-forge image photo.jpg --width 160 --height 90 \
-  --output photo-1080p.png --output-width 1920 --output-height 1080
+  --output photo-1080p.png --size 1920x1080 --fit-mode contain
 
 # Real text glyphs in an exact-size, losslessly scalable vector canvas
 glyph-forge image photo.jpg --width 240 --output photo-4k.svg \
@@ -169,14 +169,15 @@ glyph-forge text --list-styles
 glyph-forge text "SHARE THIS" --output banner.txt
 ```
 
-The `--width`/`--height` pair controls the glyph grid; `--output-width` and
-`--output-height` control PNG/SVG pixels without changing that grid. Supplying
-one output dimension preserves the glyph canvas aspect ratio, while supplying
-both produces that exact size. The output suffix selects PNG or SVG; SVG keeps
-real text glyphs sharp at arbitrary zoom levels. Plain text, ANSI colour, and
-HTML remain available for terminal and web output. All visual paths start from
-the brighter, clearer `1.12` brightness and `1.08` contrast curve, with both
-values directly overridable.
+The `--width`/`--height` pair controls the glyph grid; `--size WIDTHxHEIGHT`
+controls final PNG/SVG pixels without changing that grid. The explicit
+`--output-width` and `--output-height` forms remain useful when only one axis is
+known. Choose `--fit-mode contain`, `cover`, or `stretch`, and anchor with
+`--align`. The output suffix selects PNG, SVG, HTML, ANSI, or text; SVG keeps
+real text glyphs sharp at arbitrary zoom levels. Every destination is replaced
+atomically, so an interrupted save cannot expose a partial file. All visual
+paths start from the brighter, clearer `1.12` brightness and `1.08` contrast
+curve, with both values directly overridable.
 
 ## Rendering modes
 
@@ -258,12 +259,12 @@ On an X11 host, Glyph Forge can launch one application in an isolated virtual
 display and render that display through the same pipeline:
 
 ```bash
-python -m pip install "glyphforge[media,virtual] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"
+python -m pip install "glyphforge[media,virtual] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip"
 glyph-forge live launch -- xterm
 glyph-forge live launch --display-width 1600 --display-height 900 -- firefox
 
 # Explicit interactive mode (install media, virtual, and control extras)
-python -m pip install "glyphforge[media,virtual,control] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"
+python -m pip install "glyphforge[media,virtual,control] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip"
 glyph-forge live launch --control -- xterm
 ```
 
@@ -429,7 +430,7 @@ implementation is in [`examples/plugin_example.py`](examples/plugin_example.py).
 ## Full-screen terminal UI
 
 ```bash
-python -m pip install "glyphforge[tui] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.3.1.zip"
+python -m pip install "glyphforge[tui] @ https://github.com/Ace1928/glyph_forge/archive/refs/tags/v0.4.0.zip"
 glyph-forge interactive
 ```
 
@@ -450,6 +451,7 @@ Measure the renderer on the current machine with deterministic synthetic input:
 ```bash
 glyph-forge benchmark
 glyph-forge benchmark --mode braille --iterations 10
+glyph-forge benchmark --pipeline --performance eco --json
 glyph-forge benchmark --performance workstation --json
 ```
 
@@ -482,35 +484,48 @@ The top-level package is lazy: importing `glyph_forge` does not load video or
 UI backends and performs no filesystem writes.
 
 ```python
-from pathlib import Path
-
 import numpy as np
 from PIL import Image
 
 from glyph_forge import (
     FrameRenderer,
     RenderConfig,
+    RenderRequest,
     image_to_glyph,
-    render_text_png,
-    render_text_svg,
+    render_image,
     text_to_banner,
 )
 
 print(text_to_banner("HELLO", font="small", style="boxed"))
 print(image_to_glyph("photo.jpg", width=72, auto_scale=False))
 
+# One immutable, JSON-serializable contract powers CLI/API/TUI stills.
+request = RenderRequest(
+    width=160,
+    height=90,
+    mode="braille",
+    output_format="svg",
+    output_width=1920,
+    output_height=1080,
+    fit="contain",
+)
+artifact = render_image("photo.jpg", request, destination="photo.svg")
+print(artifact.metrics.to_dict())
+
+# The reusable frame renderer remains the low-level live-media kernel.
 frame = np.asarray(Image.open("photo.jpg").convert("RGB"), dtype=np.uint8)
 result = FrameRenderer(
     RenderConfig(width=80, mode="braille", color="none")
 ).render(frame)
 print(result.text)
-
-render_text_png(result.text, output_width=1920, output_height=1080).save("frame.png")
-Path("frame.svg").write_text(
-    render_text_svg(result.text, output_width=3840, output_height=2160),
-    encoding="utf-8",
-)
 ```
+
+`RenderRequest` is contract version 1. It validates geometry, tone, format,
+fit, alignment, charset syntax, and bounded dimensions before rendering;
+`RenderArtifact` returns the text, encoded bytes/document, exact logical and
+pixel geometry, media type, and phase timings. See the
+[rendering contract guide](docs/rendering.md) and
+[v0.4 migration notes](docs/migration-0.4.md).
 
 For low-level capture, video export, and live presentation, the public package
 also lazily exports `create_frame_source`, `LatestFramePump`,
@@ -539,6 +554,10 @@ example that uses only generated in-memory media.
 `imagize`, `bannerize`, and `glyphfy` remain installed for existing scripts.
 They are thin adapters to the maintained `glyph-forge image` and
 `glyph-forge text` implementations; there is no duplicate rendering engine.
+The stateful `ImageGlyphConverter`, mixed-case `image_to_Glyph`, and ambiguous
+top-level `get_config` names now emit `DeprecationWarning`; they remain tested
+through the 0.x line and are planned for removal at 1.0. New code should use
+`RenderRequest`/`render_image`, `image_to_glyph`, and `get_settings`.
 
 ## Development
 
@@ -563,11 +582,11 @@ python -m build
 python -m twine check dist/*
 ```
 
-The current suite has 429 passing tests (plus one platform-dependent skip) and
-measures at least 70% branch-aware coverage.
-CI runs formatting, linting, type checking, Python 3.10–3.14 tests, Windows and
-macOS smoke matrices, optional-extra installation, and installed-wheel resource
-checks.
+The suite enforces at least 70% branch-aware coverage. CI runs formatting,
+linting, strict typing, Python 3.10–3.14 tests, Windows and macOS matrices,
+optional-extra installation, installed-wheel and portable-bundle smoke tests,
+plus Chromium, Firefox, WebKit, touch, accessibility, offline, performance,
+CodeQL, and packaging gates.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [ROADMAP.md](ROADMAP.md),
 [SECURITY.md](SECURITY.md), and [CHANGELOG.md](CHANGELOG.md) for project policy

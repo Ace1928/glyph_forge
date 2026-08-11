@@ -36,6 +36,7 @@ jobs:
         run: |
           python -m ruff format --check src tests examples tools
           python -m ruff check src tests examples tools
+          python -m ruff check --select C901 --config "lint.mccabe.max-complexity=10" src/glyph_forge/contracts.py src/glyph_forge/rendering.py src/glyph_forge/persistence.py src/glyph_forge/config/settings.py src/glyph_forge/api/glyph_api.py src/glyph_forge/cli/image.py
           python -m mypy src/glyph_forge
       - name: Run complete test suite
         run: python -m pytest -q

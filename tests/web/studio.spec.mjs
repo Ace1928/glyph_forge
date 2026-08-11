@@ -1,6 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { mapPixelGrid } from "../../src/glyph_forge/ui/web/studio-renderers.js";
+
+const renderContract = JSON.parse(
+  await readFile("tests/fixtures/render-contract-v1.json", "utf8"),
+);
 
 const seriousViolations = (violations) => violations.filter(
   ({ impact }) => impact === "serious" || impact === "critical",
@@ -150,4 +155,32 @@ test("keeps the dependency-free app shell within its performance budget", async 
   ];
   const sizes = await Promise.all(files.map(async (path) => (await stat(path)).size));
   expect(sizes.reduce((total, size) => total + size, 0)).toBeLessThan(160_000);
+});
+
+test("matches the shared native/browser render contract", async ({}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-chromium",
+    "The deterministic JavaScript kernel only needs one Node/browser project",
+  );
+  expect(renderContract.contract_version).toBe(1);
+  for (const fixture of renderContract.cases) {
+    const { sample, web, expected_lines: expectedLines } = fixture;
+    const frame = mapPixelGrid(
+      new Uint8ClampedArray(sample.rgba),
+      sample.width,
+      sample.height,
+      {
+        ...web,
+        background: [0, 0, 0],
+        foreground: [1, 1, 1],
+      },
+    );
+    expect(frame.lines, fixture.name).toEqual(expectedLines);
+    if (fixture.expected_rgb) {
+      expect(
+        frame.colors.flat().map((color) => color.slice(0, 3)),
+        fixture.name,
+      ).toEqual(fixture.expected_rgb);
+    }
+  }
 });

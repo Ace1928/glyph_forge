@@ -60,6 +60,7 @@ def test_image_round_trip_is_byte_exact(sample_image: Path, tmp_path: Path) -> N
     target = tmp_path / "out.png"
     decoded.save_image(target)
     assert target.read_bytes() == sample_image.read_bytes()
+    assert not list(tmp_path.glob(".*.tmp"))
 
 
 def test_gif_round_trip(sample_gif: Path, tmp_path: Path) -> None:
@@ -76,6 +77,7 @@ def test_gif_round_trip(sample_gif: Path, tmp_path: Path) -> None:
     decoded.save_gif(target)
     with Image.open(target) as restored:
         assert restored.n_frames == 3
+    assert not list(tmp_path.glob(".*.tmp"))
 
 
 def test_auto_encodes_gif_as_animation(sample_gif: Path) -> None:

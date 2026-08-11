@@ -1,9 +1,4 @@
-"""
-⚡ Glyph Forge API ⚡
-
-Public interface to the Glyph Forge library with maximum efficiency,
-precision, and control. Designed for both simplicity and power.
-"""
+"""High-level application interface for Glyph Forge."""
 
 from .glyph_api import GlyphForgeAPI, get_api
 

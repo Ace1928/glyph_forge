@@ -9,6 +9,9 @@ from typing import Any, Dict, TypedDict, cast
 
 import yaml
 
+from .config.settings import user_config_directory
+from .persistence import atomic_write_text
+
 logger = logging.getLogger(__name__)
 
 BUNDLED_PROFILE_PATH = Path(__file__).with_name("resources") / "eidos_profile.yml"
@@ -18,6 +21,12 @@ def _user_profile_path() -> Path:
     override = os.environ.get("GLYPH_FORGE_EIDOS_PROFILE")
     if override:
         return Path(override).expanduser()
+    return user_config_directory() / "eidos_profile.yml"
+
+
+def _legacy_user_profile_path() -> Path:
+    """Return the pre-0.4 path retained as a read-only migration source."""
+
     if os.name == "nt" and os.environ.get("APPDATA"):
         return Path(os.environ["APPDATA"]) / "GlyphForge" / "eidos_profile.yml"
     config_root = Path(
@@ -63,7 +72,14 @@ def load_profile(path: Path | None = None) -> EidosProfile:
     """Load an explicit profile, a user override, or the bundled default."""
 
     user_path = _user_profile_path()
-    profile_path = path or (user_path if user_path.is_file() else PROFILE_PATH)
+    legacy_path = _legacy_user_profile_path()
+    profile_path = path or (
+        user_path
+        if user_path.is_file()
+        else legacy_path
+        if legacy_path != user_path and legacy_path.is_file()
+        else PROFILE_PATH
+    )
     with open(profile_path, "r", encoding="utf-8") as f:
         data: EidosProfile = yaml.safe_load(f)
     logger.debug("Loaded profile from %s", profile_path)
@@ -74,9 +90,8 @@ def save_profile(profile: EidosProfile, path: Path | None = None) -> None:
     """Persist profile data to an explicit path or portable user config."""
 
     profile_path = path or _user_profile_path()
-    profile_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(profile_path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(profile, f, sort_keys=False)
+    document = yaml.safe_dump(profile, sort_keys=False)
+    atomic_write_text(profile_path, document, permissions=0o600)
     logger.debug("Saved profile to %s", profile_path)
 
 

@@ -196,7 +196,7 @@ def _content_disposition(filename: str) -> str:
 class _StudioHandler(SimpleHTTPRequestHandler):
     """Static studio plus tightly scoped, capability-addressed share endpoints."""
 
-    server_version = "GlyphForgeStudio/0.3"
+    server_version = "GlyphForgeStudio/0.4"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     extensions_map = {

@@ -8,6 +8,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
+from .contracts import RenderFormat, RenderRequest
 from .live.renderers import (
     FrameRenderer,
     PluginRenderMode,
@@ -15,6 +16,7 @@ from .live.renderers import (
     RenderMode,
     normalize_render_mode,
 )
+from .rendering import render_image
 from .runtime import RuntimeProfile, detect_runtime_profile
 
 
@@ -31,6 +33,7 @@ class RendererBenchmark:
     milliseconds: float
     frames_per_second: float
     output_bytes: int
+    scope: str = "kernel"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -120,4 +123,66 @@ def benchmark_renderers(
     return results
 
 
-__all__ = ["RendererBenchmark", "benchmark_renderers", "synthetic_frame"]
+def benchmark_still_pipeline(
+    preference: str = "auto",
+    *,
+    modes: Iterable[RenderMode | PluginRenderMode | str] | None = None,
+    iterations: int = 3,
+    warmup: int = 1,
+) -> list[RendererBenchmark]:
+    """Measure the public decode/request/render/encode still-image path."""
+
+    if iterations < 1:
+        raise ValueError("iterations must be positive")
+    if warmup < 0:
+        raise ValueError("warmup cannot be negative")
+    profile = detect_runtime_profile(preference)
+    source_width, source_height = _source_dimensions(profile)
+    frame = synthetic_frame(source_width, source_height)
+    results: list[RendererBenchmark] = []
+    for value in list(modes or RenderMode):
+        mode = normalize_render_mode(value)
+        request = RenderRequest(
+            width=profile.stream_width,
+            mode=mode.value,
+            output_format=(
+                RenderFormat.ANSI256
+                if mode is RenderMode.HALF_BLOCK
+                else RenderFormat.TEXT
+            ),
+            charset="detailed",
+            edge_algorithm="scharr",
+            resample=profile.resample,
+        )
+        artifact = None
+        for _ in range(warmup):
+            artifact = render_image(frame, request)
+        started = time.perf_counter()
+        for _ in range(iterations):
+            artifact = render_image(frame, request)
+        elapsed = time.perf_counter() - started
+        assert artifact is not None
+        average = elapsed / iterations
+        results.append(
+            RendererBenchmark(
+                mode=mode.value,
+                source_width=source_width,
+                source_height=source_height,
+                columns=artifact.columns,
+                rows=artifact.rows,
+                iterations=iterations,
+                milliseconds=average * 1000,
+                frames_per_second=1 / average if average else float("inf"),
+                output_bytes=artifact.byte_size,
+                scope="still-pipeline",
+            )
+        )
+    return results
+
+
+__all__ = [
+    "RendererBenchmark",
+    "benchmark_renderers",
+    "benchmark_still_pipeline",
+    "synthetic_frame",
+]

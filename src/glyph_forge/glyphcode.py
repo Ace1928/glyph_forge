@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from .persistence import atomic_write_bytes
+
 _PREFIX = "glyph:v1:"
 _TOTAL_BYTES_LIMIT = 8 * 1024 * 1024
 _MAX_GIF_FRAMES = 96
@@ -120,32 +122,37 @@ class DecodedGlyphCode:
     def save_image(self, path: Path) -> None:
         if self.image is None:
             raise GlyphCodeError("this code carries no image")
-        path = _as_path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(self.image)
+        atomic_write_bytes(_as_path(path), self.image)
 
     def save_gif(self, path: Path, loop: int = 0) -> None:
         if not self.frames:
             raise GlyphCodeError("this code carries no frames")
-        path = _as_path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
         fps = self.fps
         durations = self.frame_durations_ms or [int(1000 / max(1, fps))] * len(
             self.frames
         )
         from PIL import Image
 
-        images = [Image.open(io.BytesIO(frame)).convert("RGB") for frame in self.frames]
+        images = []
+        for frame in self.frames:
+            with Image.open(io.BytesIO(frame)) as opened:
+                images.append(opened.convert("RGB"))
         first, rest = images[0], images[1:]
-        first.save(
-            path,
-            format="GIF",
-            save_all=True,
-            append_images=rest,
-            duration=durations,
-            loop=loop,
-            disposal=2,
-        )
+        stream = io.BytesIO()
+        try:
+            first.save(
+                stream,
+                format="GIF",
+                save_all=True,
+                append_images=rest,
+                duration=durations,
+                loop=loop,
+                disposal=2,
+            )
+            atomic_write_bytes(_as_path(path), stream.getvalue())
+        finally:
+            for image in images:
+                image.close()
 
     @property
     def fps(self) -> float:

@@ -7,7 +7,11 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from glyph_forge.benchmark import benchmark_renderers, synthetic_frame
+from glyph_forge.benchmark import (
+    benchmark_renderers,
+    benchmark_still_pipeline,
+    synthetic_frame,
+)
 from glyph_forge.cli import app
 
 
@@ -32,6 +36,20 @@ def test_single_renderer_benchmark_returns_metrics() -> None:
     assert result.milliseconds > 0
     assert result.frames_per_second > 0
     assert result.output_bytes > 0
+    assert result.scope == "kernel"
+
+
+def test_complete_still_pipeline_has_a_commercial_regression_budget() -> None:
+    result = benchmark_still_pipeline(
+        "eco",
+        modes=["glyph"],
+        iterations=2,
+        warmup=1,
+    )[0]
+
+    assert result.scope == "still-pipeline"
+    assert result.milliseconds < 100
+    assert result.output_bytes > 0
 
 
 def test_benchmark_cli_can_emit_machine_readable_json() -> None:
@@ -54,6 +72,26 @@ def test_benchmark_cli_can_emit_machine_readable_json() -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload[0]["mode"] == "glyph"
+
+
+def test_benchmark_cli_can_measure_the_public_pipeline() -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "benchmark",
+            "--mode",
+            "glyph",
+            "--performance",
+            "eco",
+            "--iterations",
+            "1",
+            "--pipeline",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)[0]["scope"] == "still-pipeline"
 
 
 def test_demo_needs_no_external_file() -> None:

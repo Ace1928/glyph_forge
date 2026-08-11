@@ -16,4 +16,4 @@ recursive-include docs *.md
 recursive-include tools *.py *.spec
 recursive-include src/glyph_forge/resources *.yml
 recursive-include src/glyph_forge/ui *.css *.html *.js *.png *.svg *.webmanifest
-recursive-include tests *.py *.mjs
+recursive-include tests *.py *.mjs *.json

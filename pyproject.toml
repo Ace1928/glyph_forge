@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "glyphforge"
-version = "0.3.1"
+version = "0.4.0"
 description = "Fast, portable image, text, video, and live-media glyph rendering"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -103,6 +103,9 @@ glyph_forge = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-config", "--strict-markers", "--color=yes"]
+filterwarnings = [
+    "ignore:ImageGlyphConverter is deprecated; use RenderRequest and render_image instead:DeprecationWarning",
+]
 markers = [
     "unit: isolated unit tests",
     "integration: multi-component integration tests",

@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from glyph_forge.persistence import AtomicWriteError
 from glyph_forge.services.image_to_glyph import ColorMode, ImageGlyphConverter
 
 
@@ -251,20 +252,16 @@ class TestImageGlyphConverter:
                 content = f.read()
             assert content == test_content
 
-    @mock.patch("builtins.open", new_callable=mock.mock_open)
-    @mock.patch("os.makedirs")
-    def test_save_creates_directory(
-        self, mock_makedirs: mock.MagicMock, mock_open: mock.MagicMock
-    ) -> None:
+    def test_save_creates_directory(self, tmp_path) -> None:
         """📁 Verify directory creation when saving to new path."""
         converter = ImageGlyphConverter()
-        output_path = "/some/new/path/output.txt"
+        output_path = tmp_path / "some" / "new" / "path" / "output.txt"
         test_content = "Test Glyph Art"
 
-        converter._save_to_file(test_content, output_path)
+        converter._save_to_file(test_content, str(output_path))
 
-        mock_makedirs.assert_called_once()
-        mock_open.assert_called_once_with(output_path, "w", encoding="utf-8")
+        assert output_path.read_text(encoding="utf-8") == test_content
+        assert not list(output_path.parent.glob(".*.tmp"))
 
     # ──── Configuration Modification Tests ────────────────────────────────
 
@@ -349,8 +346,11 @@ class TestImageGlyphConverter:
 
     # ──── Error Handling Tests ──────────────────────────────────────────────
 
-    @mock.patch("builtins.open", side_effect=IOError("Simulated IO error"))
-    def test_save_error_handling(self, mock_open: mock.MagicMock) -> None:
+    @mock.patch(
+        "glyph_forge.services.image_to_glyph.atomic_write_text",
+        side_effect=AtomicWriteError("Simulated IO error"),
+    )
+    def test_save_error_handling(self, _writer: mock.MagicMock) -> None:
         """❌ Verify appropriate error propagation on file save failure."""
         converter = ImageGlyphConverter()
 

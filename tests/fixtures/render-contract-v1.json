@@ -1,0 +1,212 @@
+{
+  "contract_version": 1,
+  "cases": [
+    {
+      "name": "neutral-density",
+      "sample": {
+        "width": 4,
+        "height": 2,
+        "rgba": [
+          0, 0, 0, 255, 64, 64, 64, 255, 128, 128, 128, 255, 255, 255, 255, 255,
+          0, 0, 0, 255, 64, 64, 64, 255, 128, 128, 128, 255, 255, 255, 255, 255
+        ]
+      },
+      "request": {
+        "width": 4,
+        "height": 2,
+        "mode": "glyph",
+        "charset": "literal: .#",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "resample": "nearest"
+      },
+      "web": {
+        "columns": 4,
+        "rows": 2,
+        "mode": "glyph",
+        "baseCharset": " .#",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "invert": false
+      },
+      "expected_lines": ["  .#", "  .#"]
+    },
+    {
+      "name": "native-integer-color-luma",
+      "sample": {
+        "width": 3,
+        "height": 1,
+        "rgba": [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255]
+      },
+      "request": {
+        "width": 3,
+        "height": 1,
+        "mode": "glyph",
+        "charset": "literal:0123456789",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "resample": "nearest"
+      },
+      "web": {
+        "columns": 3,
+        "rows": 1,
+        "mode": "glyph",
+        "baseCharset": "0123456789",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "invert": false
+      },
+      "expected_lines": ["251"]
+    },
+    {
+      "name": "braille-bit-order",
+      "sample": {
+        "width": 2,
+        "height": 4,
+        "rgba": [
+          255, 255, 255, 255, 0, 0, 0, 255,
+          0, 0, 0, 255, 255, 255, 255, 255,
+          255, 255, 255, 255, 0, 0, 0, 255,
+          0, 0, 0, 255, 255, 255, 255, 255
+        ]
+      },
+      "request": {
+        "width": 1,
+        "height": 1,
+        "mode": "braille",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "resample": "nearest"
+      },
+      "web": {
+        "columns": 1,
+        "rows": 1,
+        "mode": "braille",
+        "baseCharset": " .#",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "invert": false
+      },
+      "expected_lines": ["⢕"]
+    },
+    {
+      "name": "quadrant-bit-order",
+      "sample": {
+        "width": 2,
+        "height": 2,
+        "rgba": [
+          255, 255, 255, 255, 0, 0, 0, 255,
+          0, 0, 0, 255, 255, 255, 255, 255
+        ]
+      },
+      "request": {
+        "width": 1,
+        "height": 1,
+        "mode": "quadrant",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "resample": "nearest"
+      },
+      "web": {
+        "columns": 1,
+        "rows": 1,
+        "mode": "quadrant",
+        "baseCharset": " .#",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "invert": false
+      },
+      "expected_lines": ["▚"]
+    },
+    {
+      "name": "half-block-cell",
+      "sample": {
+        "width": 1,
+        "height": 2,
+        "rgba": [255, 0, 0, 255, 0, 0, 255, 255]
+      },
+      "request": {
+        "width": 1,
+        "height": 1,
+        "mode": "half-block",
+        "output_format": "truecolor",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "resample": "nearest"
+      },
+      "web": {
+        "columns": 1,
+        "rows": 1,
+        "mode": "half-block",
+        "baseCharset": " .#",
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "invert": false
+      },
+      "expected_lines": ["▀"]
+    },
+    {
+      "name": "sobel-edge-direction-and-weight",
+      "sample": {
+        "width": 3,
+        "height": 3,
+        "rgba": [
+          0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+          0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+          0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255
+        ]
+      },
+      "request": {
+        "width": 3,
+        "height": 3,
+        "mode": "edge",
+        "charset": "literal: .#",
+        "edge_algorithm": "sobel",
+        "edge_threshold": 48,
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "resample": "nearest"
+      },
+      "web": {
+        "columns": 3,
+        "rows": 3,
+        "mode": "edge",
+        "baseCharset": " .#",
+        "edgeThreshold": 48,
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "invert": false
+      },
+      "expected_lines": [" ┃┃", " ┃┃", " ┃┃"]
+    },
+    {
+      "name": "tone-and-truecolor-parity",
+      "sample": {
+        "width": 2,
+        "height": 1,
+        "rgba": [40, 100, 200, 255, 250, 10, 128, 255]
+      },
+      "request": {
+        "width": 2,
+        "height": 1,
+        "mode": "glyph",
+        "output_format": "truecolor",
+        "charset": "literal:0123456789",
+        "brightness": 1.12,
+        "contrast": 1.08,
+        "resample": "nearest"
+      },
+      "web": {
+        "columns": 2,
+        "rows": 1,
+        "mode": "glyph",
+        "baseCharset": "0123456789",
+        "brightness": 1.12,
+        "contrast": 1.08,
+        "invert": false
+      },
+      "expected_lines": ["33"],
+      "expected_rgb": [[37, 110, 230], [255, 1, 143]]
+    }
+  ]
+}

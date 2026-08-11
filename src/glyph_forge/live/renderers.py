@@ -363,6 +363,27 @@ def _binary_pixels(gray: NDArray[np.uint8], config: RenderConfig) -> NDArray[np.
     return np.logical_not(result) if config.invert else result
 
 
+def _dither_glyph_luma(
+    gray: NDArray[np.uint8],
+    config: RenderConfig,
+) -> NDArray[np.uint8]:
+    """Retain legacy Floyd–Steinberg glyph dithering on the reduced frame.
+
+    Dithering is deliberately applied after spatial reduction, so its optional
+    cost is proportional to the requested glyph grid rather than source pixels.
+    Subcell modes continue to use their threshold-aware ordered dither path.
+    """
+
+    if not config.dither:
+        return gray
+    return np.asarray(
+        Image.fromarray(gray, mode="L")
+        .convert("1", dither=Image.Dither.FLOYDSTEINBERG)
+        .convert("L"),
+        dtype=np.uint8,
+    )
+
+
 class FrameRenderer:
     """Reusable dispatcher for vectorized glyph and subcell renderers."""
 
@@ -400,11 +421,7 @@ class FrameRenderer:
         self.mode = normalize_render_mode(config.mode)
         self.color = _normalize_color(config.color)
         self.edge_algorithm = normalize_algorithm(config.edge_algorithm)
-        self.charset = (
-            AlphabetManager.get_alphabet(config.charset)
-            if config.charset in AlphabetManager.list_available_alphabets()
-            else config.charset
-        )
+        self.charset = AlphabetManager.resolve_alphabet(config.charset)
         if not self.charset:
             raise ValueError("charset cannot be empty")
         if config.invert:
@@ -492,7 +509,7 @@ class FrameRenderer:
             self.config.brightness,
             self.config.contrast,
         )
-        gray = _grayscale(resized)
+        gray = _dither_glyph_luma(_grayscale(resized), self.config)
         indices = (gray.astype(np.uint16) * len(self._glyphs) // 256).clip(
             max=len(self._glyphs) - 1
         )
@@ -507,7 +524,7 @@ class FrameRenderer:
             self.config.brightness,
             self.config.contrast,
         )
-        gray = _grayscale(resized)
+        gray = _dither_glyph_luma(_grayscale(resized), self.config)
         indices = (gray.astype(np.uint16) * len(self._glyphs) // 256).clip(
             max=len(self._glyphs) - 1
         )
@@ -663,6 +680,61 @@ def _text_canvas_dimensions(
     return lines, intrinsic_width, intrinsic_height, width, height
 
 
+def _fit_parameters(
+    intrinsic_width: float,
+    intrinsic_height: float,
+    output_width: float,
+    output_height: float,
+    fit: str,
+    alignment: str,
+) -> tuple[float, float, float, float]:
+    fit_mode = fit.casefold()
+    if fit_mode not in {"contain", "cover", "stretch"}:
+        raise ValueError("fit must be contain, cover, or stretch")
+    anchors = {
+        "top-left": (0.0, 0.0),
+        "top": (0.5, 0.0),
+        "top-right": (1.0, 0.0),
+        "left": (0.0, 0.5),
+        "center": (0.5, 0.5),
+        "right": (1.0, 0.5),
+        "bottom-left": (0.0, 1.0),
+        "bottom": (0.5, 1.0),
+        "bottom-right": (1.0, 1.0),
+    }
+    try:
+        anchor_x, anchor_y = anchors[alignment.casefold()]
+    except KeyError as exc:
+        raise ValueError(
+            "alignment must be top-left, top, top-right, left, center, right, "
+            "bottom-left, bottom, or bottom-right"
+        ) from exc
+    if fit_mode == "stretch":
+        return (
+            output_width / intrinsic_width,
+            output_height / intrinsic_height,
+            0.0,
+            0.0,
+        )
+    ratio = min(
+        output_width / intrinsic_width,
+        output_height / intrinsic_height,
+    )
+    if fit_mode == "cover":
+        ratio = max(
+            output_width / intrinsic_width,
+            output_height / intrinsic_height,
+        )
+    rendered_width = intrinsic_width * ratio
+    rendered_height = intrinsic_height * ratio
+    return (
+        ratio,
+        ratio,
+        (output_width - rendered_width) * anchor_x,
+        (output_height - rendered_height) * anchor_y,
+    )
+
+
 def render_text_svg(
     text: str,
     *,
@@ -672,6 +744,8 @@ def render_text_svg(
     font_family: str = "ui-monospace, SFMono-Regular, Consolas, monospace",
     output_width: int | None = None,
     output_height: int | None = None,
+    fit: str = "stretch",
+    alignment: str = "center",
 ) -> str:
     """Render text glyph art as an exact-size, infinitely scalable SVG."""
 
@@ -682,8 +756,14 @@ def render_text_svg(
         output_height,
     )
     line_height = font_size * 1.05
-    scale_x = width / intrinsic_width
-    scale_y = height / intrinsic_height
+    scale_x, scale_y, offset_x, offset_y = _fit_parameters(
+        intrinsic_width,
+        intrinsic_height,
+        width,
+        height,
+        fit,
+        alignment,
+    )
     rows = []
     for index, line in enumerate(lines, start=1):
         sizing = ""
@@ -695,14 +775,20 @@ def render_text_svg(
             f"{html.escape(line)}</text>"
         )
     family = html.escape(font_family, quote=True)
+    safe_background = html.escape(background, quote=True)
+    safe_foreground = html.escape(foreground, quote=True)
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.2f}" '
         f'height="{height:.2f}" viewBox="0 0 {width:.2f} {height:.2f}" '
         'role="img" aria-label="Glyph Forge render">\n'
-        f'<rect width="100%" height="100%" fill="{html.escape(background)}"/>\n'
-        f'<g transform="scale({scale_x:.8f} {scale_y:.8f})" '
-        f'fill="{html.escape(foreground)}" font-family="{family}" '
+        '<defs><clipPath id="glyph-forge-canvas"><rect width="100%" '
+        'height="100%"/></clipPath></defs>\n'
+        f'<rect width="100%" height="100%" fill="{safe_background}"/>\n'
+        f'<g clip-path="url(#glyph-forge-canvas)" '
+        f'transform="translate({offset_x:.8f} {offset_y:.8f}) '
+        f'scale({scale_x:.8f} {scale_y:.8f})" '
+        f'fill="{safe_foreground}" font-family="{family}" '
         f'font-size="{font_size:.2f}" xml:space="preserve">\n'
         + "\n".join(rows)
         + "\n</g>\n</svg>\n"
@@ -738,6 +824,8 @@ def render_text_png(
     font: str | None = None,
     output_width: int | None = None,
     output_height: int | None = None,
+    fit: str = "stretch",
+    alignment: str = "center",
 ) -> Image.Image:
     """Rasterize text glyph art once at an explicit final pixel size."""
 
@@ -793,9 +881,25 @@ def render_text_png(
             font=selected_font,
         )
     requested = (max(1, round(width)), max(1, round(height)))
-    if image.size != requested:
-        image = image.resize(requested, Image.Resampling.LANCZOS)
-    return image
+    scale_x, scale_y, offset_x, offset_y = _fit_parameters(
+        intrinsic_width,
+        intrinsic_height,
+        width,
+        height,
+        fit,
+        alignment,
+    )
+    rendered = (
+        max(1, round(intrinsic_width * scale_x)),
+        max(1, round(intrinsic_height * scale_y)),
+    )
+    if image.size != rendered:
+        image = image.resize(rendered, Image.Resampling.LANCZOS)
+    if image.size == requested and round(offset_x) == 0 and round(offset_y) == 0:
+        return image
+    canvas = Image.new("RGB", requested, ImageColor.getrgb(background))
+    canvas.paste(image, (round(offset_x), round(offset_y)))
+    return canvas
 
 
 __all__ = [

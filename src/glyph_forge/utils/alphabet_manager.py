@@ -1,4 +1,6 @@
 import re
+import threading
+from difflib import get_close_matches
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional, Union
 
@@ -90,6 +92,7 @@ LANGUAGES = {
 
 
 ALPHABET_CATEGORIES: Dict[Union[str, AlphabetCategory], List[str]] = {}
+_ALPHABET_LOCK = threading.RLock()
 
 
 def populate_alphabet_categories(
@@ -115,7 +118,9 @@ def populate_alphabet_categories(
                 ALPHABET_CATEGORIES[cat_key].append(str(data))
 
             # Deduplicate entries
-            ALPHABET_CATEGORIES[cat_key] = list(set(ALPHABET_CATEGORIES[cat_key]))
+            ALPHABET_CATEGORIES[cat_key] = list(
+                dict.fromkeys(ALPHABET_CATEGORIES[cat_key])
+            )
 
 
 # Initialize categorization - call this at module load time
@@ -135,40 +140,80 @@ class AlphabetManager:
         Retrieve a named alphabet, special set, or language;
         default to 'general' if not found.
         """
-        if name in ALPHABETS:
-            return ALPHABETS[name]
-        elif name in SPECIAL_SETS:
-            return SPECIAL_SETS[name]
-        elif name in LANGUAGES:
-            return LANGUAGES[name]
-        return ALPHABETS["general"]
+        with _ALPHABET_LOCK:
+            if name in ALPHABETS:
+                return ALPHABETS[name]
+            if name in SPECIAL_SETS:
+                return SPECIAL_SETS[name]
+            if name in LANGUAGES:
+                return LANGUAGES[name]
+            return ALPHABETS["general"]
+
+    @staticmethod
+    def resolve_alphabet(name_or_characters: str, *, strict_names: bool = False) -> str:
+        """Resolve a preset or explicit ``literal:...`` character sequence.
+
+        Legacy calls remain permissive.  Canonical requests enable
+        ``strict_names`` so a typo such as ``detaled`` is not silently treated
+        as an artistic character set.
+        """
+
+        if not isinstance(name_or_characters, str) or not name_or_characters:
+            raise ValueError("charset cannot be empty")
+        if name_or_characters.startswith("literal:"):
+            literal = name_or_characters.removeprefix("literal:")
+            if not literal:
+                raise ValueError("literal charset cannot be empty")
+            return literal
+        with _ALPHABET_LOCK:
+            for collection in (ALPHABETS, SPECIAL_SETS, LANGUAGES):
+                if name_or_characters in collection:
+                    return collection[name_or_characters]
+            names = [*ALPHABETS, *SPECIAL_SETS, *LANGUAGES]
+        if strict_names and re.fullmatch(r"[a-z][a-z0-9_-]{1,63}", name_or_characters):
+            suggestions = get_close_matches(name_or_characters, names, n=3, cutoff=0.5)
+            detail = f"; did you mean {', '.join(suggestions)}?" if suggestions else ""
+            raise ValueError(
+                f"Unknown character set {name_or_characters!r}{detail}. "
+                "Prefix custom lowercase glyphs with 'literal:'"
+            )
+        return name_or_characters
 
     @staticmethod
     def get_special_set(name: str) -> Optional[str]:
-        return SPECIAL_SETS.get(name)
+        with _ALPHABET_LOCK:
+            return SPECIAL_SETS.get(name)
 
     @staticmethod
     def register_alphabet(
         name: str, charset: str, category: AlphabetCategory = AlphabetCategory.DENSITY
     ) -> None:
-        ALPHABETS[name] = charset
-        if category not in ALPHABET_CATEGORIES:
-            ALPHABET_CATEGORIES[category] = []
-        if name not in ALPHABET_CATEGORIES[category]:
-            ALPHABET_CATEGORIES[category].append(name)
+        if not name or not charset:
+            raise ValueError("Alphabet name and charset cannot be empty")
+        with _ALPHABET_LOCK:
+            ALPHABETS[name] = charset
+            if category not in ALPHABET_CATEGORIES:
+                ALPHABET_CATEGORIES[category] = []
+            if name not in ALPHABET_CATEGORIES[category]:
+                ALPHABET_CATEGORIES[category].append(name)
 
     @staticmethod
     def register_special_set(
         name: str, charset: str, category: AlphabetCategory = AlphabetCategory.SPECIAL
     ) -> None:
-        SPECIAL_SETS[name] = charset
-        if category not in ALPHABET_CATEGORIES:
-            ALPHABET_CATEGORIES[category] = []
-        if name not in ALPHABET_CATEGORIES[category]:
-            ALPHABET_CATEGORIES[category].append(name)
+        if not name or not charset:
+            raise ValueError("Special-set name and charset cannot be empty")
+        with _ALPHABET_LOCK:
+            SPECIAL_SETS[name] = charset
+            if category not in ALPHABET_CATEGORIES:
+                ALPHABET_CATEGORIES[category] = []
+            if name not in ALPHABET_CATEGORIES[category]:
+                ALPHABET_CATEGORIES[category].append(name)
 
     @staticmethod
     def create_density_map(charset: str) -> Dict[int, str]:
+        if not charset:
+            raise ValueError("charset cannot be empty")
         mapping: Dict[int, str] = {}
         length = len(charset)
         for i in range(256):
@@ -180,6 +225,10 @@ class AlphabetManager:
     def create_custom_density_map(
         charset: str, min_value: int = 0, max_value: int = 255, reverse: bool = False
     ) -> Dict[int, str]:
+        if not charset:
+            raise ValueError("charset cannot be empty")
+        if not 0 <= min_value <= max_value <= 255:
+            raise ValueError("Density-map bounds must satisfy 0 <= min <= max <= 255")
         if reverse:
             charset = charset[::-1]
         length = len(charset)
@@ -193,21 +242,27 @@ class AlphabetManager:
 
     @staticmethod
     def list_available_alphabets() -> List[str]:
-        return list(ALPHABETS.keys())
+        """List every named character set accepted by the shared resolver."""
+
+        with _ALPHABET_LOCK:
+            return list(dict.fromkeys((*ALPHABETS, *SPECIAL_SETS, *LANGUAGES)))
 
     @staticmethod
     def list_special_sets() -> List[str]:
-        return list(SPECIAL_SETS.keys())
+        with _ALPHABET_LOCK:
+            return list(SPECIAL_SETS)
 
     @staticmethod
     def list_by_category(category: AlphabetCategory) -> List[str]:
-        return ALPHABET_CATEGORIES.get(category, [])
+        with _ALPHABET_LOCK:
+            return list(ALPHABET_CATEGORIES.get(category, []))
 
     @staticmethod
     def get_category(name: str) -> Optional[AlphabetCategory]:
-        for cat, names in ALPHABET_CATEGORIES.items():
-            if name in names and isinstance(cat, AlphabetCategory):
-                return cat
+        with _ALPHABET_LOCK:
+            for cat, names in ALPHABET_CATEGORIES.items():
+                if name in names and isinstance(cat, AlphabetCategory):
+                    return cat
         return None
 
     @staticmethod

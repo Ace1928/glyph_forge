@@ -1,59 +1,206 @@
-"""
-⚡ Glyph Forge Configuration System ⚡
+"""Versioned, platform-aware, atomic user configuration."""
 
-Quantum-precise configuration management with zero overhead.
-This module provides hyper-optimized access to user and system settings
-with intelligent fallbacks and state persistence.
+from __future__ import annotations
 
-Key features:
-- Layered configuration hierarchy (system → user → runtime)
-- Zero-latency access patterns
-- Atomic setting operations
-- Self-healing state management
-- Deterministic configuration resolution
-"""
-
+import copy
 import json
 import logging
+import math
 import os
+import sys
 import threading
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
+from ..persistence import AtomicWriteError, atomic_write_bytes
 from ..visual_defaults import DEFAULT_BRIGHTNESS, DEFAULT_CONTRAST
 
 logger = logging.getLogger(__name__)
 
-# Type definitions for configuration values
-ConfigValue = Union[str, int, float, bool, List[str], Dict[str, Any]]
+CONFIG_SCHEMA_VERSION = 1
+ConfigValue = Union[None, str, int, float, bool, List[str], Dict[str, Any]]
 ConfigStore = Dict[str, Dict[str, ConfigValue]]
 
 
-class ConfigScope(Enum):
-    """Configuration scopes with precise access semantics."""
+class ConfigError(Exception):
+    """Base class for configuration failures."""
 
-    SYSTEM = "system"  # System-wide, read-only default settings
-    USER = "user"  # User-specific persistent settings
-    RUNTIME = "runtime"  # Session-only ephemeral settings
+
+class ConfigValidationError(ConfigError, ValueError):
+    """A configuration value does not satisfy its declared contract."""
+
+
+class ConfigPersistenceError(ConfigError, OSError):
+    """A valid configuration update could not be persisted safely."""
+
+
+class ConfigScope(str, Enum):
+    """Storage lifetime for a setting update."""
+
+    SYSTEM = "system"
+    USER = "user"
+    RUNTIME = "runtime"
+
+
+def user_config_directory() -> Path:
+    """Return the native per-user configuration directory without creating it."""
+
+    explicit = os.environ.get("GLYPH_FORGE_CONFIG_HOME")
+    if explicit:
+        return Path(explicit).expanduser()
+    if os.name == "nt":
+        root = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+        return root / "GlyphForge"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Glyph Forge"
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    root = Path(xdg).expanduser() if xdg else Path.home() / ".config"
+    return root / "glyph_forge"
+
+
+def default_user_config_path() -> Path:
+    """Return the canonical versioned settings file location."""
+
+    explicit = os.environ.get("GLYPH_FORGE_CONFIG_FILE")
+    if explicit:
+        return Path(explicit).expanduser()
+    return user_config_directory() / "user_config.json"
+
+
+def _legacy_user_config_path() -> Path | None:
+    """Return the pre-0.4 user settings path when it differs from canonical."""
+
+    if os.name == "nt":
+        root = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+        return root / "GLYPH_Forge" / "user_config.json"
+    if sys.platform == "darwin":
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        root = Path(xdg).expanduser() if xdg else Path.home() / ".config"
+        return root / "glyph_forge" / "user_config.json"
+    return None
+
+
+def _system_config_path() -> Path:
+    system = Path("/etc/glyph_forge/system_config.json")
+    if system.is_file():
+        return system
+    return Path(__file__).with_name("system_config.json")
+
+
+def _json_compatible(value: Any) -> bool:
+    if value is None or isinstance(value, (str, bool, int)):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, list):
+        return all(_json_compatible(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(key, str) and _json_compatible(item)
+            for key, item in value.items()
+        )
+    return False
+
+
+_INTEGER_RANGES: dict[tuple[str, str], tuple[int, int]] = {
+    ("banner", "default_width"): (1, 4096),
+    ("banner", "cache_size"): (0, 100_000),
+    ("banner", "cache_ttl"): (0, 31_536_000),
+    ("image", "default_width"): (1, 4096),
+    ("image", "max_width"): (1, 4096),
+    ("image", "max_threads"): (1, 256),
+    ("performance", "optimization_level"): (1, 5),
+}
+_FLOAT_RANGES: dict[tuple[str, str], tuple[float, float]] = {
+    ("image", "brightness"): (0.0, 2.0),
+    ("image", "contrast"): (0.0, 2.0),
+}
+_BOOLEAN_FIELDS = {
+    ("banner", "cache_enabled"),
+    ("banner", "unicode_enabled"),
+    ("image", "dithering"),
+    ("image", "parallel_processing"),
+    ("io", "auto_detect_terminal"),
+    ("io", "color_output"),
+    ("io", "backup_files"),
+    ("performance", "cache_enabled"),
+    ("performance", "lazy_loading"),
+    ("performance", "debug_mode"),
+}
+_STRING_FIELDS = {
+    ("banner", "default_font"),
+    ("banner", "default_style"),
+    ("image", "default_charset"),
+    ("io", "output_format"),
+    ("io", "temp_directory"),
+}
+
+
+def _validated_integer(
+    section: str,
+    key: str,
+    value: Any,
+    bounds: tuple[int, int],
+) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigValidationError(f"{section}.{key} must be an integer")
+    minimum, maximum = bounds
+    if not minimum <= value <= maximum:
+        raise ConfigValidationError(
+            f"{section}.{key} must be between {minimum} and {maximum}"
+        )
+    return value
+
+
+def _validated_float(
+    section: str,
+    key: str,
+    value: Any,
+    bounds: tuple[float, float],
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigValidationError(f"{section}.{key} must be a number")
+    minimum, maximum = bounds
+    numeric = float(value)
+    if not math.isfinite(numeric) or not minimum <= numeric <= maximum:
+        raise ConfigValidationError(
+            f"{section}.{key} must be between {minimum} and {maximum}"
+        )
+    return numeric
+
+
+def _validated_known_field(
+    section: str,
+    key: str,
+    value: Any,
+) -> Any:
+    field = (section, key)
+    if field in _INTEGER_RANGES:
+        return _validated_integer(section, key, value, _INTEGER_RANGES[field])
+    if field in _FLOAT_RANGES:
+        return _validated_float(section, key, value, _FLOAT_RANGES[field])
+    if field in _BOOLEAN_FIELDS and not isinstance(value, bool):
+        raise ConfigValidationError(f"{section}.{key} must be true or false")
+    if field in _STRING_FIELDS and not isinstance(value, str):
+        raise ConfigValidationError(f"{section}.{key} must be a string")
+    return value
+
+
+def _validate_value(section: str, key: str, value: Any) -> ConfigValue:
+    if not section or not key:
+        raise ConfigValidationError("Configuration section and key cannot be empty")
+    value = _validated_known_field(section, key, value)
+    if not _json_compatible(value):
+        raise ConfigValidationError(
+            f"{section}.{key} must contain only finite JSON-compatible values"
+        )
+    return cast(ConfigValue, value)
 
 
 class ConfigManager:
-    """
-    Eidosian configuration manager with zero-compromise precision.
+    """Thread-safe layered settings with schema migration and atomic writes."""
 
-    Manages layered configuration with surgical access patterns
-    and atomic state transitions. Configuration resolves through
-    cascading layers with perfect determinism.
-
-    Attributes:
-        config (ConfigStore): Primary configuration state
-        _lock (threading.RLock): Thread synchronization mechanism
-        _config_paths (Dict[ConfigScope, Path]): Configuration file paths
-        _dirty_scopes (Set[ConfigScope]): Scopes requiring persistence
-    """
-
-    # Default configuration values - core system baseline
     DEFAULT_CONFIG: ConfigStore = {
         "banner": {
             "default_font": "slant",
@@ -61,7 +208,7 @@ class ConfigManager:
             "default_style": "minimal",
             "cache_enabled": True,
             "cache_size": 100,
-            "cache_ttl": 3600,  # seconds
+            "cache_ttl": 3600,
             "unicode_enabled": True,
         },
         "image": {
@@ -82,270 +229,252 @@ class ConfigManager:
             "temp_directory": "",
         },
         "performance": {
-            "optimization_level": 3,  # 1-5 scale
+            "optimization_level": 3,
             "cache_enabled": True,
             "lazy_loading": True,
             "debug_mode": False,
         },
     }
 
-    def __init__(self) -> None:
-        """Initialize configuration manager with precise state hierarchy."""
-        self.config: ConfigStore = {}
+    def __init__(
+        self,
+        *,
+        user_path: Path | None = None,
+        system_path: Path | None = None,
+    ) -> None:
         self._lock = threading.RLock()
+        self._legacy_discovery_enabled = user_path is None and not any(
+            os.environ.get(name)
+            for name in ("GLYPH_FORGE_CONFIG_FILE", "GLYPH_FORGE_CONFIG_HOME")
+        )
+        self._config_paths: dict[ConfigScope, Path | None] = {
+            ConfigScope.SYSTEM: system_path or _system_config_path(),
+            ConfigScope.USER: user_path or default_user_config_path(),
+            ConfigScope.RUNTIME: None,
+        }
+        self._system_config = self._read_config(
+            self._config_paths[ConfigScope.SYSTEM],
+            label="system",
+        )
+        self._user_config = self._read_config(
+            self._user_read_path(),
+            label="user",
+        )
+        self._runtime_config: ConfigStore = {}
         self._dirty_scopes: Set[ConfigScope] = set()
+        self.config: ConfigStore = {}
+        self._rebuild()
 
-        # Determine configuration paths with system-appropriate locations
-        self._config_paths: Dict[ConfigScope, Optional[Path]] = self._initialize_paths()
+    @property
+    def user_path(self) -> Path:
+        path = self._config_paths[ConfigScope.USER]
+        assert path is not None
+        return path
 
-        # Load configuration layers with precise fallback cascade
-        self._load_system_defaults()
-        self._load_user_config()
-
-        logger.debug("ConfigManager initialized with %d sections", len(self.config))
-
-    def _initialize_paths(self) -> Dict[ConfigScope, Optional[Path]]:
-        """Initialize configuration paths with system-aware locations."""
-        config_paths: Dict[ConfigScope, Optional[Path]] = {}
-
-        # System config path
-        system_config_dir = Path("/etc/glyph_forge")
-        if not system_config_dir.exists():
-            # Fallback to package directory
-            package_dir = Path(__file__).parent.parent
-            system_config_dir = package_dir / "config"
-        config_paths[ConfigScope.SYSTEM] = system_config_dir / "system_config.json"
-
-        # User config path - platform aware
-        if os.name == "nt":  # Windows
-            appdata = Path(
-                os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")
+    def _user_read_path(self) -> Path:
+        canonical = self.user_path
+        if canonical.is_file() or not self._legacy_discovery_enabled:
+            return canonical
+        legacy = _legacy_user_config_path()
+        if legacy is not None and legacy != canonical and legacy.is_file():
+            logger.info(
+                "Reading legacy user config %s; the next update will migrate it to %s",
+                legacy,
+                canonical,
             )
-            preferred = appdata / "GlyphForge"
-            legacy = appdata / "GLYPH_Forge"
-            user_config_dir = (
-                legacy if legacy.exists() and not preferred.exists() else preferred
-            )
-        else:  # Unix/Linux/Mac
-            xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "")
-            if xdg_config_home:
-                user_config_dir = Path(xdg_config_home) / "glyph_forge"
+            return legacy
+        return canonical
+
+    def _read_config(self, path: Path | None, *, label: str) -> ConfigStore:
+        if path is None or not path.is_file():
+            return {}
+        try:
+            with path.open("r", encoding="utf-8") as stream:
+                payload = json.load(stream)
+            if not isinstance(payload, dict):
+                raise ConfigValidationError("root must be an object")
+            if "schema_version" in payload:
+                version = payload.get("schema_version")
+                if version != CONFIG_SCHEMA_VERSION:
+                    raise ConfigValidationError(
+                        f"unsupported schema version {version!r}"
+                    )
+                values = payload.get("settings", {})
             else:
-                user_config_dir = Path.home() / ".config" / "glyph_forge"
+                # Version 0 files stored sections directly. Reading them is the
+                # migration; the next user write persists the versioned shape.
+                values = payload
+            if not isinstance(values, dict):
+                raise ConfigValidationError("settings must be an object")
+            return self._validated_store(values, label=label)
+        except (OSError, json.JSONDecodeError, ConfigValidationError) as exc:
+            logger.warning("Ignoring invalid %s config %s: %s", label, path, exc)
+            return {}
 
-        config_paths[ConfigScope.USER] = user_config_dir / "user_config.json"
-
-        # Runtime config exists only in memory
-        config_paths[ConfigScope.RUNTIME] = None
-
-        return config_paths
-
-    def _load_system_defaults(self) -> None:
-        """Load system default configuration with fallback hierarchy."""
-        with self._lock:
-            # Start with hardcoded defaults
-            self.config = self._deep_copy_config(self.DEFAULT_CONFIG)
-
-            # Try to load system configuration file if it exists
-            system_path = self._config_paths[ConfigScope.SYSTEM]
-            if system_path and system_path.exists():
-                try:
-                    with open(system_path, "r") as f:
-                        system_config = json.load(f)
-
-                    # Merge system config with defaults
-                    self._merge_configs(self.config, system_config)
-                    logger.debug("Loaded system configuration from %s", system_path)
-                except Exception as e:
-                    logger.warning("Failed to load system config: %s", str(e))
-
-    def _load_user_config(self) -> None:
-        """Load user configuration with atomic state update."""
-        with self._lock:
-            user_path = self._config_paths[ConfigScope.USER]
-            if user_path and user_path.exists():
-                try:
-                    with open(user_path, "r") as f:
-                        user_config = json.load(f)
-
-                    # Merge user config with current state
-                    self._merge_configs(self.config, user_config)
-                    logger.debug("Loaded user configuration from %s", user_path)
-                except Exception as e:
-                    logger.warning("Failed to load user config: %s", str(e))
-
-    def _merge_configs(self, base: ConfigStore, overlay: Dict[str, Any]) -> None:
-        """Merge configuration dictionaries with precise overlay semantics."""
-        for section, values in overlay.items():
-            if section not in base:
-                base[section] = {}
-
-            if isinstance(values, dict):
-                for key, value in values.items():
-                    base[section][key] = value
-
-    def _deep_copy_config(self, config: ConfigStore) -> ConfigStore:
-        """Create a deep copy of configuration with zero shared references."""
+    def _validated_store(self, values: dict[str, Any], *, label: str) -> ConfigStore:
         result: ConfigStore = {}
-        for section, values in config.items():
-            result[section] = {k: v for k, v in values.items()}
+        for section, entries in values.items():
+            if not isinstance(section, str) or not isinstance(entries, dict):
+                logger.warning("Ignoring invalid %s config section %r", label, section)
+                continue
+            for key, value in entries.items():
+                if not isinstance(key, str):
+                    logger.warning("Ignoring non-string key in %s.%s", label, section)
+                    continue
+                try:
+                    selected = _validate_value(section, key, value)
+                except ConfigValidationError as exc:
+                    logger.warning("Ignoring invalid %s setting: %s", label, exc)
+                    continue
+                result.setdefault(section, {})[key] = copy.deepcopy(selected)
         return result
 
+    @staticmethod
+    def _merge(base: ConfigStore, overlay: ConfigStore) -> None:
+        for section, values in overlay.items():
+            base.setdefault(section, {}).update(copy.deepcopy(values))
+
+    def _rebuild(self) -> None:
+        self.config = copy.deepcopy(self.DEFAULT_CONFIG)
+        self._merge(self.config, self._system_config)
+        self._merge(self.config, self._user_config)
+        self._merge(self.config, self._runtime_config)
+
     def get(self, section: str, key: str, default: Any = None) -> Any:
-        """
-        Get configuration value with deterministic resolution.
-
-        Args:
-            section: Configuration section name
-            key: Setting key within section
-            default: Default value if not found
-
-        Returns:
-            Configuration value or default
-        """
         with self._lock:
-            try:
-                return self.config[section][key]
-            except KeyError:
-                return default
+            return copy.deepcopy(self.config.get(section, {}).get(key, default))
 
     def set(
-        self, section: str, key: str, value: Any, scope: ConfigScope = ConfigScope.USER
+        self,
+        section: str,
+        key: str,
+        value: Any,
+        scope: ConfigScope = ConfigScope.USER,
     ) -> None:
-        """
-        Set configuration value with atomic state update.
-
-        Args:
-            section: Configuration section name
-            key: Setting key within section
-            value: Value to set
-            scope: Configuration scope (default: USER)
-        """
+        selected_scope = ConfigScope(scope)
+        if selected_scope is ConfigScope.SYSTEM:
+            raise ConfigValidationError("System configuration is read-only")
+        selected = _validate_value(section, key, value)
         with self._lock:
-            # Create section if it doesn't exist
-            if section not in self.config:
-                self.config[section] = {}
+            layer = (
+                self._runtime_config
+                if selected_scope is ConfigScope.RUNTIME
+                else self._user_config
+            )
+            if selected_scope is ConfigScope.RUNTIME:
+                layer.setdefault(section, {})[key] = copy.deepcopy(selected)
+                self._rebuild()
+                return
+            previous_user = copy.deepcopy(self._user_config)
+            previous_dirty = set(self._dirty_scopes)
+            layer.setdefault(section, {})[key] = copy.deepcopy(selected)
+            self._rebuild()
+            self._dirty_scopes.add(ConfigScope.USER)
+            try:
+                self._save_user_config()
+            except ConfigPersistenceError:
+                self._user_config = previous_user
+                self._dirty_scopes = previous_dirty
+                self._rebuild()
+                raise
 
-            # Set value and mark scope as dirty for persistence
-            self.config[section][key] = value
-
-            # Mark for saving if in persistent scope
-            if scope != ConfigScope.RUNTIME:
-                self._dirty_scopes.add(scope)
-                self._save_config(scope)
-
-            logger.debug("Set config [%s.%s] = %s", section, key, value)
-
-    def _save_config(self, scope: ConfigScope) -> None:
-        """Save configuration to persistent storage with atomic file write."""
-        if scope == ConfigScope.RUNTIME:
-            return  # Runtime config is not persisted
-
-        config_path = self._config_paths.get(scope)
-        if not config_path:
-            return
-
-        # Extract configuration for this scope
-        config_to_save: ConfigStore = {}
-        for section, values in self.config.items():
-            config_to_save[section] = {}
-            for key, value in values.items():
-                # Skip None values and complex objects
-                if value is not None and isinstance(
-                    value, (str, int, float, bool, list, dict)
-                ):
-                    config_to_save[section][key] = value
-
-        # Create parent directory if needed
-        os.makedirs(config_path.parent, exist_ok=True)
-
-        # Write with atomic replace strategy
-        temp_path = config_path.with_suffix(".tmp")
+    def _save_user_config(self) -> None:
+        destination = self.user_path
+        document = {
+            "schema_version": CONFIG_SCHEMA_VERSION,
+            "settings": self._user_config,
+        }
+        encoded = (
+            json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        ).encode("utf-8")
         try:
-            with open(temp_path, "w") as f:
-                json.dump(config_to_save, f, indent=2)
-
-            # Atomic replacement (works on both POSIX and Windows)
-            if os.path.exists(config_path):
-                os.replace(temp_path, config_path)
-            else:
-                os.rename(temp_path, config_path)
-
-            # Remove from dirty scopes
-            self._dirty_scopes.discard(scope)
-            logger.debug("Saved configuration to %s", config_path)
-        except Exception as e:
-            logger.error("Failed to save configuration: %s", str(e))
-            # Clean up temp file
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
+            atomic_write_bytes(destination, encoded, permissions=0o600)
+            self._dirty_scopes.discard(ConfigScope.USER)
+        except AtomicWriteError as exc:
+            raise ConfigPersistenceError(
+                f"Could not save configuration to {destination}: {exc}"
+            ) from exc
 
     def reset_to_defaults(self, section: Optional[str] = None) -> None:
-        """
-        Reset configuration to system defaults.
-
-        Args:
-            section: Section to reset (or all if None)
-        """
         with self._lock:
-            if section:
-                # Reset specific section
-                if section in self.DEFAULT_CONFIG:
-                    self.config[section] = self._deep_copy_config(
-                        {section: self.DEFAULT_CONFIG[section]}
-                    )[section]
+            previous_user = copy.deepcopy(self._user_config)
+            previous_runtime = copy.deepcopy(self._runtime_config)
+            previous_dirty = set(self._dirty_scopes)
+            if section is None:
+                self._user_config.clear()
+                self._runtime_config.clear()
             else:
-                # Reset all sections
-                self.config = self._deep_copy_config(self.DEFAULT_CONFIG)
+                self._user_config.pop(section, None)
+                self._runtime_config.pop(section, None)
+            self._rebuild()
+            self._dirty_scopes.add(ConfigScope.USER)
+            try:
+                self._save_user_config()
+            except ConfigPersistenceError:
+                self._user_config = previous_user
+                self._runtime_config = previous_runtime
+                self._dirty_scopes = previous_dirty
+                self._rebuild()
+                raise
 
-            # Mark all persistent scopes as dirty
-            self._dirty_scopes.update([ConfigScope.USER, ConfigScope.SYSTEM])
-            self._save_config(ConfigScope.USER)
+    def reload(self) -> None:
+        """Reload persistent layers while retaining session-only overrides."""
 
-            logger.info(
-                "Reset configuration to defaults%s",
-                f" for section '{section}'" if section else "",
+        with self._lock:
+            self._system_config = self._read_config(
+                self._config_paths[ConfigScope.SYSTEM],
+                label="system",
             )
+            self._user_config = self._read_config(
+                self._user_read_path(),
+                label="user",
+            )
+            self._rebuild()
 
     def get_sections(self) -> List[str]:
-        """Get list of all configuration sections."""
         with self._lock:
-            return list(self.config.keys())
+            return list(self.config)
 
     def get_section(self, section: str) -> Dict[str, Any]:
-        """
-        Get all settings in a section.
-
-        Args:
-            section: Configuration section name
-
-        Returns:
-            Dictionary of settings or empty dict if section not found
-        """
         with self._lock:
-            return self.config.get(section, {}).copy()
+            return copy.deepcopy(self.config.get(section, {}))
+
+    def snapshot(self) -> ConfigStore:
+        """Return an isolated view suitable for diagnostics or export."""
+
+        with self._lock:
+            return copy.deepcopy(self.config)
 
 
-# Singleton configuration manager
 _config_instance: Optional[ConfigManager] = None
 _config_lock = threading.Lock()
 
 
 def get_config() -> ConfigManager:
-    """
-    Get the global configuration manager instance with zero redundant initialization.
+    """Return the process-wide configuration manager."""
 
-    Returns:
-        ConfigManager singleton instance
-    """
     global _config_instance
-
     if _config_instance is None:
         with _config_lock:
             if _config_instance is None:
                 _config_instance = ConfigManager()
-
     return _config_instance
+
+
+get_settings = get_config
+
+
+__all__ = [
+    "CONFIG_SCHEMA_VERSION",
+    "ConfigError",
+    "ConfigManager",
+    "ConfigPersistenceError",
+    "ConfigScope",
+    "ConfigStore",
+    "ConfigValidationError",
+    "ConfigValue",
+    "default_user_config_path",
+    "get_config",
+    "get_settings",
+    "user_config_directory",
+]

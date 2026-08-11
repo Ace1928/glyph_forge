@@ -96,7 +96,7 @@ class TestAPIWorkflows:
         api = get_api()
 
         # Convert image
-        result = api.image_to_Glyph(
+        result = api.image_to_glyph(
             test_assets["gradient"],
             width=50,
             charset="blocks",
@@ -143,7 +143,7 @@ class TestAPIWorkflows:
         api = get_api()
 
         # Convert with color
-        result = api.image_to_Glyph(
+        result = api.image_to_glyph(
             test_assets["rgb"],
             width=30,
             color_mode="ansi",
@@ -158,7 +158,7 @@ class TestAPIWorkflows:
         api = get_api()
 
         # Convert with HTML color
-        result = api.image_to_Glyph(
+        result = api.image_to_glyph(
             test_assets["rgb"],
             width=30,
             color_mode="html",
@@ -489,7 +489,7 @@ class TestEndToEndWorkflows:
         api = get_api()
 
         # Convert to HTML
-        html_result = api.image_to_Glyph(
+        html_result = api.image_to_glyph(
             test_assets["rgb"],
             width=30,
             color_mode="html",
@@ -558,7 +558,7 @@ class TestEndToEndWorkflows:
 
         results = []
         for img_path in images:
-            result = api.image_to_Glyph(img_path, width=20)
+            result = api.image_to_glyph(img_path, width=20)
             results.append(result)
 
         assert len(results) == 2

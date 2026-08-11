@@ -13,6 +13,84 @@ the project uses semantic versioning.
   versioned GitHub wheels and portable archives remain the canonical release
   path until then
 
+## [0.4.0] - 2026-08-11
+
+### Added
+
+- Public render contract v1: immutable, JSON-serializable `RenderRequest`,
+  structured `RenderArtifact`, phase-level `RenderMetrics`, normalized format,
+  fit and alignment enums, and typed contract/source/render/export errors
+- One canonical `render_image` path for filesystem, Pillow, and NumPy sources,
+  including EXIF orientation, transparent-image compositing, bounded decoding,
+  safe HTML, ANSI256/truecolor, real-text SVG, and PNG encoding
+- User-friendly `glyph-forge image --size WIDTHxHEIGHT`, independent cell and
+  pixel geometry, contain/cover/stretch behavior, nine anchors, and exact
+  geometry reporting in CLI and TUI saves
+- All five still modes in the TUI, with tone controls, exact graphical export,
+  HTML/ANSI handling, responsive scrollable forms, and background rendering
+- Schema-versioned, layered, platform-native configuration with read-only
+  system defaults, atomic user persistence, session overrides, legacy JSON
+  migration, validation, thread safety, and rollback after failed writes
+- Shared Python/JavaScript golden fixtures covering density mapping, integer
+  RGB luma, tone rounding, truecolor, Braille and quadrant bit order,
+  half-block cells, and Sobel edge direction/weight
+- Full public still-pipeline benchmarking through `benchmark --pipeline`, with
+  an eco-profile latency regression budget alongside kernel measurements
+- Rendering-contract and 0.4 migration guides, including the compatibility
+  schedule through 1.0
+
+### Changed
+
+- CLI, TUI, `GlyphForgeAPI`, the public helper, legacy still adapter, and the
+  frame-list video compatibility service now delegate to the maintained
+  renderer instead of selecting parallel still implementations
+- Named density, special, and language character sets use one thread-safe,
+  deterministic resolver; likely preset typos now include suggestions and
+  custom lowercase-only sets use the explicit `literal:` prefix
+- `.html` and `.ansi` destinations select their format by suffix, while PNG
+  and SVG color comes from explicit foreground/background controls
+- Browser Canvas exports use native-compatible tone rounding, integer luma,
+  and Sobel direction/weight; the installed Studio shell advances to cache v3
+- Text, artifacts, API saves, configuration/profile data, GlyphCode restores,
+  demo outputs, and compatibility saves share one crash-safe, fsynced atomic
+  persistence primitive; pre-0.4 Windows/macOS configuration and profile paths
+  migrate without deleting the legacy recovery copy
+- The image CLI was split into focused request/catalog adapters and now stays
+  below the repository's strict complexity ceiling
+
+### Deprecated
+
+- `ImageGlyphConverter` in favor of `RenderRequest` plus `render_image`
+- `GlyphForgeAPI.image_to_Glyph` in favor of `image_to_glyph`
+- Top-level `get_config(profile)` in favor of `get_profile_config(profile)`;
+  persistent settings use `get_settings()`
+- These compatibility APIs remain tested throughout 0.x and are scheduled for
+  removal at 1.0
+
+### Fixed
+
+- Malformed serialized request types now produce stable contract errors rather
+  than leaking `TypeError` or `AttributeError`
+- Failed configuration replacements restore both persistent and runtime state,
+  so memory cannot claim a value that was not committed to disk
+- Compact TUI terminals can reach every image, text, and live control through
+  a real scroll container
+- HTML output inferred from `.html` no longer silently writes plain text when
+  the color flag is omitted
+
+### Performance
+
+- The canonical path downsamples before cached tone mapping and uses the
+  maintained vectorized frame kernels for every still mode
+- Browser/native edge conformance uses a reduced-grid Sobel pass, keeping work
+  proportional to visible glyphs while aligning exported text semantics
+
+### Security
+
+- Still sources are bounded to 100 megapixels, request dimensions and numeric
+  types are validated, HTML content/colors are escaped, and partial output
+  files are never published
+
 ## [0.3.1] - 2026-08-11
 
 ### Added

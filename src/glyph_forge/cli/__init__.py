@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 import typer
 from rich.columns import Columns
@@ -18,6 +17,7 @@ from rich.table import Table
 from rich.text import Text
 
 from ..config.settings import ConfigManager, get_config
+from ..persistence import atomic_write_text
 from ..runtime import (
     configure_utf8_stdio,
     detect_runtime_profile,
@@ -30,9 +30,28 @@ from .live import app as live_app
 from .live import camera_command, screen_command, source_command
 from .plugins import app as plugins_app
 
+if TYPE_CHECKING:
+    from .image import CharsetAction
+
 logger = logging.getLogger(__name__)
 console = Console()
 error_console = Console(stderr=True)
+
+
+def _display_charset_action(action: CharsetAction) -> None:
+    """Present a resolved list or preview without complicating the command path."""
+
+    if action.entries:
+        table = Table(title="Character sets")
+        table.add_column("Name", style="bold cyan")
+        table.add_column("Glyphs")
+        for name, glyphs in action.entries:
+            sample_glyphs = glyphs[:48] + ("…" if len(glyphs) > 48 else "")
+            table.add_row(name, Text(sample_glyphs))
+        console.print(table)
+    elif action.preview is not None:
+        typer.echo(action.preview)
+
 
 app = typer.Typer(
     name="glyph-forge",
@@ -142,8 +161,7 @@ def link_decode_command(
         assert banner is not None
         typer.echo(banner)
         if output is not None:
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(banner + "\n", encoding="utf-8")
+            atomic_write_text(output, banner + "\n")
             error_console.print(f"[green]Saved[/green] {output}")
         return
     if decoded.image is not None:
@@ -308,6 +326,11 @@ def image_command(
         max=8192,
         help="Exact PNG/SVG height in pixels, independent from glyph rows.",
     ),
+    size: Optional[str] = typer.Option(
+        None,
+        "--size",
+        help="Exact PNG/SVG pixels as WIDTHxHEIGHT, for example 1920x1080.",
+    ),
     foreground: str = typer.Option(
         "#e8fff7",
         "--foreground",
@@ -317,6 +340,16 @@ def image_command(
         "#07110f",
         "--background",
         help="PNG/SVG canvas colour (CSS hex/name).",
+    ),
+    fit: str = typer.Option(
+        "contain",
+        "--fit-mode",
+        help="Graphical sizing: contain, cover, or stretch.",
+    ),
+    alignment: str = typer.Option(
+        "center",
+        "--align",
+        help="Graphical anchor: center, top-left, bottom-right, and related positions.",
     ),
     charset: str = typer.Option(
         "general",
@@ -330,7 +363,11 @@ def image_command(
         "-s",
         help="Style preset to apply to the rendered art.",
     ),
-    color: str = typer.Option("none", "--color", help="none, ansi, or html"),
+    color: str = typer.Option(
+        "none",
+        "--color",
+        help="none, ansi/truecolor, ansi256, or html",
+    ),
     render_mode: str = typer.Option(
         "glyph",
         "--mode",
@@ -414,208 +451,105 @@ def image_command(
 ) -> None:
     """Convert an image with sensible adaptive defaults and an instant preview."""
 
-    from ..live.renderers import RenderMode, normalize_render_mode
-    from ..plugins import PluginError
-    from ..services.image_to_glyph import ImageGlyphConverter
-    from ..utils.alphabet_manager import AlphabetManager
+    from ..contracts import GlyphForgeRenderError
+    from .image import (
+        ImageCommandError,
+        ImageCommandOptions,
+        execute_image_command,
+        preview_payload,
+        resolve_charset_action,
+    )
 
-    if list_charsets:
-        table = Table(title="Character sets")
-        table.add_column("Name", style="bold cyan")
-        table.add_column("Glyphs")
-        for name in sorted(AlphabetManager.list_available_alphabets()):
-            glyphs = AlphabetManager.get_alphabet(name)
-            table.add_row(name, glyphs[:48] + ("…" if len(glyphs) > 48 else ""))
-        console.print(table)
-        return
-    if preview_charset is not None:
-        if preview_charset not in AlphabetManager.list_available_alphabets():
-            raise typer.BadParameter(
-                f"Unknown character set {preview_charset!r}",
-                param_hint="--preview-charset",
-            )
-        glyphs = AlphabetManager.get_alphabet(preview_charset)
-        console.print(f"[bold cyan]{preview_charset}[/bold cyan]\n{glyphs}")
-        if sample is not None:
-            typer.echo(
-                ImageGlyphConverter(
-                    charset=preview_charset,
-                    width=width or 80,
-                    height=height,
-                    auto_scale=fit_terminal,
-                ).convert(str(sample))
-            )
-        return
-    if sample is not None:
-        raise typer.BadParameter(
-            "--sample requires --preview-charset", param_hint="--sample"
+    sample_options = (
+        ImageCommandOptions(
+            source=sample,
+            output=None,
+            width=width or 80,
+            height=height,
+            size=None,
+            output_width=None,
+            output_height=None,
+            fit="contain",
+            alignment="center",
+            foreground=foreground,
+            background=background,
+            charset=preview_charset or "general",
+            style=None,
+            color="none",
+            mode="glyph",
+            edge_algorithm=edge_algorithm,
+            edge_threshold=edge_threshold,
+            aspect=aspect,
+            invert=invert,
+            brightness=brightness,
+            contrast=contrast,
+            optimize=optimize,
+            dithering=dithering,
+            fit_terminal=fit_terminal,
+            performance=performance,
         )
+        if sample is not None
+        else None
+    )
+    try:
+        charset_action = resolve_charset_action(
+            list_requested=list_charsets,
+            preview_name=preview_charset,
+            sample_options=sample_options,
+        )
+    except (GlyphForgeRenderError, ImageCommandError) as exc:
+        hint = exc.param_hint if isinstance(exc, ImageCommandError) else "--sample"
+        raise typer.BadParameter(str(exc), param_hint=hint) from exc
+    if charset_action is not None:
+        _display_charset_action(charset_action)
+        return
     if source is None:
         raise typer.BadParameter(
             "An image path is required unless listing or previewing character sets",
             param_hint="source",
         )
 
-    color_mode = color.casefold()
-    if color_mode not in {"none", "ansi", "html"}:
-        raise typer.BadParameter("Choose none, ansi, or html", param_hint="--color")
-    graphical_output = output is not None and output.suffix.casefold() in {
-        ".png",
-        ".svg",
-    }
-    if (output_width is not None or output_height is not None) and not graphical_output:
-        raise typer.BadParameter(
-            "--output-width and --output-height require a .png or .svg --output",
-            param_hint="--output",
-        )
-    if graphical_output and color_mode != "none":
-        raise typer.BadParameter(
-            "PNG/SVG exports use --foreground and --background; choose --color none",
-            param_hint="--color",
-        )
+    options = ImageCommandOptions(
+        source=source,
+        output=output,
+        width=width,
+        height=height,
+        size=size,
+        output_width=output_width,
+        output_height=output_height,
+        fit=fit,
+        alignment=alignment,
+        foreground=foreground,
+        background=background,
+        charset=charset,
+        style=style,
+        color=color,
+        mode=render_mode,
+        edge_algorithm=edge_algorithm,
+        edge_threshold=edge_threshold,
+        aspect=aspect,
+        invert=invert,
+        brightness=brightness,
+        contrast=contrast,
+        optimize=optimize,
+        dithering=dithering,
+        fit_terminal=fit_terminal,
+        performance=performance,
+    )
     try:
-        selected_render_mode = normalize_render_mode(render_mode)
-    except (PluginError, ValueError) as exc:
-        choices = ", ".join(item.value for item in RenderMode)
-        raise typer.BadParameter(
-            f"Choose {choices}, or plugin:plugin-id/renderer ({exc})",
-            param_hint="--mode",
-        ) from exc
-    if selected_render_mode is not RenderMode.GLYPH and color_mode == "html":
-        raise typer.BadParameter(
-            "HTML colour is available in glyph mode; use --color none or ansi",
-            param_hint="--color",
-        )
-    try:
-        profile = detect_runtime_profile(performance)
-    except ValueError as exc:
-        raise typer.BadParameter(str(exc), param_hint="--performance") from exc
-
-    selected_width = width or profile.image_width
-    selected_height = height
-    if aspect is not None and selected_height is None:
-        selected_height = max(1, round(selected_width / aspect))
-    destination = str(output) if output is not None and not graphical_output else None
-    prepared_source: str | Any = str(source)
-    if optimize:
-        from PIL import Image, ImageOps
-
-        with Image.open(source) as image:
-            prepared_source = ImageOps.autocontrast(image.convert("RGB"))
-    if selected_render_mode is RenderMode.GLYPH:
-        converter = ImageGlyphConverter(
-            charset=charset,
-            width=selected_width,
-            height=selected_height,
-            invert=invert,
-            brightness=brightness,
-            contrast=contrast,
-            auto_scale=fit_terminal and not graphical_output,
-            dithering=dithering,
-            threads=profile.workers,
-        )
-        if color_mode == "none":
-            result = converter.convert(
-                prepared_source, output_path=destination, style=style
-            )
-        else:
-            result = converter.convert_color(
-                prepared_source, output_path=destination, color_mode=color_mode
-            )
-    else:
-        import numpy as np
-        from PIL import Image
-
-        from ..core.style_manager import apply_style
-        from ..live.renderers import FrameRenderer, RenderConfig
-
-        if fit_terminal and not graphical_output:
-            selected_width = min(
-                selected_width,
-                max(20, shutil.get_terminal_size((selected_width, 24)).columns - 2),
-            )
-        if isinstance(prepared_source, Image.Image):
-            prepared = prepared_source
-        else:
-            with Image.open(source) as image:
-                prepared = image.convert("RGB")
-        if not isinstance(prepared_source, Image.Image):
-            prepared = prepared.copy()
-        pixels = np.asarray(prepared, dtype=np.uint8)
-        try:
-            result = (
-                FrameRenderer(
-                    RenderConfig(
-                        width=selected_width,
-                        height=selected_height,
-                        mode=selected_render_mode,
-                        color="truecolor" if color_mode == "ansi" else "none",
-                        charset=charset,
-                        invert=invert,
-                        dither=dithering,
-                        edge_algorithm=edge_algorithm,
-                        edge_threshold=edge_threshold,
-                        resample=profile.resample,
-                        brightness=brightness,
-                        contrast=contrast,
-                    )
-                )
-                .render(pixels)
-                .text
-            )
-        except PluginError as exc:
-            error_console.print(f"[bold red]Plugin render failed:[/bold red] {exc}")
-            raise typer.Exit(2) from exc
-        if style:
-            result = apply_style(result, style_name=style)
-        if output is not None and not graphical_output:
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(result, encoding="utf-8")
-    if result.startswith("Error"):
-        console.print(f"[bold red]{result}[/bold red]")
-        raise typer.Exit(1)
-    if graphical_output and output is not None:
-        from PIL import ImageColor
-
-        from ..live.renderers import render_text_png, render_text_svg
-
-        try:
-            # Validate both colours once so CLI errors are concise and uniform.
-            ImageColor.getrgb(foreground)
-            ImageColor.getrgb(background)
-        except ValueError as exc:
-            raise typer.BadParameter(
-                f"Invalid PNG/SVG colour: {exc}", param_hint="--foreground/--background"
-            ) from exc
-        output.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            if output.suffix.casefold() == ".svg":
-                output.write_text(
-                    render_text_svg(
-                        result,
-                        foreground=foreground,
-                        background=background,
-                        output_width=output_width,
-                        output_height=output_height,
-                    ),
-                    encoding="utf-8",
-                )
-            else:
-                render_text_png(
-                    result,
-                    foreground=foreground,
-                    background=background,
-                    output_width=output_width,
-                    output_height=output_height,
-                ).save(output, format="PNG", optimize=True)
-        except (OSError, ValueError) as exc:
-            raise typer.BadParameter(
-                f"Could not create graphical output: {exc}", param_hint="--output"
-            ) from exc
+        artifact = execute_image_command(options)
+    except ImageCommandError as exc:
+        raise typer.BadParameter(str(exc), param_hint=exc.param_hint) from exc
+    except GlyphForgeRenderError as exc:
+        raise typer.BadParameter(str(exc), param_hint="image options") from exc
+    result = preview_payload(artifact)
     if preview or output is None:
         typer.echo(result)
     if output is not None:
-        error_console.print(f"[green]Saved[/green] {output}")
+        detail = f"{artifact.columns}×{artifact.rows} cells"
+        if artifact.pixel_width is not None and artifact.pixel_height is not None:
+            detail += f" · {artifact.pixel_width}×{artifact.pixel_height} px"
+        error_console.print(f"[green]Saved[/green] {output} · {detail}")
 
 
 @app.command("text")
@@ -682,8 +616,7 @@ def text_command(
         error_console.print(f"[cyan]Preview[/cyan] · {font} · {style}")
     typer.echo(result)
     if output is not None:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(result, encoding="utf-8")
+        atomic_write_text(output, result)
         error_console.print(f"[green]Saved[/green] {output}")
 
 
@@ -1307,8 +1240,7 @@ def demo(
     except UnicodeEncodeError:
         typer.echo(result.text.encode("utf-8", "replace").decode("utf-8", "replace"))
     if output is not None:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(result.text, encoding="utf-8")
+        atomic_write_text(output, result.text)
         error_console.print(f"[green]Saved[/green] {output}")
     if output_dir is not None:
         error_console.print(
@@ -1347,10 +1279,15 @@ def benchmark(
         "auto", "--performance", help="auto, eco, balanced, or workstation."
     ),
     as_json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    pipeline: bool = typer.Option(
+        False,
+        "--pipeline/--kernel",
+        help="Measure the complete public still pipeline or only the render kernel.",
+    ),
 ) -> None:
     """Measure renderer throughput with a deterministic local frame."""
 
-    from ..benchmark import benchmark_renderers
+    from ..benchmark import benchmark_renderers, benchmark_still_pipeline
     from ..live.renderers import PluginRenderMode, RenderMode, normalize_render_mode
     from ..plugins import PluginError
 
@@ -1365,7 +1302,8 @@ def benchmark(
                 param_hint="--mode",
             ) from exc
     try:
-        results = benchmark_renderers(
+        benchmark_runner = benchmark_still_pipeline if pipeline else benchmark_renderers
+        results = benchmark_runner(
             performance,
             modes=modes,
             iterations=iterations,
@@ -1376,7 +1314,8 @@ def benchmark(
     if as_json:
         typer.echo(json.dumps([item.to_dict() for item in results], indent=2))
         return
-    table = Table(title=f"Renderer benchmark · {performance}")
+    scope = "still pipeline" if pipeline else "render kernel"
+    table = Table(title=f"Renderer benchmark · {scope} · {performance}")
     table.add_column("Mode", style="bold cyan")
     table.add_column("Source")
     table.add_column("Grid")

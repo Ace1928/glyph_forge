@@ -38,6 +38,12 @@ def test_named_language_charsets_are_resolved() -> None:
     assert video._resolve_charset("greek").startswith("αβγ")
 
 
+def test_video_charset_uses_strict_shared_preset_and_literal_syntax() -> None:
+    assert video._resolve_charset("literal:abc") == "abc"
+    with pytest.raises(ValueError, match="did you mean detailed"):
+        video._resolve_charset("detaled")
+
+
 @pytest.mark.parametrize(
     ("changes", "message"),
     [

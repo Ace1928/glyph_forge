@@ -13,8 +13,10 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from PIL import Image
 
 from glyph_forge.api.glyph_api import GlyphForgeAPI, get_api
+from glyph_forge.contracts import RenderArtifact, RenderFormat, RenderRequest
 
 
 def test_top_level_image_helper_resolves_to_callable() -> None:
@@ -89,22 +91,6 @@ def mock_banner_generator():
         yield mock_instance
 
 
-@pytest.fixture
-def mock_image_converter():
-    """Mock the ImageGlyphConverter for isolated testing."""
-    with mock.patch(
-        "glyph_forge.services.image_to_Glyph.ImageGlyphConverter"
-    ) as mock_converter:
-        # Configure mock
-        mock_instance = mock_converter.return_value
-        mock_instance.convert.return_value = "MOCK Glyph ART"
-        mock_instance.convert_color.return_value = "MOCK COLOR Glyph ART"
-        mock_instance.charset = "general"
-        mock_instance.width = 100
-
-        yield mock_instance
-
-
 class TestGlyphForgeAPI:
     """Comprehensive test suite for the Glyph Forge API."""
 
@@ -120,17 +106,16 @@ class TestGlyphForgeAPI:
     def test_api_initialization(self, api):
         """🧰 Verify API initializes core components properly."""
         assert api._banner_generator is not None
-        assert api._image_converter is None  # Lazy loading
 
-    def test_lazy_loading_image_converter(self, api):
-        """⚡ Verify image converter initializes on first use."""
-        # Initially None
-        assert api._image_converter is None
+    def test_structured_renderer_uses_canonical_pipeline(self, api):
+        """The high-level API returns the canonical structured artifact."""
 
-        # Access triggers initialization
-        converter = api._get_image_converter()
-        assert converter is not None
-        assert api._image_converter is not None
+        request = RenderRequest(width=2, height=1, brightness=1.0, contrast=1.0)
+        artifact = api.render_image(Image.new("RGB", (2, 1), "white"), request)
+
+        assert isinstance(artifact, RenderArtifact)
+        assert artifact.request is request
+        assert (artifact.columns, artifact.rows) == (2, 1)
 
     # ──── Banner Generation Tests ───────────────────────────────────────
 
@@ -166,59 +151,63 @@ class TestGlyphForgeAPI:
 
     # ──── Image Conversion Tests ───────────────────────────────────────
 
-    def test_image_to_Glyph_basic(self, api, mock_image_converter):
-        """🖼️ Verify basic image conversion."""
-        with mock.patch.object(
-            api, "_get_image_converter", return_value=mock_image_converter
-        ):
-            result = api.image_to_Glyph("image.jpg")
+    def test_image_to_glyph_basic(self, api):
+        """🖼️ Verify convenient plain image conversion."""
 
-            mock_image_converter.convert.assert_called_once()
-            assert result == "MOCK Glyph ART"
+        result = api.image_to_glyph(
+            Image.new("RGB", (2, 1), "white"),
+            width=2,
+            height=1,
+            brightness=1.0,
+            contrast=1.0,
+        )
 
-    def test_image_to_Glyph_with_color(self, api, mock_image_converter):
-        """🌈 Verify color image conversion."""
-        with mock.patch.object(
-            api, "_get_image_converter", return_value=mock_image_converter
-        ):
-            result = api.image_to_Glyph("image.jpg", color_mode="ansi")
+        assert isinstance(result, str)
+        assert len(result) == 2
 
-            mock_image_converter.convert_color.assert_called_once()
-            assert result == "MOCK COLOR Glyph ART"
+    def test_image_to_glyph_with_color(self, api):
+        """🌈 Verify truecolor conversion uses the same engine."""
+
+        result = api.image_to_glyph(
+            Image.new("RGB", (1, 1), (17, 34, 51)),
+            width=1,
+            height=1,
+            brightness=1.0,
+            contrast=1.0,
+            color_mode="ansi",
+        )
+
+        assert "\x1b[38;2;17;34;51m" in result
+
+    def test_mixed_case_image_alias_warns_and_delegates(self, api):
+        with mock.patch.object(api, "image_to_glyph", return_value="compat") as modern:
+            with pytest.warns(DeprecationWarning, match="image_to_Glyph"):
+                result = api.image_to_Glyph("image.jpg", width=80)
+
+        assert result == "compat"
+        modern.assert_called_once()
 
     def test_image_to_Glyph_with_params(self, api):
         """⚙️ Verify parameter forwarding to image converter."""
-        # Setup more complex mock with parameter verification
-        mock_converter = mock.MagicMock()
-        mock_converter.charset = "general"
-        mock_converter.width = 100
-        mock_converter.brightness = 1.0
-        mock_converter.contrast = 1.0
-        mock_converter.convert.return_value = "MOCK Glyph ART"
+        artifact = mock.MagicMock(spec=RenderArtifact)
+        artifact.data = "MOCK Glyph ART"
+        with mock.patch.object(api, "render_image", return_value=artifact) as renderer:
+            api.image_to_glyph(
+                "image.jpg",
+                charset="minimal",
+                width=80,
+                height=40,
+                invert=True,
+                brightness=1.0,
+                contrast=1.0,
+            )
 
-        with mock.patch.object(
-            api, "_get_image_converter", return_value=mock_converter
-        ):
-            with mock.patch(
-                "glyph_forge.api.glyph_api.ImageGlyphConverter"
-            ) as mock_constructor:
-                mock_constructor.return_value = mock_converter
-
-                # Call with custom parameters
-                api.image_to_Glyph(
-                    "image.jpg", charset="minimal", width=80, height=40, invert=True
-                )
-
-                # Verify correct ImageGlyphConverter instantiation
-                mock_constructor.assert_called_with(
-                    charset="minimal",
-                    width=80,
-                    height=40,
-                    invert=True,
-                    dithering=False,
-                    brightness=1.0,
-                    contrast=1.0,
-                )
+        request = renderer.call_args.args[1]
+        assert isinstance(request, RenderRequest)
+        assert request.charset == "minimal"
+        assert (request.width, request.height) == (80, 40)
+        assert request.invert is True
+        assert request.render_format is RenderFormat.TEXT
 
     # ──── Utility Method Tests ───────────────────────────────────────
 
@@ -273,7 +262,10 @@ class TestGlyphForgeAPI:
 
     def test_save_to_file_error_handling(self, api):
         """🛑 Verify file saving handles errors gracefully."""
-        with mock.patch("builtins.open", side_effect=IOError("Test error")):
+        with mock.patch(
+            "glyph_forge.persistence.tempfile.NamedTemporaryFile",
+            side_effect=IOError("Test error"),
+        ):
             result = api.save_to_file("content", "/some/path")
 
             assert result is False

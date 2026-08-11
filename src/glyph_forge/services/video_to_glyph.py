@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Iterator
 from pathlib import Path
 
-from .image_to_glyph import ImageGlyphConverter
+from ..contracts import RenderFormat, RenderRequest
+from ..rendering import render_image
 from .video_to_images import iter_video_images
 
 
@@ -20,12 +22,24 @@ def iter_video_glyph_frames(
     mode = color_mode.casefold()
     if mode not in {"none", "ansi", "html"}:
         raise ValueError("color_mode must be none, ansi, or html")
-    converter = ImageGlyphConverter(width=width)
+    output_format = {
+        "none": RenderFormat.TEXT,
+        "ansi": RenderFormat.TRUECOLOR,
+        "html": RenderFormat.HTML,
+    }[mode]
+    terminal = shutil.get_terminal_size(fallback=(80, 24))
+    request = RenderRequest(
+        width=width,
+        output_format=output_format,
+        max_width=max(1, terminal.columns - 2),
+        max_height=max(1, terminal.lines - 3),
+        cell_aspect=0.55,
+        resample="lanczos",
+    )
     for image in iter_video_images(video_path, max_frames=max_frames):
-        if mode == "none":
-            yield converter.convert(image)
-        else:
-            yield converter.convert_color(image, color_mode=mode)
+        artifact = render_image(image, request)
+        assert isinstance(artifact.data, str)
+        yield artifact.data
 
 
 def video_to_glyph_frames(

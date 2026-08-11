@@ -34,6 +34,16 @@ jobs:
         run: python -m ruff format --check src tests examples tools
       - name: Lint
         run: python -m ruff check src tests examples tools
+      - name: Enforce maintained boundary complexity
+        run: >-
+          python -m ruff check --select C901
+          --config "lint.mccabe.max-complexity=10"
+          src/glyph_forge/contracts.py
+          src/glyph_forge/rendering.py
+          src/glyph_forge/persistence.py
+          src/glyph_forge/config/settings.py
+          src/glyph_forge/api/glyph_api.py
+          src/glyph_forge/cli/image.py
       - name: Type check
         run: python -m mypy src/glyph_forge
 
@@ -160,6 +170,7 @@ jobs:
           python -m pip install --force-reinstall dist/*.whl
           python -c "from importlib.metadata import version; import glyph_forge; assert version('glyphforge') == glyph_forge.__version__"
           python -c "from importlib.resources import files; import glyph_forge; from glyph_forge import SharePublication; from glyph_forge.plugins import PLUGIN_API_VERSION, PluginManifest, PluginRegistry; root = files('glyph_forge'); assert root.joinpath('resources/eidos_profile.yml').is_file(); assert root.joinpath('ui/web/index.html').is_file(); assert root.joinpath('ui/web/studio-renderers.js').is_file(); assert root.joinpath('ui/web/manifest.webmanifest').is_file(); assert root.joinpath('ui/web/service-worker.js').is_file(); assert root.joinpath('ui/web/icon-512.png').is_file(); assert root.joinpath('sharing.py').is_file(); assert root.joinpath('plugins/contracts.py').is_file(); assert not root.joinpath('services/image_to_Glyph.py').is_file(); assert SharePublication.__module__ == 'glyph_forge.studio'; assert PLUGIN_API_VERSION == 1; assert PluginManifest(name='CI', version='1').name == 'CI'; assert PluginRegistry(discoverer=lambda: ()).inventory() == ()"
+          python -c "from io import BytesIO; from PIL import Image; from glyph_forge import RENDER_CONTRACT_VERSION, RenderRequest, render_image; artifact = render_image(Image.new('RGB', (8, 6), '#789abc'), RenderRequest(width=4, height=3, output_format='png', output_width=33, output_height=21)); assert RENDER_CONTRACT_VERSION == 1; assert (artifact.columns, artifact.rows) == (4, 3); assert (artifact.pixel_width, artifact.pixel_height) == (33, 21); assert Image.open(BytesIO(artifact.data)).size == (33, 21)"
           glyph-forge version
           glyph-forge share --help
           glyph-forge plugins --json

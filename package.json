@@ -1,6 +1,6 @@
 {
   "name": "glyph-forge-web-quality",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Cross-browser production checks for Glyph Forge Studio",

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 import threading
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from rich.console import Group
 from rich.table import Table
@@ -28,8 +29,14 @@ from textual.widgets import (
 )
 from textual.worker import get_current_worker
 
+from ..persistence import AtomicWriteError, atomic_write_text
 from ..runtime import runtime_report
 from ..utils.alphabet_manager import AlphabetManager
+
+if TYPE_CHECKING:
+    from ..contracts import RenderArtifact, RenderRequest
+
+_PIXEL_SIZE = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)\s*$", re.IGNORECASE)
 
 MEDIA_EXTENSIONS = {
     ".apng",
@@ -59,6 +66,18 @@ def filter_media_paths(paths: Iterable[Path]) -> list[Path]:
         if not path.name.startswith(".")
         and (path.is_dir() or path.suffix.casefold() in MEDIA_EXTENSIONS)
     ]
+
+
+def parse_pixel_dimensions(value: str) -> tuple[int, int]:
+    """Parse and bound an exact graphical export size from the TUI."""
+
+    match = _PIXEL_SIZE.fullmatch(value)
+    if match is None:
+        raise ValueError("Output pixels must use WIDTHxHEIGHT, such as 1920x1080")
+    width, height = (int(part) for part in match.groups())
+    if not 1 <= width <= 8192 or not 1 <= height <= 8192:
+        raise ValueError("Output pixels must be between 1 and 8192 per dimension")
+    return width, height
 
 
 class MediaDirectoryTree(DirectoryTree):
@@ -114,6 +133,9 @@ class GlyphForgeApp(App[str | None]):
         super().__init__()
         self.image_result = ""
         self.text_result = ""
+        self._image_source: str | None = None
+        self._image_request: RenderRequest | None = None
+        self._image_artifact: RenderArtifact | None = None
         self._live_stop = threading.Event()
 
     def compose(self) -> ComposeResult:
@@ -125,7 +147,7 @@ class GlyphForgeApp(App[str | None]):
         with TabbedContent(initial="image-tab", id="workspace-tabs"):
             with TabPane("Image", id="image-tab"):
                 with Horizontal(classes="workflow"):
-                    with Vertical(classes="form-panel"):
+                    with VerticalScroll(classes="form-panel"):
                         yield Static("IMAGE → GLYPHS", classes="eyebrow")
                         yield Label("Source")
                         with Horizontal(classes="input-row"):
@@ -141,10 +163,43 @@ class GlyphForgeApp(App[str | None]):
                             allow_blank=False,
                             id="image-charset",
                         )
+                        yield Label("Fidelity mode")
+                        yield Select(
+                            [
+                                ("Density glyphs", "glyph"),
+                                ("Directional edges", "edge"),
+                                ("Braille · 2×4 subpixels", "braille"),
+                                ("True-colour half blocks", "half-block"),
+                                ("Quadrants · 2×2 subpixels", "quadrant"),
+                            ],
+                            value="glyph",
+                            allow_blank=False,
+                            id="image-mode",
+                        )
                         with Horizontal(classes="field-row"):
                             with Vertical():
-                                yield Label("Width")
+                                yield Label("Columns")
                                 yield Input("80", type="integer", id="image-width")
+                            with Vertical():
+                                yield Label("Rows")
+                                yield Input(
+                                    "",
+                                    placeholder="Auto",
+                                    type="integer",
+                                    id="image-height",
+                                )
+                        with Horizontal(classes="switch-row"):
+                            yield Label("Invert")
+                            yield Switch(id="image-invert")
+                            yield Label("Dither")
+                            yield Switch(id="image-dither")
+                        yield Button(
+                            "Forge preview",
+                            id="image-convert",
+                            variant="success",
+                            classes="primary-action",
+                        )
+                        with Horizontal(classes="field-row"):
                             with Vertical():
                                 yield Label("Colour")
                                 yield Select(
@@ -157,16 +212,28 @@ class GlyphForgeApp(App[str | None]):
                                     allow_blank=False,
                                     id="image-color",
                                 )
-                        with Horizontal(classes="switch-row"):
-                            yield Label("Invert")
-                            yield Switch(id="image-invert")
-                            yield Label("Dither")
-                            yield Switch(id="image-dither")
-                        yield Button(
-                            "Forge preview",
-                            id="image-convert",
-                            variant="success",
-                            classes="primary-action",
+                            with Vertical():
+                                yield Label("Output pixels")
+                                yield Input("1280x720", id="image-output-size")
+                        with Horizontal(classes="field-row"):
+                            with Vertical():
+                                yield Label("Brightness")
+                                yield Input(
+                                    "1.12", type="number", id="image-brightness"
+                                )
+                            with Vertical():
+                                yield Label("Contrast")
+                                yield Input("1.08", type="number", id="image-contrast")
+                        yield Label("Graphical export fit")
+                        yield Select(
+                            [
+                                ("Contain · preserve all", "contain"),
+                                ("Cover · fill and crop", "cover"),
+                                ("Stretch · exact edges", "stretch"),
+                            ],
+                            value="contain",
+                            allow_blank=False,
+                            id="image-fit",
                         )
                         yield Label("Save as")
                         with Horizontal(classes="input-row"):
@@ -187,7 +254,7 @@ class GlyphForgeApp(App[str | None]):
 
             with TabPane("Text", id="text-tab"):
                 with Horizontal(classes="workflow"):
-                    with Vertical(classes="form-panel"):
+                    with VerticalScroll(classes="form-panel"):
                         yield Static("TEXT → BANNER", classes="eyebrow")
                         yield Label("Words")
                         yield Input("Glyph Forge", id="text-value")
@@ -225,7 +292,7 @@ class GlyphForgeApp(App[str | None]):
 
             with TabPane("Live", id="live-tab"):
                 with Horizontal(classes="workflow"):
-                    with Vertical(classes="form-panel"):
+                    with VerticalScroll(classes="form-panel"):
                         yield Static("LIVE → LATEST FRAME", classes="eyebrow")
                         yield Label("Source")
                         with Horizontal(classes="input-row"):
@@ -307,6 +374,28 @@ class GlyphForgeApp(App[str | None]):
         except ValueError:
             return fallback
 
+    def optional_positive_int(self, widget_id: str) -> int | None:
+        value = self.query_one(widget_id, Input).value.strip()
+        if not value:
+            return None
+        try:
+            return max(1, int(value))
+        except ValueError:
+            return None
+
+    def bounded_float(
+        self,
+        widget_id: str,
+        fallback: float,
+        minimum: float = 0.0,
+        maximum: float = 2.0,
+    ) -> float:
+        value = self.query_one(widget_id, Input).value.strip()
+        try:
+            return max(minimum, min(maximum, float(value)))
+        except ValueError:
+            return fallback
+
     def positive_float(self, widget_id: str, fallback: float) -> float:
         value = self.query_one(widget_id, Input).value.strip()
         try:
@@ -339,10 +428,15 @@ class GlyphForgeApp(App[str | None]):
         self.convert_image(
             path,
             self.positive_int("#image-width", 80),
+            self.optional_positive_int("#image-height"),
             self.selected_value("#image-charset", "general"),
+            self.selected_value("#image-mode", "glyph"),
             self.selected_value("#image-color", "none"),
             self.query_one("#image-invert", Switch).value,
             self.query_one("#image-dither", Switch).value,
+            self.bounded_float("#image-brightness", 1.12),
+            self.bounded_float("#image-contrast", 1.08),
+            self.selected_value("#image-fit", "contain"),
         )
 
     @work(thread=True, exclusive=True, group="image-preview")
@@ -350,29 +444,55 @@ class GlyphForgeApp(App[str | None]):
         self,
         path: str,
         width: int,
+        height: int | None,
         charset: str,
+        mode: str,
         color: str,
         invert: bool,
         dither: bool,
+        brightness: float,
+        contrast: float,
+        fit: str,
     ) -> None:
-        from ..services.image_to_glyph import ImageGlyphConverter
+        from ..contracts import GlyphForgeRenderError, RenderRequest
+        from ..rendering import format_for_path, render_image
 
-        converter = ImageGlyphConverter(
-            width=width,
-            charset=charset,
-            invert=invert,
-            dithering=dither,
-            auto_scale=False,
+        try:
+            request = RenderRequest(
+                width=width,
+                height=height,
+                charset=charset,
+                mode=mode,
+                output_format=format_for_path(None, color=color),
+                invert=invert,
+                dither=dither,
+                brightness=brightness,
+                contrast=contrast,
+                fit=fit,
+            )
+            artifact = render_image(path, request)
+        except GlyphForgeRenderError as exc:
+            self.app.call_from_thread(
+                self.query_one("#image-preview", Static).update,
+                f"Could not render image:\n{exc}",
+            )
+            self.app.call_from_thread(self.notify, str(exc), severity="error")
+            return
+        result = (
+            artifact.data if isinstance(artifact.data, str) else artifact.glyph_text
         )
-        if color == "none":
-            result = converter.convert(path)
-            renderable: str | Text = result
+        renderable: str | Text
+        if color == "ansi":
+            renderable = Text.from_ansi(result)
         else:
-            result = converter.convert_color(path, color_mode=color)
-            renderable = Text.from_ansi(result) if color == "ansi" else result
+            # HTML is saved as HTML but previewed as glyphs rather than markup.
+            renderable = artifact.glyph_text
         worker = get_current_worker()
         if not worker.is_cancelled:
             self.image_result = result
+            self._image_source = path
+            self._image_request = request
+            self._image_artifact = artifact
             self.app.call_from_thread(
                 self.query_one("#image-preview", Static).update,
                 renderable,
@@ -412,16 +532,72 @@ class GlyphForgeApp(App[str | None]):
             return
         try:
             path = Path(path_value).expanduser()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(result, encoding="utf-8")
-        except OSError as exc:
+            atomic_write_text(path, result)
+        except AtomicWriteError as exc:
             self.notify(f"Could not save: {exc}", severity="error")
             return
         self.notify(f"Saved {path}")
 
     @on(Button.Pressed, "#image-save")
     def save_image(self) -> None:
-        self.save_result(self.image_result, "#image-output-path")
+        if self._image_source is None or self._image_request is None:
+            self.notify("Create an image preview before saving", severity="warning")
+            return
+        destination = self.query_one("#image-output-path", Input).value.strip()
+        if not destination:
+            self.notify("Choose an output path", severity="warning")
+            return
+        self.export_image(destination)
+
+    @work(thread=True, exclusive=True, group="image-export")
+    def export_image(self, destination: str) -> None:
+        from ..contracts import (
+            GlyphForgeRenderError,
+            RenderFormat,
+            RenderRequest,
+        )
+        from ..rendering import render_image
+
+        request = self._image_request
+        if not isinstance(request, RenderRequest) or self._image_source is None:
+            return
+        path = Path(destination).expanduser()
+        suffix = path.suffix.casefold()
+        output_format = {
+            ".png": RenderFormat.PNG,
+            ".svg": RenderFormat.SVG,
+            ".html": RenderFormat.HTML,
+            ".htm": RenderFormat.HTML,
+            ".ansi": RenderFormat.TRUECOLOR,
+        }.get(suffix, RenderFormat.TEXT)
+        output_width: int | None = None
+        output_height: int | None = None
+        if output_format in {RenderFormat.PNG, RenderFormat.SVG}:
+            try:
+                output_width, output_height = parse_pixel_dimensions(
+                    self.query_one("#image-output-size", Input).value
+                )
+            except ValueError as exc:
+                self.app.call_from_thread(self.notify, str(exc), severity="error")
+                return
+        try:
+            export_request = request.with_updates(
+                output_format=output_format,
+                output_width=output_width,
+                output_height=output_height,
+            )
+            artifact = render_image(
+                self._image_source,
+                export_request,
+                destination=path,
+            )
+        except GlyphForgeRenderError as exc:
+            self.app.call_from_thread(self.notify, str(exc), severity="error")
+            return
+        detail = f"{artifact.columns}×{artifact.rows} cells"
+        if artifact.pixel_width is not None and artifact.pixel_height is not None:
+            detail += f" · {artifact.pixel_width}×{artifact.pixel_height} px"
+        self.app.call_from_thread(self.notify, f"Saved {path} · {detail}")
 
     @on(Button.Pressed, "#text-save")
     def save_text(self) -> None:
@@ -568,4 +744,5 @@ __all__ = [
     "GlyphForgeApp",
     "MediaDirectoryTree",
     "filter_media_paths",
+    "parse_pixel_dimensions",
 ]

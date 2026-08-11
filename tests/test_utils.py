@@ -351,6 +351,21 @@ class TestAlphabetManager:
         result = AlphabetManager.get_alphabet("nonexistent")
         assert result == ALPHABETS["general"]
 
+    def test_resolve_alphabet_supports_every_preset_collection(self) -> None:
+        assert AlphabetManager.resolve_alphabet("detailed") == ALPHABETS["detailed"]
+        assert (
+            AlphabetManager.resolve_alphabet("box_drawing")
+            == SPECIAL_SETS["box_drawing"]
+        )
+        assert AlphabetManager.resolve_alphabet("greek").startswith("αβγ")
+
+    def test_strict_resolver_catches_typos_and_explicit_literals(self) -> None:
+        assert (
+            AlphabetManager.resolve_alphabet("literal:abc", strict_names=True) == "abc"
+        )
+        with pytest.raises(ValueError, match="did you mean detailed"):
+            AlphabetManager.resolve_alphabet("detaled", strict_names=True)
+
     def test_get_special_set(self) -> None:
         """Special set should be returned."""
         result = AlphabetManager.get_special_set("box_drawing")
@@ -362,6 +377,8 @@ class TestAlphabetManager:
         assert isinstance(result, list)
         assert "general" in result
         assert "detailed" in result
+        assert "box_drawing" in result
+        assert "greek" in result
         assert len(result) > 5
 
     def test_list_special_sets(self) -> None:

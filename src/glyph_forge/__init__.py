@@ -12,6 +12,7 @@ import logging
 import os
 import shutil
 import sys
+import warnings
 from importlib import import_module
 from pathlib import Path
 from typing import (
@@ -28,7 +29,7 @@ from typing import (
     Union,
 )
 
-VERSION: Final[Tuple[int, int, int]] = (0, 3, 1)
+VERSION: Final[Tuple[int, int, int]] = (0, 4, 0)
 __version__ = ".".join(map(str, VERSION))
 __author__ = "Lloyd Handyside"
 __license__ = "MIT"
@@ -172,8 +173,8 @@ _PROFILE_OVERRIDES: Final[Dict[str, Dict[str, Any]]] = {
 }
 
 
-def get_config(profile: str | None = None) -> Dict[str, Any]:
-    """Return an isolated configuration with profile and environment overrides."""
+def get_profile_config(profile: str | None = None) -> Dict[str, Any]:
+    """Return an isolated legacy render profile with environment overrides."""
 
     config = copy.deepcopy(DEFAULT_CONFIG)
     selected = _PROFILE_OVERRIDES.get(profile or "standard")
@@ -199,6 +200,22 @@ def get_config(profile: str | None = None) -> Dict[str, Any]:
         else:
             config[key] = env_value
     return config
+
+
+def get_config(profile: str | None = None) -> Dict[str, Any]:
+    """Deprecated alias for :func:`get_profile_config`.
+
+    Persistent application settings now have one unambiguous entry point:
+    :func:`get_settings`.
+    """
+
+    warnings.warn(
+        "glyph_forge.get_config() is deprecated; use get_profile_config() for "
+        "legacy render profiles or get_settings() for persistent settings",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return get_profile_config(profile)
 
 
 def get_project_info() -> ProjectInfo:
@@ -239,6 +256,26 @@ def get_system_capabilities() -> SystemCapabilities:
 
 
 _LAZY_EXPORTS: Final[Dict[str, Tuple[str, str]]] = {
+    "Alignment": ("glyph_forge.contracts", "Alignment"),
+    "FitMode": ("glyph_forge.contracts", "FitMode"),
+    "GlyphForgeRenderError": (
+        "glyph_forge.contracts",
+        "GlyphForgeRenderError",
+    ),
+    "RENDER_CONTRACT_VERSION": (
+        "glyph_forge.contracts",
+        "RENDER_CONTRACT_VERSION",
+    ),
+    "RenderArtifact": ("glyph_forge.contracts", "RenderArtifact"),
+    "RenderContractError": ("glyph_forge.contracts", "RenderContractError"),
+    "RenderExecutionError": ("glyph_forge.contracts", "RenderExecutionError"),
+    "RenderExportError": ("glyph_forge.contracts", "RenderExportError"),
+    "RenderFormat": ("glyph_forge.contracts", "RenderFormat"),
+    "RenderMetrics": ("glyph_forge.contracts", "RenderMetrics"),
+    "RenderRequest": ("glyph_forge.contracts", "RenderRequest"),
+    "SourceLoadError": ("glyph_forge.contracts", "SourceLoadError"),
+    "render_image": ("glyph_forge.rendering", "render_image"),
+    "get_settings": ("glyph_forge.config.settings", "get_settings"),
     "get_api": ("glyph_forge.api", "get_api"),
     "GlyphForgeAPI": ("glyph_forge.api", "GlyphForgeAPI"),
     "TextRenderer": ("glyph_forge.renderers", "TextRenderer"),
@@ -323,6 +360,7 @@ def __dir__() -> List[str]:
 
 __all__ = [
     "ANSIRenderer",
+    "Alignment",
     "CaptureRegion",
     "ColorMapper",
     "ColorMode",
@@ -332,6 +370,8 @@ __all__ = [
     "EdgeDetector",
     "EidosProfile",
     "FrameRenderer",
+    "FitMode",
+    "GlyphForgeRenderError",
     "GlyphForgeAPI",
     "GlyphMatrix",
     "HTMLRenderer",
@@ -346,10 +386,18 @@ __all__ = [
     "PluginRegistry",
     "PluginRenderMode",
     "PROJECT",
+    "RENDER_CONTRACT_VERSION",
     "RenderOptions",
+    "RenderArtifact",
     "RenderConfig",
+    "RenderContractError",
+    "RenderExecutionError",
+    "RenderExportError",
+    "RenderFormat",
+    "RenderMetrics",
     "RenderMode",
     "RenderOutput",
+    "RenderRequest",
     "RendererRequest",
     "Renderer",
     "SVGRenderer",
@@ -358,6 +406,7 @@ __all__ = [
     "TerminalRedraw",
     "TerminalSessionConfig",
     "StudioServer",
+    "SourceLoadError",
     "SharePublication",
     "SourceRequest",
     "TextRenderer",
@@ -375,6 +424,8 @@ __all__ = [
     "get_api",
     "get_config",
     "get_project_info",
+    "get_profile_config",
+    "get_settings",
     "get_plugin_registry",
     "get_system_capabilities",
     "image_to_glyph",
@@ -388,6 +439,7 @@ __all__ = [
     "text_to_banner",
     "run_terminal_session",
     "render_svg",
+    "render_image",
     "render_text_png",
     "render_text_svg",
     "update_eidos_profile",

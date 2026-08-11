@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, TypeAlias, TypeVar, Union, cast
@@ -9,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from ..persistence import AtomicWriteError, atomic_write_text
 from ..utils.alphabet_manager import AlphabetManager
 from ..visual import (
     DEFAULT_BRIGHTNESS,
@@ -34,23 +36,12 @@ class ColorMode(Enum):
 
 
 class ImageGlyphConverter:
-    """
-    # ImageGlyphConverter
-    A high-performance image-to-Glyph art converter that transforms visual data into textual representations with precision and flexibility.
-    ## Overview
-    `ImageGlyphConverter` provides comprehensive functionality to convert images into Glyph art using various character sets, processing techniques, and output formats. The converter supports grayscale and color output, with options for adjusting dimensions, brightness, contrast, and applying effects like dithering.
-    ## Features
-    - **Multiple character sets** - Use built-in or custom character sets for different artistic styles
-    - **Adaptive rendering** - Maintains aspect ratio and can auto-scale to terminal dimensions
-    - **Multi-threaded processing** - Parallel conversion for large images with configurable thread count
-    - **Image adjustments** - Controls for brightness, contrast, and dithering
-    - **Color output** - Support for ANSI (terminal) and HTML color formats
-    - **Styling options** - Apply visual styles to the resulting Glyph art
-    ## Usage
-    ⚡ Hyper-optimized image-to-Glyph converter with Eidosian principles ⚡
+    """Compatibility adapter for the original stateful image API.
 
-    Transforms visual data into textual art with surgical precision.
-    Features adaptive rendering, multi-threaded processing, and specialized character sets.
+    New applications should use :func:`glyph_forge.render_image` with an
+    immutable :class:`glyph_forge.RenderRequest`.  This class retains the 0.x
+    constructor, mutators, error strings, and helper methods while delegating
+    production rendering to that canonical pipeline.
     """
 
     def __init__(
@@ -79,6 +70,12 @@ class ImageGlyphConverter:
             dithering: Apply dithering for improved visual quality
             threads: Number of threads for parallel processing (0=auto)
         """
+        warnings.warn(
+            "ImageGlyphConverter is deprecated; use RenderRequest and "
+            "render_image instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # Get the appropriate charset
         self._available_charsets: List[str] = AlphabetManager.list_available_alphabets()
         self.charset = (
@@ -154,53 +151,48 @@ class ImageGlyphConverter:
         return img
 
     def _process_image(self, img: Image.Image, style: Optional[str] = None) -> str:
-        """Process image through the complete conversion pipeline."""
-        # Calculate new dimensions
-        orig_width, orig_height = img.size
-        aspect_ratio = orig_height / orig_width
+        """Render through the maintained vectorized pipeline."""
 
-        # Set output dimensions, maintaining aspect ratio
-        new_width = self.width
-        # Character aspect ratio correction factor (chars are taller than wide)
-        char_aspect = 0.55
-        new_height = (
-            self.height if self.height else int(aspect_ratio * new_width * char_aspect)
+        from ..contracts import RenderFormat, RenderRequest
+        from ..rendering import render_image
+
+        width, height = self._output_dimensions(img)
+        request = RenderRequest(
+            width=width,
+            height=height,
+            charset=f"literal:{self._effective_charset()}",
+            brightness=self.brightness,
+            contrast=self.contrast,
+            dither=self.dithering,
+            resample="lanczos",
+            style=style,
+            output_format=RenderFormat.TEXT,
+            # Preserve the original adapter's historical still-image geometry.
+            cell_aspect=0.55,
         )
+        return render_image(img, request).glyph_text
 
-        # Auto-scale to terminal size if requested
+    def _output_dimensions(self, image: Image.Image) -> tuple[int, int]:
+        """Resolve legacy explicit/aspect/terminal dimensions once."""
+
+        aspect_ratio = image.height / max(1, image.width)
+        width = self.width
+        height = self.height or max(1, int(aspect_ratio * width * 0.55))
         if self.auto_scale:
-            new_width, new_height = self._apply_terminal_scaling(new_width, new_height)
+            width, height = self._apply_terminal_scaling(width, height)
+        return max(1, width), max(1, height)
 
-        # Resize image with high quality resampling
-        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    def _effective_charset(self) -> str:
+        """Honor callers that historically customized ``density_map`` directly."""
 
-        # Apply brightness/contrast adjustments if needed
-        if self.brightness != 1.0 or self.contrast != 1.0:
-            img = self._apply_image_adjustments(img)
-
-        # Apply dithering if enabled
-        if self.dithering:
-            img = img.convert("1", dither=Image.Dither.FLOYDSTEINBERG)
-            img = img.convert("L")  # Convert back to grayscale
-
-        # Convert to numpy array for faster processing
-        pixels = np.array(img)
-
-        # Generate Glyph art (with parallel processing for large images)
-        if new_height > 100 and self.threads > 1:
-            # Process rows in parallel
-            Glyph_art = self._parallel_conversion(pixels)
-        else:
-            # Single-threaded processing
-            Glyph_art = self._convert_pixels(pixels)
-
-        # Apply style if requested
-        if style:
-            from ..core.style_manager import apply_style
-
-            Glyph_art = apply_style(Glyph_art, style_name=style)
-
-        return Glyph_art
+        ordered: list[str] = []
+        previous: str | None = None
+        for index in range(256):
+            character = self.density_map.get(index)
+            if character is not None and character != previous:
+                ordered.append(character)
+                previous = character
+        return "".join(ordered) or self.charset
 
     def _apply_terminal_scaling(
         self, new_width: int, new_height: int
@@ -277,19 +269,11 @@ class ImageGlyphConverter:
         return "\n".join(results)
 
     def _save_to_file(self, Glyph_art: str, output_path: str) -> None:
-        """Save Glyph art to a file with proper directory creation."""
+        """Atomically save legacy Glyph art with proper directory creation."""
         try:
-            # Ensure directory exists
-            dirname = os.path.dirname(output_path)
-            if dirname:
-                os.makedirs(dirname, exist_ok=True)
-
-            # Write with UTF-8 encoding for maximum compatibility
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(Glyph_art)
-
+            atomic_write_text(output_path, Glyph_art)
             self.logger.debug(f"Saved output to {output_path}")
-        except Exception as e:
+        except AtomicWriteError as e:
             self.logger.error(f"Failed to save output: {e}")
             raise OSError(f"Failed to save output: {str(e)}") from e
 
@@ -370,71 +354,36 @@ class ImageGlyphConverter:
         Returns:
             Glyph art with color formatting
         """
+        mode = color_mode.value if isinstance(color_mode, ColorMode) else color_mode
+        mode = mode.casefold()
+        if mode not in {"ansi", "html"}:
+            return self.convert(image_path, output_path)
         try:
-            # Load image
-            if isinstance(image_path, str):
-                img = Image.open(image_path).convert("RGB")
-            elif hasattr(image_path, "convert") and callable(image_path.convert):
-                img = image_path.convert("RGB")
-            else:
-                return "Error: image_path must be a string path or PIL Image object"
+            from ..contracts import RenderFormat, RenderRequest
+            from ..rendering import load_image, render_image
 
-            # Calculate dimensions
-            orig_width, orig_height = img.size
-            aspect_ratio = orig_height / orig_width
-
-            # Set output dimensions
-            new_width = self.width
-            char_aspect = 0.55
-            new_height = (
-                self.height
-                if self.height
-                else int(aspect_ratio * new_width * char_aspect)
+            probe_request = RenderRequest()
+            image = load_image(image_path, probe_request)
+            width, height = self._output_dimensions(image)
+            request = RenderRequest(
+                width=width,
+                height=height,
+                charset=f"literal:{self._effective_charset()}",
+                brightness=self.brightness,
+                contrast=self.contrast,
+                dither=self.dithering,
+                resample="lanczos",
+                output_format=(
+                    RenderFormat.TRUECOLOR if mode == "ansi" else RenderFormat.HTML
+                ),
+                cell_aspect=0.55,
             )
-
-            # Auto-scale if requested
-            if self.auto_scale:
-                new_width, new_height = self._apply_terminal_scaling(
-                    new_width, new_height
-                )
-
-            # Resize image
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-            # Apply the same tone curve to colour and grayscale paths.  This
-            # keeps glyph density and source-colour output visually aligned.
-            if self.brightness != 1.0 or self.contrast != 1.0:
-                img = self._apply_image_adjustments(img)
-
-            # Convert to grayscale for character selection
-            gray_img = img.convert("L")
-
-            # Get both color and grayscale pixels
-            pixels_rgb = np.array(img)
-            pixels_gray = np.array(gray_img)
-
-            # Normalize color mode input
-            mode = color_mode.value if isinstance(color_mode, ColorMode) else color_mode
-            mode = mode.lower()
-
-            # Generate color Glyph art based on mode
-            if mode == "ansi":
-                Glyph_art = self._generate_ansi_color(pixels_rgb, pixels_gray)
-            elif mode == "html":
-                Glyph_art = self._generate_html_color(pixels_rgb, pixels_gray)
-            else:
-                # Fallback to standard grayscale conversion
-                return self.convert(gray_img, output_path)
-
-            # Save to file if requested
-            if output_path:
-                self._save_to_file(Glyph_art, output_path)
-
-            return Glyph_art
-
-        except Exception as e:
-            self.logger.error(f"Color conversion error: {e}", exc_info=True)
-            return f"Error converting color image: {str(e)}"
+            artifact = render_image(image, request, destination=output_path)
+            assert isinstance(artifact.data, str)
+            return artifact.data
+        except Exception as exc:
+            self.logger.error("Color conversion error: %s", exc, exc_info=True)
+            return f"Error converting color image: {exc}"
 
     def _generate_ansi_color(
         self, pixels_rgb: PixelArray, pixels_gray: PixelArray
@@ -489,43 +438,54 @@ def image_to_glyph(
 ) -> str:
     """High-level helper for quick image conversion.
 
-    This convenience wrapper instantiates :class:`ImageGlyphConverter` with the
-    provided parameters and performs a single image conversion. It mirrors the
-    constructor arguments of :class:`ImageGlyphConverter` and supports both
-    grayscale and color output modes.
+    This stateless compatibility wrapper translates the historical keyword
+    arguments into a :class:`glyph_forge.RenderRequest` and uses the canonical
+    renderer directly. It supports both grayscale and color output modes.
 
     Args:
         image_path: Path to an image file or ``PIL.Image`` object.
         output_path: Optional destination to save the resulting glyph art.
-        style: Optional style name forwarded to :meth:`ImageGlyphConverter.convert`.
+        style: Optional style name applied to plain-text output.
         color_mode: ``"none"`` for grayscale, ``"ansi"`` or ``"html"`` for color.
-        **kwargs: Additional parameters for :class:`ImageGlyphConverter`.
+        **kwargs: Historical width, height, charset, tone, and fitting options.
 
     Returns:
         Glyph art string.
     """
 
-    params = {
-        k: v
-        for k, v in kwargs.items()
-        if k
-        in {
-            "charset",
-            "width",
-            "height",
-            "invert",
-            "brightness",
-            "contrast",
-            "auto_scale",
-            "dithering",
-            "threads",
-        }
-    }
-    converter = ImageGlyphConverter(**params)
+    from ..contracts import GlyphForgeRenderError, RenderRequest
+    from ..rendering import format_for_path, render_image
 
-    if color_mode.lower() in {"ansi", "html"}:
-        return converter.convert_color(
-            image_path, output_path=output_path, color_mode=color_mode
+    width = max(1, int(kwargs.get("width", 100)))
+    height_value = kwargs.get("height")
+    height = max(1, int(height_value)) if height_value is not None else None
+    max_width: int | None = None
+    max_height: int | None = None
+    if bool(kwargs.get("auto_scale", True)):
+        terminal = shutil.get_terminal_size(fallback=(80, 24))
+        max_width = max(1, terminal.columns - 2)
+        max_height = max(1, terminal.lines - 3)
+    try:
+        output_format = format_for_path(output_path, color=color_mode)
+        requested_charset = str(kwargs.get("charset", "general"))
+        if requested_charset not in AlphabetManager.list_available_alphabets():
+            requested_charset = f"literal:{requested_charset}"
+        request = RenderRequest(
+            width=width,
+            height=height,
+            charset=requested_charset,
+            invert=bool(kwargs.get("invert", False)),
+            brightness=float(kwargs.get("brightness", DEFAULT_BRIGHTNESS)),
+            contrast=float(kwargs.get("contrast", DEFAULT_CONTRAST)),
+            dither=bool(kwargs.get("dithering", False)),
+            output_format=output_format,
+            style=style if output_format.value == "text" else None,
+            max_width=max_width,
+            max_height=max_height,
+            resample="lanczos",
+            cell_aspect=0.55,
         )
-
-    return converter.convert(image_path, output_path=output_path, style=style)
+        artifact = render_image(image_path, request, destination=output_path)
+        return artifact.data if isinstance(artifact.data, str) else artifact.glyph_text
+    except GlyphForgeRenderError as exc:
+        return f"Error converting image: {exc}"

@@ -35,6 +35,7 @@ from .live.renderers import (
     RenderMode,
     normalize_render_mode,
 )
+from .persistence import atomic_write_bytes, atomic_write_text
 from .runtime import detect_runtime_profile
 from .services.text_to_banner import text_to_banner
 from .utils.alphabet_manager import AlphabetManager
@@ -191,7 +192,7 @@ class DemoBuilder:
         if self.output_dir is None:
             return
         path = self.output_dir / name
-        path.write_text(content, encoding="utf-8")
+        atomic_write_text(path, content)
         self.artifacts.append(DemoArtifact(name=name, path=path, kind="text"))
 
     def _fetch(self, url: str) -> Optional[bytes]:
@@ -208,8 +209,7 @@ class DemoBuilder:
                     raw: bytes = resp.read()
                 if len(raw) > 4 * 1024 * 1024:
                     return None
-                cached_root.mkdir(parents=True, exist_ok=True)
-                cached.write_bytes(raw)
+                atomic_write_bytes(cached, raw)
                 return raw
             except (urllib.error.URLError, OSError, TimeoutError):
                 continue
@@ -237,7 +237,13 @@ class DemoBuilder:
         if self.output_dir is None:
             return
         path = self.output_dir / name
-        image.convert("RGB").save(path, format="PNG", optimize=True)
+        stream = io.BytesIO()
+        converted = image.convert("RGB")
+        try:
+            converted.save(stream, format="PNG", optimize=True)
+        finally:
+            converted.close()
+        atomic_write_bytes(path, stream.getvalue())
         self.artifacts.append(DemoArtifact(name=name, path=path, kind="image"))
 
     # -- asset acquisition ----------------------------------------------------

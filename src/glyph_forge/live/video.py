@@ -29,7 +29,7 @@ from ..runtime import (
     python_install_hint,
     subprocess_environment,
 )
-from ..utils.alphabet_manager import AlphabetCategory, AlphabetManager
+from ..utils.alphabet_manager import AlphabetManager
 from ..visual import (
     DEFAULT_BRIGHTNESS,
     DEFAULT_CONTRAST,
@@ -247,14 +247,9 @@ class VideoExportResult:
 
 
 def _resolve_charset(name_or_characters: str) -> str:
-    """Resolve a named alphabet while still allowing literal custom glyphs."""
+    """Resolve the shared preset/literal syntax used by still rendering."""
 
-    known = set(AlphabetManager.list_available_alphabets())
-    known.update(AlphabetManager.list_special_sets())
-    known.update(AlphabetManager.list_by_category(AlphabetCategory.LANGUAGES))
-    if name_or_characters in known:
-        return AlphabetManager.get_alphabet(name_or_characters)
-    return name_or_characters
+    return AlphabetManager.resolve_alphabet(name_or_characters, strict_names=True)
 
 
 def _font_candidates(explicit: str | os.PathLike[str] | None) -> tuple[str, ...]:

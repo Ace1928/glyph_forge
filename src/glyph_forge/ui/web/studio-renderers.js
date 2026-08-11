@@ -5,7 +5,7 @@ export const BRAILLE_GLYPHS = Array.from(
   (_, mask) => String.fromCodePoint(0x2800 + mask),
 ).join("");
 export const QUADRANT_GLYPHS = " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█";
-export const EDGE_GLYPHS = "─│╱╲";
+export const EDGE_GLYPHS = "─│╱╲━┃";
 
 const MODE_IDS = Object.freeze({
   glyph: 0,
@@ -39,17 +39,18 @@ function mixedCss(options, density) {
 }
 
 function adjustedPixel(pixels, offset, options) {
-  const channel = (value) => clamp(
-    ((value / 255 - 0.5) * options.contrast + 0.5) * options.brightness,
+  const channel = (value) => Math.round(clamp(
+    ((value - 127.5) * options.contrast + 127.5) * options.brightness,
     0,
-    1,
-  );
+    255,
+  ));
   const red = channel(pixels[offset]);
   const green = channel(pixels[offset + 1]);
   const blue = channel(pixels[offset + 2]);
-  let luma = red * 0.299 + green * 0.587 + blue * 0.114;
+  // Match the native SIMD-friendly 77/150/29 integer luma contract.
+  let luma = Math.floor((red * 77 + green * 150 + blue * 29) / 256) / 255;
   if (options.invert) luma = 1 - luma;
-  return [red * 255, green * 255, blue * 255, luma];
+  return [red, green, blue, luma];
 }
 
 function averageColor(samples) {
@@ -62,14 +63,46 @@ function averageColor(samples) {
   return total.map((value) => value / samples.length);
 }
 
-export function sampleGlyphFrame(source, options, canvas, context) {
-  const [subcolumns, subrows] = MODE_SUBCELLS[options.mode];
-  const sampleWidth = options.columns * subcolumns;
-  const sampleHeight = options.rows * subrows;
-  canvas.width = sampleWidth;
-  canvas.height = sampleHeight;
-  context.drawImage(source, 0, 0, sampleWidth, sampleHeight);
-  const pixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
+function sobelEdgeGlyphs(samples, width, height, threshold = 48) {
+  const at = (column, row) => samples[
+    clamp(row, 0, height - 1) * width + clamp(column, 0, width - 1)
+  ][3] * 255;
+  const gradients = [];
+  let peak = 0;
+  for (let row = 0; row < height; row += 1) {
+    for (let column = 0; column < width; column += 1) {
+      const topLeft = at(column - 1, row - 1);
+      const top = at(column, row - 1);
+      const topRight = at(column + 1, row - 1);
+      const left = at(column - 1, row);
+      const right = at(column + 1, row);
+      const bottomLeft = at(column - 1, row + 1);
+      const bottom = at(column, row + 1);
+      const bottomRight = at(column + 1, row + 1);
+      const gx = -topLeft + topRight - 2 * left + 2 * right
+        - bottomLeft + bottomRight;
+      const gy = -topLeft - 2 * top - topRight
+        + bottomLeft + 2 * bottom + bottomRight;
+      const magnitude = Math.hypot(gx, gy);
+      peak = Math.max(peak, magnitude);
+      gradients.push({ gx, gy, magnitude });
+    }
+  }
+  return gradients.map(({ gx, gy, magnitude }) => {
+    const normalized = peak > 0 ? Math.floor((magnitude * 255) / peak) : 0;
+    if (normalized < threshold) return null;
+    const tangent = ((Math.atan2(gy, gx) * 180) / Math.PI + 270) % 180;
+    const horizontal = tangent < 22.5 || tangent >= 157.5;
+    const diagonalUp = tangent >= 22.5 && tangent < 67.5;
+    const vertical = tangent >= 67.5 && tangent < 112.5;
+    if (horizontal) return normalized >= 176 ? "━" : "─";
+    if (diagonalUp) return "╱";
+    if (vertical) return normalized >= 176 ? "┃" : "│";
+    return "╲";
+  });
+}
+
+export function mapPixelGrid(pixels, sampleWidth, sampleHeight, options) {
   const samples = Array.from({ length: sampleWidth * sampleHeight }, (_, index) => (
     adjustedPixel(pixels, index * 4, options)
   ));
@@ -78,6 +111,9 @@ export function sampleGlyphFrame(source, options, canvas, context) {
       + clamp(column, 0, sampleWidth - 1)
   ];
   const densityGlyphs = Array.from(options.baseCharset);
+  const edgeGlyphs = options.mode === "edge"
+    ? sobelEdgeGlyphs(samples, sampleWidth, sampleHeight, options.edgeThreshold ?? 48)
+    : null;
   const glyphRows = [];
   const colors = [];
   const halfColors = [];
@@ -124,16 +160,8 @@ export function sampleGlyphFrame(source, options, canvas, context) {
           Math.floor(sample[3] * densityGlyphs.length),
         );
         let glyph = densityGlyphs[glyphIndex];
-        if (options.mode === "edge") {
-          const gx = at(column + 1, row)[3] - at(column - 1, row)[3];
-          const gy = at(column, row - 1)[3] - at(column, row + 1)[3];
-          const horizontal = Math.abs(gx);
-          const vertical = Math.abs(gy);
-          if (Math.hypot(gx, gy) >= 0.12) {
-            if (horizontal > vertical * 2) glyph = "│";
-            else if (vertical > horizontal * 2) glyph = "─";
-            else glyph = gx * gy >= 0 ? "╲" : "╱";
-          }
+        if (edgeGlyphs?.[row * sampleWidth + column]) {
+          glyph = edgeGlyphs[row * sampleWidth + column];
         }
         glyphRow.push(glyph);
         colorRow.push(sample);
@@ -150,6 +178,17 @@ export function sampleGlyphFrame(source, options, canvas, context) {
     halfColors,
     options,
   };
+}
+
+export function sampleGlyphFrame(source, options, canvas, context) {
+  const [subcolumns, subrows] = MODE_SUBCELLS[options.mode];
+  const sampleWidth = options.columns * subcolumns;
+  const sampleHeight = options.rows * subrows;
+  canvas.width = sampleWidth;
+  canvas.height = sampleHeight;
+  context.drawImage(source, 0, 0, sampleWidth, sampleHeight);
+  const pixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
+  return mapPixelGrid(pixels, sampleWidth, sampleHeight, options);
 }
 
 export class WebGLGlyphRenderer {
@@ -223,7 +262,10 @@ export class WebGLGlyphRenderer {
       }
 
       float density(vec2 uv) {
-        float value = dot(adjusted_color(uv), vec3(0.299, 0.587, 0.114));
+        float value = dot(
+          adjusted_color(uv),
+          vec3(0.30078125, 0.5859375, 0.11328125)
+        );
         return u_invert ? 1.0 - value : value;
       }
 
@@ -271,10 +313,12 @@ export class WebGLGlyphRenderer {
           float gy = above - below;
           float ax = abs(gx);
           float ay = abs(gy);
-          if (length(vec2(gx, gy)) >= 0.12) {
+          float strength = length(vec2(gx, gy));
+          if (strength >= 0.12) {
             float direction = ax > ay * 2.0
               ? 1.0
               : (ay > ax * 2.0 ? 0.0 : (gx * gy >= 0.0 ? 3.0 : 2.0));
+            if (strength >= 0.69 && direction < 2.0) direction += 4.0;
             glyph = u_base_glyph_count + direction;
           }
         }
