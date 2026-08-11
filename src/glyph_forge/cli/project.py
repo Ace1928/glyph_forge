@@ -72,7 +72,11 @@ def _available_asset_path(directory: Path, name: str) -> Path:
     stem = candidate.stem
     suffix = candidate.suffix
     index = 2
-    existing = {item.name.casefold() for item in directory.iterdir()} if directory.is_dir() else set()
+    existing = (
+        {item.name.casefold() for item in directory.iterdir()}
+        if directory.is_dir()
+        else set()
+    )
     while candidate.name.casefold() in existing:
         candidate = directory / f"{stem}-{index}{suffix}"
         index += 1
@@ -146,7 +150,9 @@ def new_project_command(
         except ProjectError:
             if not copy_asset:
                 raise
-            asset_path = _available_asset_path(project_path.parent / "assets", source.name)
+            asset_path = _available_asset_path(
+                project_path.parent / "assets", source.name
+            )
             atomic_copy_file(source, asset_path)
             copied_asset = asset_path
             reference = AssetReference.from_path(asset_path, project_path)
@@ -181,7 +187,9 @@ def project_info_command(
         readable=True,
         resolve_path=True,
     ),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON."
+    ),
 ) -> None:
     """Inspect variants, source portability, and recovery state."""
 
@@ -224,7 +232,11 @@ def project_info_command(
     console.print(
         f"Source · {project.source.path} · "
         + ("available" if asset.is_file() else "[red]missing[/red]")
-        + (" · [yellow]recovery available[/yellow]" if recovery_path(project_path).is_file() else "")
+        + (
+            " · [yellow]recovery available[/yellow]"
+            if recovery_path(project_path).is_file()
+            else ""
+        )
     )
 
 
@@ -247,18 +259,24 @@ def render_project_command(
         resolve_path=True,
         help="Atomic output path; previews glyph text when omitted.",
     ),
-    variant: Optional[str] = typer.Option(None, "--variant", help="Variant identifier."),
+    variant: Optional[str] = typer.Option(
+        None, "--variant", help="Variant identifier."
+    ),
     recover: bool = typer.Option(
         True,
         "--recover/--saved-only",
         help="Render a compatible autosave when one exists.",
     ),
-    json_output: bool = typer.Option(False, "--json", help="Emit render metrics as JSON."),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit render metrics as JSON."
+    ),
 ) -> None:
     """Render a saved or recovered project variant through the canonical engine."""
 
     try:
-        session = ProjectSession.open(project_path, recover=recover, autosave_delay=None)
+        session = ProjectSession.open(
+            project_path, recover=recover, autosave_delay=None
+        )
         selected = _variant(session.project, variant)
         artifact = render_image(
             session.project.source.resolve(project_path),
@@ -292,7 +310,9 @@ def render_project_command(
 
 @project_app.command("variant-add")
 def add_variant_command(
-    project_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
+    project_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
     identifier: str = typer.Argument(..., help="Portable unique identifier."),
     name: Optional[str] = typer.Option(None, "--name", help="Friendly display name."),
     preset: Optional[Path] = typer.Option(
@@ -310,7 +330,9 @@ def add_variant_command(
     try:
         with ProjectSession.open(project_path, autosave_delay=None) as session:
             request = load_preset(preset).request if preset is not None else None
-            session.add_variant(identifier, name or identifier, request, activate=activate)
+            session.add_variant(
+                identifier, name or identifier, request, activate=activate
+            )
             session.save()
         RecentProjectStore().touch(project_path)
     except ProjectError as exc:
@@ -320,7 +342,9 @@ def add_variant_command(
 
 @project_app.command("variant-select")
 def select_variant_command(
-    project_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
+    project_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
     identifier: str = typer.Argument(...),
 ) -> None:
     """Select a project's active render variant."""
@@ -336,7 +360,9 @@ def select_variant_command(
 
 @project_app.command("variant-remove")
 def remove_variant_command(
-    project_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
+    project_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
     identifier: str = typer.Argument(...),
 ) -> None:
     """Remove a render variant while always retaining one."""
@@ -352,7 +378,9 @@ def remove_variant_command(
 
 @project_app.command("recover")
 def recover_project_command(
-    project_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
+    project_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
     discard: bool = typer.Option(
         False,
         "--discard",
@@ -363,13 +391,17 @@ def recover_project_command(
 
     try:
         if discard:
-            session = ProjectSession.open(project_path, recover=False, autosave_delay=None)
+            session = ProjectSession.open(
+                project_path, recover=False, autosave_delay=None
+            )
             session.discard_recovery()
             session.close(checkpoint=False)
             error_console.print("[green]Discarded project recovery[/green]")
             return
         if not recovery_path(project_path).is_file():
-            raise typer.BadParameter("No project recovery is available", param_hint="project_path")
+            raise typer.BadParameter(
+                "No project recovery is available", param_hint="project_path"
+            )
         session = ProjectSession.open(project_path, recover=True, autosave_delay=None)
         session.save()
         session.close(checkpoint=False)
@@ -381,8 +413,12 @@ def recover_project_command(
 
 @project_app.command("recent")
 def recent_projects_command(
-    prune: bool = typer.Option(False, "--prune", help="Remove paths that no longer exist."),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    prune: bool = typer.Option(
+        False, "--prune", help="Remove paths that no longer exist."
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON."
+    ),
 ) -> None:
     """List bounded platform-native recent projects."""
 
@@ -392,7 +428,9 @@ def recent_projects_command(
             store.prune()
         projects = store.list()
     except ProjectError as exc:
-        error_console.print(f"[bold red]Could not read recent projects:[/bold red] {exc}")
+        error_console.print(
+            f"[bold red]Could not read recent projects:[/bold red] {exc}"
+        )
         raise typer.Exit(2) from exc
     if json_output:
         typer.echo(
@@ -420,8 +458,12 @@ def create_preset_command(
     height: Optional[int] = typer.Option(None, "--height", min=1, max=4096),
     mode: str = typer.Option("glyph", "--mode"),
     output_format: str = typer.Option("text", "--format"),
-    output_width: Optional[int] = typer.Option(None, "--output-width", min=1, max=32768),
-    output_height: Optional[int] = typer.Option(None, "--output-height", min=1, max=32768),
+    output_width: Optional[int] = typer.Option(
+        None, "--output-width", min=1, max=32768
+    ),
+    output_height: Optional[int] = typer.Option(
+        None, "--output-height", min=1, max=32768
+    ),
     fit: str = typer.Option("contain", "--fit-mode"),
     alignment: str = typer.Option("center", "--align"),
     charset: str = typer.Option("general", "--charset"),
@@ -457,7 +499,9 @@ def create_preset_command(
 
 @preset_app.command("export")
 def export_preset_command(
-    project_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
+    project_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
     output: Path = typer.Argument(..., dir_okay=False, resolve_path=True),
     variant: Optional[str] = typer.Option(None, "--variant"),
     name: Optional[str] = typer.Option(None, "--name"),
@@ -478,8 +522,12 @@ def export_preset_command(
 
 @preset_app.command("apply")
 def apply_preset_command(
-    preset_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
-    project_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
+    preset_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
+    project_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
     variant: Optional[str] = typer.Option(
         None,
         "--new-variant",
@@ -503,7 +551,9 @@ def apply_preset_command(
 
 @preset_app.command("info")
 def preset_info_command(
-    preset_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
+    preset_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Inspect a portable render preset."""
@@ -525,9 +575,15 @@ def preset_info_command(
 
 @preset_app.command("render")
 def render_preset_command(
-    preset_path: Path = typer.Argument(..., exists=True, dir_okay=False, resolve_path=True),
-    source: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True, resolve_path=True),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", dir_okay=False, resolve_path=True),
+    preset_path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, resolve_path=True
+    ),
+    source: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, readable=True, resolve_path=True
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", dir_okay=False, resolve_path=True
+    ),
 ) -> None:
     """Render one image using exactly the settings in a preset."""
 

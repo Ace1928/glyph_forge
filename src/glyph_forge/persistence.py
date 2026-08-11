@@ -92,13 +92,16 @@ def atomic_copy_file(
             raise OSError("source and destination must be different")
         source_mode = stat.S_IMODE(original.stat().st_mode)
         target.parent.mkdir(parents=True, exist_ok=True)
-        with original.open("rb") as input_stream, tempfile.NamedTemporaryFile(
-            mode="wb",
-            prefix=f".{target.name}.",
-            suffix=".tmp",
-            dir=target.parent,
-            delete=False,
-        ) as output_stream:
+        with (
+            original.open("rb") as input_stream,
+            tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=f".{target.name}.",
+                suffix=".tmp",
+                dir=target.parent,
+                delete=False,
+            ) as output_stream,
+        ):
             temporary = Path(output_stream.name)
             shutil.copyfileobj(input_stream, output_stream, length=1024 * 1024)
             output_stream.flush()

@@ -73,12 +73,8 @@ def test_cli_creates_portable_project_and_round_trips_preset_and_variant(
         "shared",
     ]
 
-    selected = invoke(
-        tmp_path, ["project", "variant-select", str(project), "default"]
-    )
-    removed = invoke(
-        tmp_path, ["project", "variant-remove", str(project), "shared"]
-    )
+    selected = invoke(tmp_path, ["project", "variant-select", str(project), "default"])
+    removed = invoke(tmp_path, ["project", "variant-remove", str(project), "shared"])
     assert selected.exit_code == removed.exit_code == 0
     assert len(load_project(project).variants) == 1
 
@@ -88,7 +84,9 @@ def test_cli_project_render_and_recovery_are_machine_readable(tmp_path: Path) ->
     source = project_dir / "source.png"
     source_image(source)
     project = project_dir / "art.glyphforge.json"
-    assert invoke(tmp_path, ["project", "new", str(project), str(source)]).exit_code == 0
+    assert (
+        invoke(tmp_path, ["project", "new", str(project), str(source)]).exit_code == 0
+    )
     interrupted = ProjectSession.open(project, autosave_delay=0)
     interrupted.update_active_request(RenderRequest(width=7, height=3))
     assert recovery_path(project).is_file()
@@ -168,7 +166,10 @@ def test_cli_preset_create_and_batch_share_one_exact_request(tmp_path: Path) -> 
         "same-2.glyph.svg",
         "same.glyph.svg",
     ]
-    assert all("viewBox=\"0 0 640.00 360.00\"" in path.read_text(encoding="utf-8") for path in output.iterdir())
+    assert all(
+        'viewBox="0 0 640.00 360.00"' in path.read_text(encoding="utf-8")
+        for path in output.iterdir()
+    )
 
 
 def test_reference_only_rejects_external_media_without_leaving_a_project(

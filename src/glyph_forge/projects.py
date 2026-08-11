@@ -67,8 +67,10 @@ class ProjectRecoveryError(ProjectError):
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace(
-        "+00:00", "Z"
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
     )
 
 
@@ -141,9 +143,7 @@ def _exact_keys(
     missing = required - values.keys()
     unknown = values.keys() - required - optional
     if missing:
-        raise ProjectValidationError(
-            f"{name} is missing {', '.join(sorted(missing))}"
-        )
+        raise ProjectValidationError(f"{name} is missing {', '.join(sorted(missing))}")
     if unknown:
         raise ProjectValidationError(
             f"{name} contains unknown fields: {', '.join(sorted(unknown))}"
@@ -152,15 +152,20 @@ def _exact_keys(
 
 def _encode(values: Mapping[str, Any]) -> str:
     try:
-        encoded = json.dumps(
-            values,
-            ensure_ascii=False,
-            indent=2,
-            sort_keys=True,
-            allow_nan=False,
-        ) + "\n"
+        encoded = (
+            json.dumps(
+                values,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        )
     except (TypeError, ValueError) as exc:
-        raise ProjectValidationError(f"Document is not JSON serializable: {exc}") from exc
+        raise ProjectValidationError(
+            f"Document is not JSON serializable: {exc}"
+        ) from exc
     if len(encoded.encode("utf-8")) > MAX_DOCUMENT_BYTES:
         raise ProjectValidationError(
             f"Document exceeds the {MAX_DOCUMENT_BYTES // (1024 * 1024)} MiB limit"
@@ -205,9 +210,7 @@ class AssetReference:
         if not isinstance(self.path, str) or not self.path:
             raise ProjectValidationError("asset path cannot be empty")
         if "\x00" in self.path or "\\" in self.path:
-            raise ProjectValidationError(
-                "asset path must use portable forward slashes"
-            )
+            raise ProjectValidationError("asset path must use portable forward slashes")
         normalized_path = unicodedata.normalize("NFC", self.path)
         candidate = PurePosixPath(normalized_path)
         if candidate.is_absolute() or candidate == PurePosixPath("."):
@@ -222,12 +225,16 @@ class AssetReference:
             if (
                 part.rstrip(" .") != part
                 or Path(part).stem.casefold() in _WINDOWS_RESERVED
-                or any(ord(character) < 32 or character in '<>"|?*' for character in part)
+                or any(
+                    ord(character) < 32 or character in '<>"|?*' for character in part
+                )
             ):
                 raise ProjectValidationError(
                     f"asset path segment {part!r} is not portable across operating systems"
                 )
-        normalized_kind = _bounded_string(self.kind, "asset kind", maximum=32).casefold()
+        normalized_kind = _bounded_string(
+            self.kind, "asset kind", maximum=32
+        ).casefold()
         if not _IDENTIFIER.fullmatch(normalized_kind):
             raise ProjectValidationError("asset kind must be a portable identifier")
         object.__setattr__(self, "path", candidate.as_posix())
@@ -241,7 +248,9 @@ class AssetReference:
         try:
             resolved.relative_to(root)
         except ValueError as exc:  # pragma: no cover - constructor is the first guard
-            raise ProjectValidationError("asset path escapes the project directory") from exc
+            raise ProjectValidationError(
+                "asset path escapes the project directory"
+            ) from exc
         return resolved
 
     @classmethod
@@ -442,17 +451,13 @@ class GlyphProject:
             name="project",
         )
         if selected["schema"] != PROJECT_SCHEMA:
-            raise ProjectValidationError(
-                f"Not a {PROJECT_SCHEMA!r} document"
-            )
+            raise ProjectValidationError(f"Not a {PROJECT_SCHEMA!r} document")
         raw_variants = selected["variants"]
         if not isinstance(raw_variants, list):
             raise ProjectValidationError("variants must be an array")
         return cls(
             name=selected["name"],
-            source=AssetReference.from_dict(
-                _mapping(selected["source"], "source")
-            ),
+            source=AssetReference.from_dict(_mapping(selected["source"], "source")),
             variants=tuple(
                 RenderVariant.from_dict(_mapping(item, "variant"))
                 for item in raw_variants
@@ -525,7 +530,9 @@ def save_project(project: GlyphProject, destination: str | os.PathLike[str]) -> 
 
     if not isinstance(project, GlyphProject):
         raise ProjectValidationError("project must be a GlyphProject")
-    return _write_json(Path(destination).expanduser(), project.to_dict(), kind="project")
+    return _write_json(
+        Path(destination).expanduser(), project.to_dict(), kind="project"
+    )
 
 
 def load_project(source: str | os.PathLike[str]) -> GlyphProject:
@@ -548,9 +555,7 @@ def save_preset(preset: RenderPreset, destination: str | os.PathLike[str]) -> Pa
 def load_preset(source: str | os.PathLike[str]) -> RenderPreset:
     """Load and validate one render preset."""
 
-    return RenderPreset.from_dict(
-        _read_json(Path(source).expanduser(), kind="preset")
-    )
+    return RenderPreset.from_dict(_read_json(Path(source).expanduser(), kind="preset"))
 
 
 def recovery_path(project_path: str | os.PathLike[str]) -> Path:
@@ -707,7 +712,7 @@ class ProjectSession:
             return self._project
         if record:
             self._undo.append(self._project)
-            del self._undo[:-self.history_limit]
+            del self._undo[: -self.history_limit]
             self._redo.clear()
         self._project = project
         self._dirty = True
@@ -748,7 +753,9 @@ class ProjectSession:
                 name,
                 request or self._project.active.request,
             )
-            if any(item.identifier == variant.identifier for item in self._project.variants):
+            if any(
+                item.identifier == variant.identifier for item in self._project.variants
+            ):
                 raise ProjectValidationError(
                     f"variant {variant.identifier!r} already exists"
                 )
@@ -772,7 +779,9 @@ class ProjectSession:
         selected = identifier.casefold()
         with self._lock:
             if len(self._project.variants) == 1:
-                raise ProjectValidationError("the last project variant cannot be removed")
+                raise ProjectValidationError(
+                    "the last project variant cannot be removed"
+                )
             variants = tuple(
                 item for item in self._project.variants if item.identifier != selected
             )
@@ -934,9 +943,7 @@ class RecentProjectStore:
                 values["schema"] != RECENTS_SCHEMA
                 or values["schema_version"] != RECENTS_SCHEMA_VERSION
             ):
-                raise ProjectValidationError(
-                    "Unsupported recent-project store version"
-                )
+                raise ProjectValidationError("Unsupported recent-project store version")
             raw_projects = values["projects"]
             if not isinstance(raw_projects, list) or len(raw_projects) > 1000:
                 raise ProjectValidationError("recent projects must be a bounded array")
@@ -952,7 +959,9 @@ class RecentProjectStore:
                 if not isinstance(item["path"], str) or not item["path"]:
                     raise ProjectValidationError("recent project path must be a string")
                 if "\x00" in item["path"]:
-                    raise ProjectValidationError("recent project path contains a null byte")
+                    raise ProjectValidationError(
+                        "recent project path contains a null byte"
+                    )
                 path = Path(item["path"]).expanduser().resolve()
                 accessed_at = _validated_timestamp(
                     item["accessed_at"], "recent project accessed_at"
@@ -984,9 +993,7 @@ class RecentProjectStore:
     def remove(self, project_path: str | os.PathLike[str]) -> Path:
         selected = Path(project_path).expanduser().resolve()
         with self._lock:
-            return self._save(
-                [item for item in self.list() if item.path != selected]
-            )
+            return self._save([item for item in self.list() if item.path != selected])
 
     def prune(self) -> Path:
         with self._lock:
