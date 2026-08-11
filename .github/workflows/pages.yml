@@ -1,8 +1,9 @@
 name: Pages
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -11,23 +12,35 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: pages-main
   cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy browser Studio
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Stage static Studio
         run: |
           mkdir -p _site
           cp -r src/glyph_forge/ui/web/. _site/
+          mkdir -p _site/api
+          printf '%s\n' '{"share_links":false,"public_base_url":null,"default_ttl_seconds":null,"max_upload_bytes":0,"csrf_token":null}' > _site/api/config
+          touch _site/.nojekyll
+          python -m json.tool _site/manifest.webmanifest >/dev/null
+          python -m json.tool _site/api/config >/dev/null
 
       - uses: actions/configure-pages@v6
 

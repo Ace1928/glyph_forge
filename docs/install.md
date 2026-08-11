@@ -4,10 +4,26 @@ Choose the route that matches how you want to use Glyph Forge:
 
 | Route | Python needed | Updates | Best for |
 |---|---:|---|---|
+| browser / installed web app | no | automatic | phones, tablets, Chromebooks, and instant sharing |
 | `uv tool` | managed automatically | `uv tool upgrade glyph-forge` | fastest isolated install |
 | pipx | managed automatically | `pipx upgrade glyph-forge` | familiar isolated CLI install |
 | portable archive | no | replace the unpacked directory | friends and machines without Python |
 | `pip` in a venv | yes, 3.10–3.14 | `pip install --upgrade` | Python/API development |
+
+## Install the browser Studio
+
+Open [ace1928.github.io/glyph_forge](https://ace1928.github.io/glyph_forge/).
+Chrome and Edge expose an **Install app** prompt; Safari uses **Add to Dock** on
+macOS or **Add to Home Screen** on iPhone and iPad. The installed Studio runs in
+its own window and can reopen its editor shell offline after the first visit.
+Selected images, video, camera/screen streams, exports, API responses, and
+temporary shares are excluded from offline storage.
+
+The web route needs no Python and remains useful when a browser does not offer
+installation. Camera, microphone, screen capture, recording, file-handler, and
+Web Share support follow the browser and operating system permission model;
+controls whose underlying API is unavailable are disabled without affecting
+the rest of the editor.
 
 ## Fast isolated install
 

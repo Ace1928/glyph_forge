@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">Glyph Forge</title>
+  <desc id="description">GF monogram formed inside a glowing glyph grid.</desc>
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0d211c"/>
+      <stop offset="1" stop-color="#030706"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.72" cy="0.12" r="0.9">
+      <stop stop-color="#5fffc1" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#5fffc1" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse">
+      <path d="M34 0H0V34" fill="none" stroke="#5fffc1" stroke-opacity=".055" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#050a09"/>
+  <rect x="22" y="22" width="468" height="468" rx="96" fill="url(#surface)" stroke="#265f4e" stroke-width="4"/>
+  <rect x="22" y="22" width="468" height="468" rx="96" fill="url(#glow)"/>
+  <rect x="44" y="44" width="424" height="424" rx="76" fill="url(#grid)"/>
+  <path d="M185 153h-53c-32 0-55 23-55 56v94c0 34 23 56 57 56h79V248h-74v41h25v25h-28c-8 0-13-5-13-14v-88c0-10 5-15 14-15h48V153Zm42 0v206h48v-79h76v-45h-76v-38h86v-44H227Z" fill="#e8fff7"/>
+  <path d="M91 407h330" stroke="#5fffc1" stroke-width="5" stroke-linecap="round"/>
+  <g fill="#5fffc1">
+    <circle cx="105" cy="407" r="8"/>
+    <circle cx="137" cy="407" r="5" opacity=".8"/>
+    <circle cx="164" cy="407" r="3" opacity=".6"/>
+  </g>
+</svg>

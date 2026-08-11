@@ -6,11 +6,14 @@ include README.md
 include ROADMAP.md
 include SECURITY.md
 include pyproject.toml
+include package.json
+include package-lock.json
+include playwright.config.mjs
 
 include src/glyph_forge/py.typed
 recursive-include examples *.py
 recursive-include docs *.md
 recursive-include tools *.py *.spec
 recursive-include src/glyph_forge/resources *.yml
-recursive-include src/glyph_forge/ui *.css *.html *.js
-recursive-include tests *.py
+recursive-include src/glyph_forge/ui *.css *.html *.js *.png *.svg *.webmanifest
+recursive-include tests *.py *.mjs

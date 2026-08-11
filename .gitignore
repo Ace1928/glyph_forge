@@ -36,6 +36,10 @@ ENV/
 .coverage
 coverage.xml
 htmlcov/
+node_modules/
+playwright-report/
+test-results/
+blob-report/
 
 # Misc
 *.log

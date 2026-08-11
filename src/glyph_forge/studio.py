@@ -199,6 +199,12 @@ class _StudioHandler(SimpleHTTPRequestHandler):
     server_version = "GlyphForgeStudio/0.3"
     sys_version = ""
     protocol_version = "HTTP/1.1"
+    extensions_map = {
+        **SimpleHTTPRequestHandler.extensions_map,
+        ".js": "text/javascript",
+        ".svg": "image/svg+xml",
+        ".webmanifest": "application/manifest+json",
+    }
 
     def __init__(
         self,
@@ -217,6 +223,13 @@ class _StudioHandler(SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header(
+            "Permissions-Policy",
+            "camera=(self), microphone=(self), display-capture=(self), "
+            "fullscreen=(self), geolocation=(), payment=(), serial=(), usb=()",
+        )
         if self._share_response:
             self.send_header(
                 "Content-Security-Policy",
@@ -228,8 +241,9 @@ class _StudioHandler(SimpleHTTPRequestHandler):
                 "Content-Security-Policy",
                 "default-src 'self'; img-src 'self' blob: data:; "
                 "media-src 'self' blob:; connect-src 'self'; "
-                "style-src 'self'; script-src 'self'; object-src 'none'; "
-                "base-uri 'none'; frame-ancestors 'none'",
+                "style-src 'self'; script-src 'self'; worker-src 'self'; "
+                "manifest-src 'self'; object-src 'none'; base-uri 'none'; "
+                "form-action 'none'; frame-ancestors 'none'",
             )
         super().end_headers()
 

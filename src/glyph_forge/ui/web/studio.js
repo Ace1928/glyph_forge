@@ -30,6 +30,7 @@ const elements = {
   emptyState: $("emptyState"),
   emptyOpen: $("emptyOpenButton"),
   canvasShell: $("canvasShell"),
+  install: $("installButton"),
   webcam: $("webcamButton"),
   screen: $("screenButton"),
   stop: $("stopButton"),
@@ -78,7 +79,13 @@ const state = {
   objectUrl: null,
   generation: 0,
   frameTimes: [],
+  lastMetricPaint: 0,
+  lastRenderAt: 0,
   renderer: null,
+  rendererEventsBound: false,
+  options: null,
+  optionsDirty: true,
+  installPrompt: null,
   dimensions: { width: 1280, height: 720, rows: 72 },
   recording: null,
   audioBridge: null,
@@ -128,6 +135,15 @@ function isDynamicSource() {
   return ["video", "webcam", "screen"].includes(state.sourceKind) || Boolean(state.gifFrames);
 }
 
+function performanceTier() {
+  const memory = Number(navigator.deviceMemory) || 4;
+  const cores = Number(navigator.hardwareConcurrency) || 4;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  if (memory >= 12 || cores >= 12) return "workstation";
+  if (memory <= 3 || cores <= 2 || (coarse && cores <= 4)) return "modest";
+  return "balanced";
+}
+
 function sourceSize() {
   if (!state.source) return { width: 1280, height: 720 };
   if (state.sourceKind === "image") {
@@ -140,19 +156,11 @@ function sourceSize() {
 }
 
 function adaptiveHeight() {
-  const memory = navigator.deviceMemory || 4;
-  const cores = navigator.hardwareConcurrency || 4;
-  if (memory >= 12 && cores >= 12) return 1080;
-  if (memory <= 3 || cores <= 2) return 540;
-  return 720;
+  return { workstation: 1080, balanced: 720, modest: 540 }[performanceTier()];
 }
 
 function adaptiveColumns() {
-  const memory = navigator.deviceMemory || 4;
-  const cores = navigator.hardwareConcurrency || 4;
-  if (memory >= 12 && cores >= 12) return 240;
-  if (memory <= 3 || cores <= 2) return 96;
-  return 160;
+  return { workstation: 240, balanced: 160, modest: 96 }[performanceTier()];
 }
 
 function targetDimensions() {
@@ -180,10 +188,11 @@ function targetDimensions() {
 }
 
 function currentOptions() {
+  if (!state.optionsDirty && state.options) return state.options;
   const dimensions = targetDimensions();
   const source = sourceSize();
   const baseCharset = densityCharset();
-  return {
+  state.options = {
     ...dimensions,
     sourceWidth: source.width,
     sourceHeight: source.height,
@@ -202,6 +211,13 @@ function currentOptions() {
     contrast: Number(elements.contrast.value),
     invert: elements.invert.checked,
   };
+  state.optionsDirty = false;
+  return state.options;
+}
+
+function invalidateOptions() {
+  state.options = null;
+  state.optionsDirty = true;
 }
 
 function initializeRenderer() {
@@ -212,6 +228,20 @@ function initializeRenderer() {
     console.warn("WebGL2 renderer unavailable; using Canvas 2D", error);
     state.renderer = new CanvasGlyphRenderer(elements.canvas);
     elements.engine.textContent = "Canvas 2D";
+  }
+  if (!state.rendererEventsBound) {
+    elements.canvas.addEventListener("webglcontextlost", (event) => {
+      event.preventDefault();
+      state.renderer = null;
+      elements.engine.textContent = "GPU recovering";
+      setStatus("The GPU context paused. Glyph Forge will resume automatically.");
+    });
+    elements.canvas.addEventListener("webglcontextrestored", () => {
+      initializeRenderer();
+      if (state.source) renderCurrent();
+      setStatus("GPU rendering restored.");
+    });
+    state.rendererEventsBound = true;
   }
 }
 
@@ -248,45 +278,59 @@ function updateMetrics(timestamp) {
   state.frameTimes.push(timestamp);
   const cutoff = timestamp - 1000;
   while (state.frameTimes.length && state.frameTimes[0] < cutoff) state.frameTimes.shift();
-  elements.fps.textContent = String(Math.max(0, state.frameTimes.length - 1));
+  if (timestamp - state.lastMetricPaint >= 250) {
+    elements.fps.textContent = String(Math.max(0, state.frameTimes.length - 1));
+    state.lastMetricPaint = timestamp;
+  }
 }
 
-  function gifAdvance(timestamp) {
-    if (!state.gifDurations || !state.gifFrames || state.gifDurations.length < 2) return;
-    if (state.gifElapsedBase === undefined) state.gifElapsedBase = timestamp;
-    let elapsed = timestamp - state.gifElapsedBase;
-    let index = state.gifIndex || 0;
-    while (elapsed > 0) {
-      const duration = state.gifDurations[index];
-      if (elapsed < duration) break;
-      elapsed -= duration;
-      index = (index + 1) % state.gifDurations.length;
-    }
-    if (index !== state.gifIndex) {
-      state.gifIndex = index;
-      state.source.src = state.gifFrames[index];
-    }
+function gifAdvance(timestamp) {
+  if (!state.gifDurations || !state.gifFrames || state.gifDurations.length < 2) return;
+  if (state.gifElapsedBase === undefined) state.gifElapsedBase = timestamp;
+  let elapsed = timestamp - state.gifElapsedBase;
+  let index = state.gifIndex || 0;
+  while (elapsed > 0) {
+    const duration = state.gifDurations[index];
+    if (elapsed < duration) break;
+    elapsed -= duration;
+    index = (index + 1) % state.gifDurations.length;
   }
+  if (index !== state.gifIndex) {
+    state.gifIndex = index;
+    state.source.src = state.gifFrames[index];
+  }
+}
 
-  function renderCurrent(timestamp = performance.now()) {
-    if (!state.source || !state.renderer) return;
-    try {
-      gifAdvance(timestamp);
-      state.renderer.draw(state.source, currentOptions());
-      updateMetrics(timestamp);
-    } catch (error) {
-      console.error(error);
-      setStatus(`Render failed: ${error.message}`, true);
-    }
+function renderCurrent(timestamp = performance.now()) {
+  if (!state.source || !state.renderer) return;
+  try {
+    gifAdvance(timestamp);
+    state.renderer.draw(state.source, currentOptions());
+    state.lastRenderAt = timestamp;
+    updateMetrics(timestamp);
+  } catch (error) {
+    console.error(error);
+    setStatus(`Render failed: ${error.message}`, true);
   }
+}
+
+function shouldRender(timestamp) {
+  if (document.hidden && !state.recording) return false;
+  const fallbackBudget = elements.engine.textContent.startsWith("Canvas")
+    ? (performanceTier() === "modest" ? 50 : 1000 / 30)
+    : 0;
+  return !fallbackBudget || timestamp - state.lastRenderAt >= fallbackBudget;
+}
 
 function beginRenderLoop() {
   state.generation += 1;
   const generation = state.generation;
   state.frameTimes = [];
+  state.lastMetricPaint = 0;
+  state.lastRenderAt = 0;
   const frame = (timestamp) => {
     if (generation !== state.generation || !state.source) return;
-    renderCurrent(timestamp);
+    if (shouldRender(timestamp)) renderCurrent(timestamp);
     if (isDynamicSource()) schedule();
   };
   const schedule = () => {
@@ -300,6 +344,7 @@ function beginRenderLoop() {
 }
 
 function describeSource(name) {
+  invalidateOptions();
   const size = sourceSize();
   elements.sourceName.textContent = name;
   elements.sourceMeta.textContent = `${size.width}×${size.height} · ${state.sourceKind}`;
@@ -327,6 +372,9 @@ async function stopSource({ reset = true, saveRecording = true } = {}) {
   state.source = null;
   state.sourceKind = null;
   state.frameTimes = [];
+  state.lastMetricPaint = 0;
+  state.lastRenderAt = 0;
+  invalidateOptions();
   state.gifFrames = null;
   state.gifDurations = null;
   state.gifIndex = 0;
@@ -388,18 +436,31 @@ async function openFile(file) {
   await stopSource({ reset: false });
   try {
     state.objectUrl = URL.createObjectURL(file);
-    if (file.type.startsWith("video/")) {
+    const mediaType = file.type.toLowerCase();
+    const filename = file.name.toLowerCase();
+    const videoFile = mediaType.startsWith("video/")
+      || /\.(mp4|m4v|mov|webm|ogv|avi|mkv)$/u.test(filename);
+    const imageFile = mediaType.startsWith("image/")
+      || /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/u.test(filename);
+    if (videoFile) {
       state.sourceKind = "video";
       elements.video.src = state.objectUrl;
       elements.video.loop = true;
       await waitForVideo(elements.video);
       await elements.video.play();
       state.source = elements.video;
-    } else if (file.type.startsWith("image/")) {
+    } else if (imageFile) {
       state.sourceKind = "image";
       const image = new Image();
       image.src = state.objectUrl;
-      await image.decode();
+      if (typeof image.decode === "function") {
+        await image.decode();
+      } else {
+        await new Promise((resolve, reject) => {
+          image.addEventListener("load", resolve, { once: true });
+          image.addEventListener("error", () => reject(new Error("The browser could not decode this image")), { once: true });
+        });
+      }
       state.source = image;
     } else {
       throw new Error("Choose an image or video file");
@@ -580,7 +641,10 @@ function download(blob, filename) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.hidden = true;
+  document.body.append(anchor);
   anchor.click();
+  anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -911,9 +975,13 @@ async function shareOutput() {
   }
 }
 
+function studioEndpoint(path) {
+  return new URL(path.replace(/^\//u, ""), document.baseURI);
+}
+
 async function loadStudioConfig() {
   try {
-    const response = await fetch("/api/config", {
+    const response = await fetch(studioEndpoint("api/config"), {
       credentials: "same-origin",
       headers: { Accept: "application/json" },
     });
@@ -950,7 +1018,8 @@ async function publishLink() {
       throw new Error(`PNG is larger than the ${limit} MiB link limit`);
     }
     const filename = outputName("png");
-    const response = await fetch(`/api/share?name=${encodeURIComponent(filename)}`, {
+    const endpoint = studioEndpoint(`api/share?name=${encodeURIComponent(filename)}`);
+    const response = await fetch(endpoint, {
       method: "POST",
       credentials: "same-origin",
       headers: {
@@ -1031,8 +1100,101 @@ function syncControlLabels() {
 }
 
 function rerender() {
+  invalidateOptions();
   syncControlLabels();
   if (state.source && !isDynamicSource()) renderCurrent();
+}
+
+function standaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function syncInstallButton() {
+  const eligible = window.location.protocol === "https:" && !standaloneMode();
+  elements.install.classList.toggle("hidden", !eligible);
+}
+
+async function installStudio() {
+  if (state.installPrompt) {
+    const prompt = state.installPrompt;
+    state.installPrompt = null;
+    await prompt.prompt();
+    const choice = await prompt.userChoice;
+    if (choice.outcome === "accepted") {
+      elements.install.classList.add("hidden");
+      setStatus("Glyph Forge is being installed.");
+    } else {
+      setStatus("Installation cancelled. The browser Studio remains ready here.");
+    }
+    return;
+  }
+  const appleMobile = /iPad|iPhone|iPod/u.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const safari = /Safari/u.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg/u.test(navigator.userAgent);
+  if (appleMobile) {
+    setStatus("To install on iPhone or iPad, open Share and choose Add to Home Screen.");
+  } else if (safari) {
+    setStatus("To install from Safari, choose Add to Dock from the File menu.");
+  } else {
+    setStatus("Choose Install app or Add to Home Screen from your browser menu.");
+  }
+}
+
+function syncCapabilities() {
+  const media = navigator.mediaDevices;
+  const camera = Boolean(window.isSecureContext && media?.getUserMedia);
+  const screen = Boolean(window.isSecureContext && media?.getDisplayMedia);
+  elements.webcam.disabled = !camera;
+  elements.webcam.title = camera ? "" : "Webcam capture needs a secure, supported browser";
+  elements.screen.disabled = !screen;
+  elements.screen.title = screen ? "" : "Screen capture is unavailable on this browser or device";
+  if (!recordingSupported()) {
+    elements.record.title = "This browser cannot record a canvas stream; still-image exports remain available";
+  }
+}
+
+function bindInstallability() {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    state.installPrompt = event;
+    syncInstallButton();
+  });
+  window.addEventListener("appinstalled", () => {
+    state.installPrompt = null;
+    elements.install.classList.add("hidden");
+    setStatus("Glyph Forge installed. It can now launch like an app.");
+  });
+  window.matchMedia("(display-mode: standalone)").addEventListener?.("change", syncInstallButton);
+  elements.install.addEventListener("click", () => void installStudio());
+  syncInstallButton();
+}
+
+function bindLaunchQueue() {
+  if (!window.launchQueue?.setConsumer) return;
+  window.launchQueue.setConsumer(async (launchParams) => {
+    const [handle] = launchParams.files || [];
+    if (!handle) return;
+    try {
+      await openFile(await handle.getFile());
+    } catch (error) {
+      setStatus(`Could not open the shared file: ${error.message}`, true);
+    }
+  });
+}
+
+async function registerServiceWorker() {
+  const installableOrigin = window.location.protocol === "https:"
+    || window.location.hostname === "localhost";
+  if (!("serviceWorker" in navigator) || !installableOrigin) return;
+  try {
+    await navigator.serviceWorker.register("./service-worker.js", {
+      scope: "./",
+      updateViaCache: "none",
+    });
+  } catch (error) {
+    console.warn("Offline app installation is unavailable", error);
+  }
 }
 
 function bindEvents() {
@@ -1068,6 +1230,9 @@ function bindEvents() {
   elements.fullscreen.addEventListener("click", () => void toggleFullscreen());
   document.addEventListener("fullscreenchange", syncFullscreenUi);
   document.addEventListener("webkitfullscreenchange", syncFullscreenUi);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.source && !isDynamicSource()) renderCurrent();
+  });
 
   for (const control of [
     elements.mode, elements.charset, elements.customCharset, elements.font, elements.columns,
@@ -1097,12 +1262,16 @@ function bindEvents() {
     void openFile(event.dataTransfer.files[0]);
   });
 
-  window.addEventListener("beforeunload", () => void stopSource({ reset: false, saveRecording: false }));
+  window.addEventListener("pagehide", () => void stopSource({ reset: false, saveRecording: false }));
 }
 
 restoreSettings();
 syncControlLabels();
 initializeRenderer();
+syncCapabilities();
 bindEvents();
-loadStudioConfig();
+bindInstallability();
+bindLaunchQueue();
+void registerServiceWorker();
+void loadStudioConfig();
 setStatus("Ready. Nothing is uploaded.");

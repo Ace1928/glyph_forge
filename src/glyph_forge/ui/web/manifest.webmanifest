@@ -1,0 +1,63 @@
+{
+  "id": "./",
+  "name": "Glyph Forge Studio",
+  "short_name": "Glyph Forge",
+  "description": "Private, GPU-accelerated glyph art for images, video, text, webcams, and screens.",
+  "start_url": "./",
+  "scope": "./",
+  "lang": "en",
+  "dir": "ltr",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#050a09",
+  "theme_color": "#07110f",
+  "categories": ["photo", "video", "entertainment", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Braille forge",
+      "short_name": "Braille",
+      "description": "Open Glyph Forge in 2×4 Braille subpixel mode.",
+      "url": "./#mode=braille&style=detailed&columns=160&resolution=auto&color=source&ink=e8fff7&canvas=07110f&brightness=1&contrast=1&invert=0&font=0"
+    },
+    {
+      "name": "Full-colour blocks",
+      "short_name": "Colour blocks",
+      "description": "Open Glyph Forge in high-fidelity half-block mode.",
+      "url": "./#mode=half-block&style=detailed&columns=160&resolution=auto&color=source&ink=e8fff7&canvas=07110f&brightness=1&contrast=1&invert=0&font=0"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "image/*": [".avif", ".bmp", ".gif", ".heic", ".heif", ".jpeg", ".jpg", ".png", ".svg", ".webp"],
+        "video/*": [".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm"]
+      }
+    }
+  ],
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  }
+}

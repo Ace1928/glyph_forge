@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Glyph Forge Studio</title>
+  <desc id="description">Visuals become living type in a private GPU-accelerated studio.</desc>
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#10261f"/>
+      <stop offset=".58" stop-color="#07110f"/>
+      <stop offset="1" stop-color="#030706"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".77" cy=".08" r=".72">
+      <stop stop-color="#5fffc1" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#5fffc1" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="38" height="38" patternUnits="userSpaceOnUse">
+      <path d="M38 0H0V38" fill="none" stroke="#5fffc1" stroke-opacity=".045" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#surface)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect x="74" y="72" width="92" height="92" rx="22" fill="#091713" stroke="#5fffc1" stroke-width="2"/>
+  <text x="120" y="130" fill="#5fffc1" font-family="monospace" font-size="28" font-weight="800" text-anchor="middle">GF</text>
+  <text x="194" y="114" fill="#e8fff7" font-family="Arial, sans-serif" font-size="34" font-weight="800">Glyph Forge</text>
+  <text x="194" y="148" fill="#86a89d" font-family="Arial, sans-serif" font-size="19">LOCAL VISUAL FOUNDRY</text>
+  <text x="74" y="285" fill="#e8fff7" font-family="Arial, sans-serif" font-size="68" font-weight="800" letter-spacing="-2">Visuals become</text>
+  <text x="74" y="363" fill="#5fffc1" font-family="Arial, sans-serif" font-size="68" font-weight="800" letter-spacing="-2">living type.</text>
+  <text x="78" y="424" fill="#a5c6bb" font-family="Arial, sans-serif" font-size="25">Images · Video · Webcam · Screen · Text</text>
+  <g transform="translate(760 170)" font-family="monospace" font-size="24" font-weight="700" fill="#5fffc1">
+    <text y="0">░▒▓█▓▒░  ░▒▓█▓▒░</text>
+    <text y="34" opacity=".88">▒▓███▓▒  ▒▓███▓▒</text>
+    <text y="68" opacity=".76">▓██░██▓  ▓██░██▓</text>
+    <text y="102" opacity=".68">██▓▒▓██  ██▓▒▓██</text>
+    <text y="136" opacity=".58">▓█████▓  ▓█████▓</text>
+    <text y="170" opacity=".48">▒▓███▓▒  ▒▓███▓▒</text>
+    <text y="204" opacity=".36">░▒▓█▓▒░  ░▒▓█▓▒░</text>
+  </g>
+  <rect x="74" y="498" width="1052" height="1" fill="#2d5e50"/>
+  <circle cx="88" cy="551" r="7" fill="#5fffc1"/>
+  <text x="108" y="559" fill="#86a89d" font-family="Arial, sans-serif" font-size="20">Private by design</text>
+  <text x="1126" y="559" fill="#86a89d" font-family="monospace" font-size="19" text-anchor="end">GPU · CANVAS · OFFLINE</text>
+</svg>

@@ -51,6 +51,9 @@ slow client or burst of connections from creating unbounded work.
 
 The ordinary **Share file** button still uses the browser's Web Share API where
 available, and **Copy style link** still contains settings without media.
+The installable Studio's service worker explicitly bypasses `/api/` and `/s/`
+routes, so temporary publications and capability responses are never placed in
+its offline cache.
 
 ## Security model
 

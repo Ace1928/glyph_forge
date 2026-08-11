@@ -62,6 +62,10 @@ def test_studio_serves_assets_with_security_headers() -> None:
     assert "Glyph Forge Studio" in html
     assert headers["X-Content-Type-Options"] == "nosniff"
     assert "object-src 'none'" in headers["Content-Security-Policy"]
+    assert "worker-src 'self'" in headers["Content-Security-Policy"]
+    assert "camera=(self)" in headers["Permissions-Policy"]
+    assert headers["Cross-Origin-Resource-Policy"] == "same-origin"
+    assert headers["X-Frame-Options"] == "DENY"
     assert headers["Cache-Control"] == "no-store"
 
 
@@ -282,8 +286,39 @@ def test_browser_assets_include_opt_in_publish_controls() -> None:
             javascript = response.read().decode("utf-8")
 
     assert 'id="publishButton"' in html
-    assert 'fetch("/api/config"' in javascript
-    assert "fetch(`/api/share?name=" in javascript
+    assert 'fetch(studioEndpoint("api/config")' in javascript
+    assert "studioEndpoint(`api/share?name=" in javascript
+
+
+def test_browser_assets_form_an_installable_offline_app_shell() -> None:
+    with StudioServer(port=0) as server:
+        assets: dict[str, tuple[str, bytes]] = {}
+        for name in (
+            "manifest.webmanifest",
+            "service-worker.js",
+            "icon.svg",
+            "icon-192.png",
+            "icon-512.png",
+            "apple-touch-icon.png",
+            "social-card.png",
+        ):
+            with urllib.request.urlopen(f"{server.url}{name}", timeout=2) as response:
+                assets[name] = (response.headers.get_content_type(), response.read())
+
+    manifest = json.loads(assets["manifest.webmanifest"][1])
+    assert assets["manifest.webmanifest"][0] == "application/manifest+json"
+    assert assets["service-worker.js"][0] == "text/javascript"
+    assert manifest["display"] == "standalone"
+    assert manifest["start_url"] == "./"
+    assert {icon["sizes"] for icon in manifest["icons"]} >= {"192x192", "512x512"}
+    assert manifest["file_handlers"][0]["action"] == "./"
+    assert assets["icon-192.png"][1].startswith(b"\x89PNG\r\n\x1a\n")
+    assert assets["icon-512.png"][1].startswith(b"\x89PNG\r\n\x1a\n")
+    assert assets["apple-touch-icon.png"][1].startswith(b"\x89PNG\r\n\x1a\n")
+    assert assets["social-card.png"][1].startswith(b"\x89PNG\r\n\x1a\n")
+    worker = assets["service-worker.js"][1].decode("utf-8")
+    assert 'url.pathname.includes("/api/")' in worker
+    assert 'url.pathname.includes("/s/")' in worker
 
 
 def test_browser_assets_expose_full_fidelity_and_recording_controls() -> None:
@@ -300,6 +335,7 @@ def test_browser_assets_expose_full_fidelity_and_recording_controls() -> None:
         "audioToggle",
         "recordButton",
         "fullscreenButton",
+        "installButton",
     ):
         assert f'id="{control}"' in html
     assert '<script type="module" src="studio.js"></script>' in html
@@ -318,7 +354,7 @@ def test_browser_assets_expose_full_fidelity_and_recording_controls() -> None:
 def test_browser_javascript_parses() -> None:
     with StudioServer(port=0) as server:
         assets = []
-        for name in ("studio.js", "studio-renderers.js"):
+        for name in ("studio.js", "studio-renderers.js", "service-worker.js"):
             with urllib.request.urlopen(f"{server.url}{name}", timeout=2) as response:
                 assets.append((name, response.read()))
 

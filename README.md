@@ -267,6 +267,21 @@ quadrant 2×2, and true-colour half-block modes as the maintained live engine;
 a complete Canvas2D fallback keeps those modes available without a GPU. The
 same static pages power the GitHub Pages playground.
 
+The public Studio is an installable progressive web app. On Chrome or Edge,
+use **Install app**; on Safari, use **Add to Dock** or **Add to Home Screen**.
+Its versioned offline shell caches only the Studio code, manifest, and brand
+assets—never selected media, generated output, API responses, or temporary
+shares. After one online visit, the installed editor can reopen offline and
+continue processing local files and text.
+
+Phone and tablet layouts keep a compact live preview docked above the controls,
+honour notches and safe areas, use coarse-pointer touch targets of at least 44
+CSS pixels, and avoid hover-only actions. Unsupported device APIs are disabled
+cleanly: for example, iPhone browsers without screen capture still retain file,
+text, camera (where permitted), styling, and export workflows. Adaptive defaults
+start at 96, 160, or 240 glyph columns for modest, balanced, and workstation
+hardware; every quality control remains manually overridable.
+
 For uploaded videos, **Render full video** restarts at frame zero and saves the
 whole processed result when playback ends. Webcam and screen sources use a
 manual **Record live video** toggle. When **Include source audio** is enabled,
@@ -315,6 +330,12 @@ or the command stops. Capability URLs are random but use unencrypted HTTP: use
 `--lan` only on a trusted local network and share the URL only with intended
 viewers. Glyph Forge does not provide a public Internet relay or hosted storage.
 See [the sharing guide](docs/sharing.md) for behavior and security boundaries.
+
+The browser surface is release-gated in Chromium, Firefox, and WebKit, plus
+Pixel-class and iPhone-class touch profiles. Those checks exercise every render
+mode, offline recovery, responsive geometry, accessible semantics, touch target
+sizes, startup rendering latency, and a dependency-free app-shell size budget.
+GitHub Pages deploys only after the complete repository CI run succeeds.
 
 ## Glyph codes — the artwork IS the link
 
