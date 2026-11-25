@@ -1,6 +1,7 @@
 """Render a sequence of images to an animated GIF."""
 
 from typing import List
+
 from PIL import Image
 
 

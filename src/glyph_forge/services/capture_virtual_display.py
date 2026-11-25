@@ -20,9 +20,13 @@ def start_virtual_display(width: int = 1024, height: int = 768) -> Optional[obje
     """
     if Display is None:
         return None
-    display = Display(visible=False, size=(width, height))
-    display.start()
-    return display
+    try:
+        display = Display(visible=False, size=(width, height))
+        display.start()
+        return display
+    except Exception:
+        # Missing Xvfb or patched subprocess implementations can fail at runtime.
+        return None
 
 
 def stop_virtual_display(display: object) -> None:

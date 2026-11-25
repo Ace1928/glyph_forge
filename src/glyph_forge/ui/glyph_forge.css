@@ -1,4 +1,467 @@
-/* Minimal styles for Glyph Forge TUI */
+/* Glyph Forge TUI styles */
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 🎨 Color Variables */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+$primary: #ffd700;
+$secondary: #00d4ff;
+$accent: #ff6b6b;
+$success: #50fa7b;
+$warning: #ffb86c;
+$error: #ff5555;
+$surface: #1e1e2e;
+$surface-light: #313244;
+$text: #cdd6f4;
+$text-muted: #6c7086;
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 📱 Screen Layout */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
 Screen {
+    background: $surface;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 🔝 Header & Footer */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+Header {
+    background: $primary;
+    color: $surface;
+    text-style: bold;
+}
+
+Footer {
+    background: $surface-light;
+}
+
+FooterKey {
+    background: $surface-light;
+    color: $primary;
+}
+
+FooterKey > .footer-key--key {
+    background: $primary;
+    color: $surface;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 📑 Tabs */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+TabbedContent {
+    height: 1fr;
+}
+
+TabPane {
+    padding: 0;
+}
+
+Tabs {
+    background: $surface-light;
+}
+
+Tab {
+    background: $surface-light;
+    color: $text-muted;
+    padding: 1 3;
+}
+
+Tab:hover {
+    background: $surface;
+    color: $text;
+}
+
+Tab.-active {
+    background: $surface;
+    color: $primary;
+    text-style: bold;
+    border-bottom: solid #ffd700;
+}
+
+Underline {
+    background: $primary;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 🎛️ Form Elements */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+Input {
+    border: solid #6c7086;
+    background: $surface;
+    color: $text;
+    padding: 0 1;
+}
+
+Input:focus {
+    border: solid #ffd700;
+}
+
+Input.-invalid {
+    border: solid #ff5555;
+}
+
+Select {
+    border: solid #6c7086;
+    background: $surface;
+}
+
+Select:focus {
+    border: solid #ffd700;
+}
+
+Select > SelectCurrent {
+    background: $surface;
+    color: $text;
+}
+
+Select > SelectOverlay {
+    background: $surface-light;
+    border: solid #ffd700;
+}
+
+SelectOverlay > OptionList {
+    background: $surface-light;
+}
+
+OptionList > .option-list--option-highlighted {
+    background: $primary;
+    color: $surface;
+}
+
+Switch {
+    background: #6c7086;
+}
+
+Switch.-on {
+    background: $success;
+}
+
+Switch.-on > .switch--slider {
+    color: $success;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 🔘 Buttons */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+Button {
+    background: $surface-light;
+    color: $text;
+    border: solid #6c7086;
+    margin: 0 1;
+    min-width: 12;
+}
+
+Button:hover {
+    background: $surface;
+    border: solid #ffd700;
+    color: $primary;
+}
+
+Button:focus {
+    border: solid #ffd700;
+}
+
+Button.-primary {
+    background: $primary;
+    color: $surface;
+    border: solid #ffd700;
+    text-style: bold;
+}
+
+Button.-primary:hover {
+    background: $surface;
+    color: $primary;
+}
+
+Button.-warning {
+    background: $warning;
+    color: $surface;
+    border: solid #ffb86c;
+}
+
+Button.-warning:hover {
+    background: $surface;
+    color: $warning;
+}
+
+Button.-error {
+    background: $error;
+    color: white;
+    border: solid #ff5555;
+}
+
+Button.-error:hover {
+    background: $surface;
+    color: $error;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 📝 Labels & Text */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+Label {
+    color: $text;
+}
+
+Static {
+    color: $text;
+}
+
+.section_title {
+    color: $primary;
+    text-style: bold;
+    padding: 1 0;
+    border-bottom: solid #6c7086;
+    margin-bottom: 1;
+}
+
+.subsection {
+    color: $secondary;
+    text-style: italic;
+    padding: 1 0 0 0;
+}
+
+.tagline {
+    color: $secondary;
+    text-align: center;
+    text-style: italic;
+    padding: 1;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* �� Containers */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.controls {
+    background: $surface;
+    overflow-y: auto;
+}
+
+.output {
+    background: $surface;
+}
+
+.panel {
+    background: $surface;
+    border: solid #6c7086;
+    padding: 1;
+    margin: 1;
+}
+
+.panel:focus-within {
+    border: solid #ffd700;
+}
+
+.button_row {
+    height: auto;
+    padding: 1 0;
     align: center middle;
+}
+
+.info {
+    background: $surface-light;
+    border: solid #6c7086;
+    padding: 1;
+    margin: 1 0;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 📄 Output Panel */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+OutputPanel {
+    border: solid #ffd700;
+    background: $surface;
+    padding: 1;
+    height: 1fr;
+}
+
+OutputPanel > Static {
+    width: auto;
+    color: $text;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 🖼️ Tab-specific Styles */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+BannerTab {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 2fr;
+    padding: 1;
+    height: 1fr;
+}
+
+BannerTab > .controls {
+    padding: 1;
+    border: solid #6c7086;
+    height: 100%;
+    overflow-y: auto;
+}
+
+BannerTab > .output {
+    padding: 1;
+    height: 100%;
+}
+
+ImageTab {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 2fr;
+    padding: 1;
+    height: 1fr;
+}
+
+ImageTab > VerticalScroll {
+    padding: 1;
+    border: solid #6c7086;
+    height: 100%;
+}
+
+ImageTab > .output {
+    padding: 1;
+    height: 100%;
+}
+
+StreamingTab {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 1fr;
+    padding: 1;
+    height: 1fr;
+}
+
+SettingsTab {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 1fr;
+    grid-rows: 1fr 1fr;
+    padding: 1;
+    height: 1fr;
+}
+
+AboutTab {
+    padding: 2;
+    height: 1fr;
+    overflow-y: auto;
+}
+
+AboutTab > .banner {
+    text-align: center;
+    color: $primary;
+    padding: 1;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 🔄 Custom Widget Styles */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+LabeledInput {
+    height: auto;
+    margin: 1 0;
+}
+
+LabeledInput > Label {
+    width: 20;
+    padding: 1 1;
+    color: $text;
+}
+
+LabeledInput > Input {
+    width: 1fr;
+}
+
+LabeledSelect {
+    height: auto;
+    margin: 1 0;
+}
+
+LabeledSelect > Label {
+    width: 20;
+    padding: 1 1;
+    color: $text;
+}
+
+LabeledSelect > Select {
+    width: 1fr;
+}
+
+LabeledSwitch {
+    height: auto;
+    margin: 1 0;
+}
+
+LabeledSwitch > Label {
+    width: 20;
+    padding: 1 1;
+    color: $text;
+}
+
+LabeledSwitch > Switch {
+    width: auto;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 📊 Data Table */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+DataTable {
+    background: $surface;
+}
+
+DataTable > .datatable--header {
+    background: $surface-light;
+    color: $primary;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: $primary;
+    color: $surface;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* 🎯 Scrollbars */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+ScrollBar {
+    background: $surface-light;
+}
+
+ScrollBar > .scrollbar--bar {
+    color: $text-muted;
+}
+
+ScrollBar > .scrollbar--bar:hover {
+    color: $primary;
+}
+
+ScrollBar > .scrollbar--bar.-active {
+    color: $primary;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ✨ Animations */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+Button {
+    transition: background 200ms, color 200ms, border 200ms;
+}
+
+Tab {
+    transition: background 150ms, color 150ms;
+}
+
+Input {
+    transition: border 150ms;
+}
+
+Select {
+    transition: border 150ms;
 }

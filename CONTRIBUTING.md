@@ -1,256 +1,76 @@
-# Contributing to Glyph Forge ⚡
+# Contributing
 
-> *"Where precision meets purpose and structure enhances function."*
+Thank you for improving Glyph Forge. Small, focused changes with reproducible
+tests are the easiest to review and maintain.
 
-Welcome to the Glyph Forge contributor ecosystem. Your participation represents a commitment to structural integrity, algorithmic elegance, and transformative code. This document will guide you through our contribution process with exact specifications.
+## Before coding
 
-## 🔄 Eidosian Development Principles
+- Search existing issues and pull requests.
+- Open an issue for a large feature, public API change, new required dependency,
+  or format change before investing substantial work.
+- Keep unrelated cleanup out of a focused fix.
+- Never commit private media, credentials, browser cookies, or generated caches.
 
-Glyph Forge follows these core principles:
+Security reports follow [SECURITY.md](SECURITY.md), not the public issue tracker.
 
-1. **Contextual Integrity** - Every element must serve a precise purpose
-2. **Structure as Control** - Clean architectural boundaries with defined interfaces
-3. **Exhaustive But Concise** - Complete functionality with minimal expression
-4. **Humor as Cognitive Leverage** - Wit that enhances understanding
-5. **Self-Awareness as Foundation** - Continuous improvement through reflection
-
-## ⚙️ Development Environment Setup
+## Setup
 
 ```bash
-# Clone repository
 git clone https://github.com/Ace1928/glyph_forge.git
 cd glyph_forge
-
-# Create isolated environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Verify installation
-pytest
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+pre-commit install
 ```
 
-## 🧩 Contribution Workflow
+Use a branch based on `master`, the repository's default branch.
 
-### 1. Issue Alignment
-
-Before implementation, establish context:
-
-- **Issue first** - Create or reference an existing issue
-- **Design alignment** - Match implementation to architectural patterns
-- **Scope definition** - Clearly articulate boundaries and deliverables
-
-### 2. Branch Naming System
+## Required checks
 
 ```bash
-# Sync with main branch
-git checkout main
-git pull origin main
-
-# Create semantic branch
-git checkout -b feature/specific-capability-name
+python -m ruff format .
+python -m ruff check .
+python -m pytest -q --tb=short
 ```
 
-Branch prefixes with purpose:
-
-- `feature/` - New capabilities
-- `fix/` - Error resolution
-- `refactor/` - Structure improvement
-- `perf/` - Performance enhancement
-- `docs/` - Documentation update
-
-### 3. Implementation Process
+Changes to streaming or the TUI should also be tested with:
 
 ```bash
-# Test-driven approach
-# 1. Write tests
-# 2. Implement functionality
-# 3. Refactor for clarity
-
-# Verification sequence
-pytest
-
-# Style enforcement
-black src/ tests/
-isort src/ tests/
-flake8 src/ tests/
-mypy src/
+python -m pip install -e ".[dev,streaming,tui]"
+python -m pytest -q --tb=short
 ```
 
-### 4. Commit Structure
+The full type and packaging commands are listed in
+[the development guide](docs/DEVELOPMENT.md).
 
-Commits must be atomic and descriptive:
+## Change requirements
 
-```bash
-# Format: <type>: <specific change description>
-git commit -m "feat: implement adaptive character density mapping"
-git commit -m "fix: resolve edge case in brightness calculation"
-git commit -m "docs: clarify parameter constraints with examples"
-```
+- Validate user input before filesystem, network, capture, or subprocess work.
+- Keep core features independent from optional dependencies.
+- Preserve ASCII, redirected-output, `NO_COLOR`, and narrow-terminal behavior.
+- Use package exception types at public boundaries and preserve causes.
+- Keep writes atomic where partial output would be harmful.
+- Add fast, deterministic tests using temporary directories and generated data.
+- Update API, compatibility, and changelog documentation with behavior changes.
+- Add a deprecation path instead of breaking documented 1.x interfaces.
 
-Categories:
+Run benchmarks for hot-path changes, but do not reject a correctness improvement
+solely because of noise in a single benchmark run.
 
-- **feat**: New functionality
-- **fix**: Bug resolution
-- **refactor**: Code restructuring
-- **perf**: Performance improvement
-- **docs**: Documentation enhancement
-- **test**: Test coverage expansion
-- **chore**: Maintenance tasks
+## Pull requests
 
-### 5. Pull Request Process
+A useful pull request includes:
 
-```bash
-# Push changes
-git push -u origin feature/specific-capability-name
+- the problem and intended behavior;
+- the implementation approach and important tradeoffs;
+- exact verification commands and results;
+- screenshots or sample output only when visual behavior changed;
+- compatibility, migration, and security notes where relevant.
 
-# Create PR via GitHub
-# Use the template for consistency
-```
+Keep commits understandable. Conventional prefixes such as `feat:`, `fix:`,
+`perf:`, `docs:`, and `test:` are welcome but not mandatory.
 
-## 🔍 Code Style & Structure
-
-Glyph Forge maintains these standards:
-
-### Python Style
-
-- **Formatting**: Black (88 char line limit)
-- **Imports**: isort with sections
-- **Typing**: Comprehensive type annotations
-- **Documentation**: Google-style docstrings
-
-### Code Architecture
-
-1. **Single-Purpose Functions** - Each function performs exactly one operation
-2. **Elimination of Redundancy** - No duplicated logic
-3. **Input Validation** - All parameters validated at interfaces
-4. **Precise Exception Handling** - Specific, informative errors
-5. **Performance Awareness** - Efficiency in critical paths
-
-### Implementation Example
-
-```python
-def map_luminance_to_glyph(
-    values: np.ndarray,
-    charset: str,
-    invert: bool = False,
-    contrast: float = 1.0
-) -> str:
-    """
-    Map luminance values to glyph characters with controlled density.
-    
-    Args:
-        values: Array of luminance values (0-255)
-        charset: Characters from darkest to lightest
-        invert: Reverse the mapping direction
-        contrast: Contrast adjustment factor
-        
-    Returns:
-        glyph string representation
-        
-    Raises:
-        ValueError: If charset is empty or contrast invalid
-    """
-    # Validation with specific feedback
-    if not charset:
-        raise ValueError("Character set cannot be empty")
-    if not 0.1 <= contrast <= 3.0:
-        raise ValueError(f"Contrast ({contrast}) must be between 0.1 and 3.0")
-        
-    # Apply contrast with proper scaling
-    mid = 128
-    adjusted = np.clip(((values - mid) * contrast + mid), 0, 255).astype(np.uint8)
-    
-    # Character mapping with direction control
-    char_set = charset[::-1] if invert else charset
-    
-    # Efficient vectorized mapping - O(n) complexity
-    char_indices = (adjusted * (len(char_set) - 1) / 255).astype(np.uint8)
-    result = ''.join(char_set[idx] for idx in char_indices)
-    
-    return result
-```
-
-## 🧪 Testing Framework
-
-Tests must be:
-
-1. **Complete** - Covering functionality, edge cases, and error conditions
-2. **Fast** - Executing without unnecessary delays
-3. **Independent** - No test should depend on another
-4. **Readable** - Clear test purpose and expectations
-5. **Maintainable** - Easy to update with implementation changes
-
-```python
-# Example test structure
-def test_map_luminance_to_glyph():
-    # Setup
-    values = np.array([0, 128, 255])
-    charset = ".#@"
-    
-    # Core functionality
-    result = map_luminance_to_glyph(values, charset)
-    assert result == ".#@"
-    
-    # Edge cases
-    assert map_luminance_to_glyph(np.array([]), charset) == ""
-    
-    # Input validation
-    with pytest.raises(ValueError, match="Character set cannot be empty"):
-        map_luminance_to_glyph(values, "")
-```
-
-## 📝 Documentation Standards
-
-Documentation requirements:
-
-1. **API Completeness** - Every public interface fully documented
-2. **Example-Driven** - Practical usage examples for all capabilities
-3. **Context-Aware** - Explaining not just how, but why
-4. **Format Consistency** - Adhering to established patterns
-
-## 📊 PR Review Criteria
-
-Pull requests are evaluated on:
-
-1. **Functional Correctness** - It must work as specified
-2. **Test Coverage** - All code paths must be tested
-3. **Documentation Quality** - Clear, complete, and accurate
-4. **Performance Impact** - No unintended performance degradation
-5. **Architectural Fit** - Alignment with system design
-
-## 💡 Enhancement Focus Areas
-
-Glyph Forge welcomes these improvements:
-
-1. **Rendering Engine Optimizations** - Faster, more memory-efficient processing
-2. **Character Mapping Systems** - New artistically-balanced character sets
-3. **Format Support** - Additional input/output formats
-4. **Terminal Compatibility** - Enhanced support across environments
-5. **Integration Interfaces** - Simplified connections to other systems
-
-## 🛠️ Development Tools
-
-Required tools:
-
-- **pytest** - Test execution
-- **black** - Code formatting
-- **isort** - Import organization
-- **mypy** - Static type checking
-- **flake8** - Style verification
-- **coverage** - Test coverage analysis
-
-## 🔗 Contacts & Recognition
-
-- **Lloyd Handyside** (<ace1928@gmail.com>) — Implementation Lead
-- **Eidos** (<syntheticeidos@gmail.com>) — Architectural Vision
-- **Neuroforge** (<lloyd.handyside@neuroforge.io>) — Organization
-
-Contributors recognized in CONTRIBUTORS.md and release notes.
-
----
-
-"glyph art without structure is just random characters with hope."
-    - ⚡ Glyph Forge Team ⚡
+By contributing, you agree that your contribution is licensed under the MIT
+License and that project interactions follow the [Code of Conduct](CODE_OF_CONDUCT.md).

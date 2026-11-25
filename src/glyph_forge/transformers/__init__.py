@@ -1,7 +1,4 @@
-"""
-⚡ Glyph Forge Transformer Classes ⚡
-
-Transformer classes for converting various input formats into GlyphMatrix
+"""Transformer classes for converting inputs into GlyphMatrix
 representations. These transformers implement the core conversion logic
 for the glyph art generation pipeline.
 
@@ -11,6 +8,7 @@ Key transformers:
 - DepthAnalyzer: Analyze image depth for enhanced detail
 - EdgeDetector: Detect edges for structural emphasis
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,6 +23,18 @@ logger = logging.getLogger(__name__)
 # Type definitions
 GlyphMatrix = List[List[str]]
 PixelArray = NDArray[np.uint8]
+
+
+def _build_density_lut(density_map: Dict[int, str]) -> NDArray[Any]:
+    """Build a lookup table for fast brightness-to-char mapping."""
+    return np.array([density_map[i] for i in range(256)], dtype=object)
+
+
+def _pixels_to_matrix(pixels: PixelArray, density_lut: NDArray[Any]) -> GlyphMatrix:
+    """Vectorize pixel-to-character mapping into a GlyphMatrix."""
+    if pixels.size == 0:
+        return []
+    return density_lut[pixels].tolist()
 
 
 class ImageTransformer:
@@ -57,9 +67,8 @@ class ImageTransformer:
         """
         self.charset = charset[::-1] if invert else charset
         self.density_map = self._create_density_map(self.charset)
-        logger.debug(
-            f"ImageTransformer initialized with {len(charset)} characters"
-        )
+        self._density_lut = _build_density_lut(self.density_map)
+        logger.debug(f"ImageTransformer initialized with {len(charset)} characters")
 
     def _create_density_map(self, charset: str) -> Dict[int, str]:
         """Create mapping from brightness (0-255) to character."""
@@ -96,12 +105,12 @@ class ImageTransformer:
         img = self._load_image(source)
 
         # Convert to grayscale
-        if img.mode != 'L':
-            img = img.convert('L')
+        if img.mode != "L":
+            img = img.convert("L")
 
         # Calculate dimensions
         orig_width, orig_height = img.size
-        aspect_ratio = options.get('aspect_ratio', 0.55)
+        aspect_ratio = options.get("aspect_ratio", 0.55)
 
         if height is None:
             height = int((orig_height / orig_width) * width * aspect_ratio)
@@ -110,8 +119,8 @@ class ImageTransformer:
         img = img.resize((width, height), Image.Resampling.LANCZOS)
 
         # Apply adjustments
-        brightness = options.get('brightness', 1.0)
-        contrast = options.get('contrast', 1.0)
+        brightness = options.get("brightness", 1.0)
+        contrast = options.get("contrast", 1.0)
         if brightness != 1.0 or contrast != 1.0:
             img = self._adjust_image(img, brightness, contrast)
 
@@ -119,17 +128,12 @@ class ImageTransformer:
         pixels = np.array(img)
 
         # Map pixels to characters
-        matrix: GlyphMatrix = []
-        for row in pixels:
-            char_row = [self.density_map[int(pixel)] for pixel in row]
-            matrix.append(char_row)
+        matrix = _pixels_to_matrix(pixels, self._density_lut)
 
         logger.debug(f"Transformed image to {width}x{height} matrix")
         return matrix
 
-    def _load_image(
-        self, source: Union[str, Image.Image, PixelArray]
-    ) -> Image.Image:
+    def _load_image(self, source: Union[str, Image.Image, PixelArray]) -> Image.Image:
         """Load image from various sources."""
         if isinstance(source, str):
             return Image.open(source)
@@ -140,9 +144,7 @@ class ImageTransformer:
         else:
             raise TypeError(f"Unsupported source type: {type(source)}")
 
-    def _adjust_image(
-        self, img: Image.Image, brightness: float, contrast: float
-    ) -> Image.Image:
+    def _adjust_image(self, img: Image.Image, brightness: float, contrast: float) -> Image.Image:
         """Apply brightness and contrast adjustments."""
         pixels = np.array(img, dtype=np.float32)
 
@@ -189,6 +191,7 @@ class ColorMapper:
         self.charset = charset
         self.color_weights = color_weights
         self.density_map = self._create_density_map(charset)
+        self._density_lut = _build_density_lut(self.density_map)
         logger.debug("ColorMapper initialized")
 
     def _create_density_map(self, charset: str) -> Dict[int, str]:
@@ -225,12 +228,12 @@ class ColorMapper:
         img = self._load_image(source)
 
         # Ensure RGB mode
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
+        if img.mode != "RGB":
+            img = img.convert("RGB")
 
         # Calculate dimensions
         orig_width, orig_height = img.size
-        aspect_ratio = options.get('aspect_ratio', 0.55)
+        aspect_ratio = options.get("aspect_ratio", 0.55)
 
         if height is None:
             height = int((orig_height / orig_width) * width * aspect_ratio)
@@ -243,27 +246,20 @@ class ColorMapper:
 
         # Calculate weighted luminance
         r, g, b = self.color_weights
-        luminance = (
-            pixels[:, :, 0] * r +
-            pixels[:, :, 1] * g +
-            pixels[:, :, 2] * b
-        ).astype(np.uint8)
+        luminance = (pixels[:, :, 0] * r + pixels[:, :, 1] * g + pixels[:, :, 2] * b).astype(
+            np.uint8
+        )
 
         # Optionally weight by saturation
-        if options.get('preserve_saturation', False):
+        if options.get("preserve_saturation", False):
             luminance = self._apply_saturation_weighting(pixels, luminance)
 
         # Map to characters
-        matrix: GlyphMatrix = []
-        for row in luminance:
-            char_row = [self.density_map[int(pixel)] for pixel in row]
-            matrix.append(char_row)
+        matrix = _pixels_to_matrix(luminance, self._density_lut)
 
         return matrix
 
-    def _load_image(
-        self, source: Union[str, Image.Image, PixelArray]
-    ) -> Image.Image:
+    def _load_image(self, source: Union[str, Image.Image, PixelArray]) -> Image.Image:
         """Load image from various sources."""
         if isinstance(source, str):
             return Image.open(source)
@@ -285,12 +281,8 @@ class ColorMapper:
         rgb_min = np.min(rgb_pixels, axis=2)
 
         # Saturation = (max - min) / max (avoid division by zero)
-        with np.errstate(divide='ignore', invalid='ignore'):
-            saturation = np.where(
-                rgb_max > 0,
-                (rgb_max - rgb_min) / rgb_max,
-                0
-            )
+        with np.errstate(divide="ignore", invalid="ignore"):
+            saturation = np.where(rgb_max > 0, (rgb_max - rgb_min) / rgb_max, 0)
 
         # Boost luminance for highly saturated colors
         adjustment = 1.0 + saturation * 0.3
@@ -318,6 +310,7 @@ class DepthAnalyzer:
         """
         self.charset = charset
         self.density_map = self._create_density_map(charset)
+        self._density_lut = _build_density_lut(self.density_map)
         logger.debug("DepthAnalyzer initialized")
 
     def _create_density_map(self, charset: str) -> Dict[int, str]:
@@ -354,12 +347,12 @@ class DepthAnalyzer:
         img = self._load_image(source)
 
         # Convert to grayscale
-        if img.mode != 'L':
-            img = img.convert('L')
+        if img.mode != "L":
+            img = img.convert("L")
 
         # Calculate dimensions
         orig_width, orig_height = img.size
-        aspect_ratio = options.get('aspect_ratio', 0.55)
+        aspect_ratio = options.get("aspect_ratio", 0.55)
 
         if height is None:
             height = int((orig_height / orig_width) * width * aspect_ratio)
@@ -368,8 +361,8 @@ class DepthAnalyzer:
         img = img.resize((width, height), Image.Resampling.LANCZOS)
 
         # Calculate depth map using local contrast
-        depth_weight = options.get('depth_weight', 0.3)
-        blur_radius = options.get('blur_radius', 2)
+        depth_weight = options.get("depth_weight", 0.3)
+        blur_radius = options.get("blur_radius", 2)
 
         depth_map = self._estimate_depth(img, blur_radius)
 
@@ -378,22 +371,14 @@ class DepthAnalyzer:
         depth = np.array(depth_map)
 
         # Combine luminance with depth
-        combined = (
-            pixels * (1 - depth_weight) +
-            depth * depth_weight
-        ).astype(np.uint8)
+        combined = (pixels * (1 - depth_weight) + depth * depth_weight).astype(np.uint8)
 
         # Map to characters
-        matrix: GlyphMatrix = []
-        for row in combined:
-            char_row = [self.density_map[int(pixel)] for pixel in row]
-            matrix.append(char_row)
+        matrix = _pixels_to_matrix(combined, self._density_lut)
 
         return matrix
 
-    def _load_image(
-        self, source: Union[str, Image.Image, PixelArray]
-    ) -> Image.Image:
+    def _load_image(self, source: Union[str, Image.Image, PixelArray]) -> Image.Image:
         """Load image from various sources."""
         if isinstance(source, str):
             return Image.open(source)
@@ -404,9 +389,7 @@ class DepthAnalyzer:
         else:
             raise TypeError(f"Unsupported source type: {type(source)}")
 
-    def _estimate_depth(
-        self, img: Image.Image, blur_radius: int
-    ) -> Image.Image:
+    def _estimate_depth(self, img: Image.Image, blur_radius: int) -> Image.Image:
         """
         Estimate depth using focus-based heuristics.
 
@@ -458,6 +441,7 @@ class EdgeDetector:
         self.charset = charset
         self.edge_charset = edge_charset
         self.density_map = self._create_density_map(charset)
+        self._density_lut = _build_density_lut(self.density_map)
         logger.debug("EdgeDetector initialized")
 
     def _create_density_map(self, charset: str) -> Dict[int, str]:
@@ -495,12 +479,12 @@ class EdgeDetector:
         img = self._load_image(source)
 
         # Convert to grayscale
-        if img.mode != 'L':
-            img = img.convert('L')
+        if img.mode != "L":
+            img = img.convert("L")
 
         # Calculate dimensions
         orig_width, orig_height = img.size
-        aspect_ratio = options.get('aspect_ratio', 0.55)
+        aspect_ratio = options.get("aspect_ratio", 0.55)
 
         if height is None:
             height = int((orig_height / orig_width) * width * aspect_ratio)
@@ -509,8 +493,8 @@ class EdgeDetector:
         img = img.resize((width, height), Image.Resampling.LANCZOS)
 
         # Detect edges
-        edge_weight = options.get('edge_weight', 0.5)
-        method = options.get('method', 'sobel')
+        edge_weight = options.get("edge_weight", 0.5)
+        method = options.get("method", "sobel")
 
         edges = self._detect_edges(img, method)
 
@@ -519,23 +503,15 @@ class EdgeDetector:
         edge_array = np.array(edges, dtype=np.float32)
 
         # Combine original with edges
-        combined = (
-            pixels * (1 - edge_weight) +
-            edge_array * edge_weight
-        )
+        combined = pixels * (1 - edge_weight) + edge_array * edge_weight
         combined = np.clip(combined, 0, 255).astype(np.uint8)
 
         # Map to characters
-        matrix: GlyphMatrix = []
-        for row in combined:
-            char_row = [self.density_map[int(pixel)] for pixel in row]
-            matrix.append(char_row)
+        matrix = _pixels_to_matrix(combined, self._density_lut)
 
         return matrix
 
-    def _load_image(
-        self, source: Union[str, Image.Image, PixelArray]
-    ) -> Image.Image:
+    def _load_image(self, source: Union[str, Image.Image, PixelArray]) -> Image.Image:
         """Load image from various sources."""
         if isinstance(source, str):
             return Image.open(source)
@@ -557,13 +533,13 @@ class EdgeDetector:
         Returns:
             Edge-detected image
         """
-        if method == 'laplacian':
+        if method == "laplacian":
             # Use PIL's FIND_EDGES filter (Laplacian-based)
             return img.filter(ImageFilter.FIND_EDGES)
 
         else:  # Default to Sobel
             # Apply Sobel filters for X and Y gradients
-            pixels = np.array(img, dtype=np.float32)
+            np.array(img, dtype=np.float32)
 
             # Sobel kernels
             sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
@@ -571,12 +547,8 @@ class EdgeDetector:
 
             # Apply convolution (simplified using PIL)
             # Note: For production, scipy.ndimage.convolve would be better
-            edges_x = img.filter(
-                ImageFilter.Kernel((3, 3), sobel_x.flatten(), scale=1)
-            )
-            edges_y = img.filter(
-                ImageFilter.Kernel((3, 3), sobel_y.flatten(), scale=1)
-            )
+            edges_x = img.filter(ImageFilter.Kernel((3, 3), sobel_x.flatten(), scale=1))
+            edges_y = img.filter(ImageFilter.Kernel((3, 3), sobel_y.flatten(), scale=1))
 
             # Combine gradients
             gx = np.array(edges_x, dtype=np.float32)

@@ -1,78 +1,59 @@
-# 📜 CHANGELOG
+# Changelog
 
-> *"History is a linked list of intentional transformations."*
-
-## ⚡ Glyph Forge Version Timeline ⚡
-
-This document maps the evolution pathway of Glyph Forge through its structural iterations. Each release represents a precise advancement with measurable impact.
-
-<!-- 
-    Change classification system:
-    ⚠️ Breaking - Interface restructuring
-    ✨ Features - Capability expansion
-    🐛 Fixes - Error resolution
-    ⚡ Performance - Execution optimization
-    📚 Documentation - Knowledge crystallization
-    🔧 Refactor - Internal restructuring
-    🔒 Security - Protection enhancements
- -->
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## [0.1.0] - 2024-11-15
-
-> *"Initial implementation—where pixels find their glyph essence."*
-
-### ✨ Added
-
-- Core transformation engine with edge-preserving algorithms
-- Multi-format renderer ecosystem (Text, ANSI, HTML, SVG)
-- Terminal-aware color system with fallback pathways
-- Image processing pipeline with density mapping
-- CLI entry points: `imagize` (alias: `glyphfy`) and `bannerize`
-- Comprehensive type annotations across all interfaces
-- Documentation system with practical examples
-
-### 🔧 Technical Implementation
-
-- Character density mappings with contextual boundary detection
-- Gradient-preserving transformation with minimal information loss
-- Color representation system with environment adaptation
-- Performance baseline established (0.09s standard processing time)
-- Verification system with edge case coverage
-
-### 📚 Documentation
-
-- Installation guide with dependency explanation
-- Quick start examples for immediate productivity
-- API reference with precise parameter definitions
-- Architectural overview with component relationships
-- Contribution guidelines with workflow specifications
-
-### 🛠️ Infrastructure
-
-- Continuous integration pipeline with validation gates
-- Style enforcement hooks for pre-commit verification
-- Distribution system through PyPI with integrity checks
-- Development environment configuration
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Notable user-visible changes are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
+[Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-> *"Functionality expands like glyph itself—simple elements creating complex structures."*
+No changes yet.
 
-### 🔮 Development Vector
+## [1.0.0] - 2026-07-13
 
-- Format-specific rendering optimizations
-- Pattern recognition system with feature preservation
-- Extended format support with conversion integrity
-- Animation framework with frame coherence
-- Stable API contracts with backward compatibility
-- CLI enhancement with progress visualization
+### Added
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Standalone package, CLI, documentation, tests, and release automation.
+- Image conversion to plain text, ANSI 16/256, truecolor, and HTML.
+- Adaptive streaming renderer with gradient, blocks, Braille, and ASCII modes.
+- Video, webcam, URL, screen-capture, recording, audio, gallery, and TUI feature
+  stacks behind optional dependencies.
+- Side-effect-free terminal capability detection and machine-readable doctor
+  output.
+- Layered system, user, and runtime configuration with atomic persistence.
+- Stable package exception hierarchy and conventional `image_to_glyph` API.
+- Cross-platform CI, wheel smoke tests, dependency audit, completions, and
+  contributor/security policies.
 
-© 2023-2024 [Lloyd Handyside](mailto:ace1928@gmail.com) & [Eidos](mailto:syntheticeidos@gmail.com) — Maintained by [Neuroforge](https://neuroforge.io).
+### Changed
 
-"A changelog is like glyph art—structured information that tells a complete story."
+- Package import is now lazy and free of logging, filesystem, signal, and
+  optional dependency side effects.
+- Streaming defaults adapt to TTY state, color depth, encoding, `NO_COLOR`, and
+  `TERM=dumb`.
+- Galleries consume caller-provided media instead of a repository-managed asset
+  library.
+- The banner command is directly available as `glyph-forge bannerize TEXT`.
+- Configuration now keeps runtime values out of the user file and treats system
+  configuration as read-only.
+
+### Security
+
+- Replaced pickle-based streaming caches with validated `allow_pickle=False`
+  NPZ archives and atomic owner-only writes.
+- Added early frame validation, escaped gallery HTML, safer output-directory
+  behavior, and explicit confirmation for sensitive capture/network operations.
+
+### Deprecated
+
+- `GlyphForgeAPI.image_to_Glyph`; use `image_to_glyph`. The alias remains for
+  the 1.x line.
+
+## [0.1.0] - 2024-11-15
+
+### Added
+
+- Initial banner, image transformation, renderer, and command-line modules.
+
+[Unreleased]: https://github.com/Ace1928/glyph_forge/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Ace1928/glyph_forge/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/Ace1928/glyph_forge/releases/tag/v0.1.0

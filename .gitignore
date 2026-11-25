@@ -28,8 +28,40 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
+.mypy_cache/
+.ruff_cache/
+.coverage.*
 
 # Misc
 *.log
 .cache/
+*.prof
+*.lprof
 
+# Runtime output
+glyph_forge_output/
+gallery/
+reports/
+recordings/
+captures/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.gflink
+
+# User and provider secrets
+*.cookies
+cookies.txt
+yt_cookies.txt
+.env
+.env.*
+!.env.example
+
+# Downloaded or generated media
+*.mp4
+*.mkv
+*.mov
+*.webm
+*.avi
+*.wav
+*.mp3

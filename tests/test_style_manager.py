@@ -1,7 +1,5 @@
 """Eidosian tests for border detection and removal utilities."""
 
-import pytest
-
 from glyph_forge.core.style_manager import (
     apply_style,
     detect_border_style,
@@ -26,4 +24,3 @@ class TestBorderUtilities:
         stripped = remove_border(art)
 
         assert stripped.strip() == original
-

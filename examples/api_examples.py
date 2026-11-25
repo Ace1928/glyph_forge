@@ -1,148 +1,52 @@
 #!/usr/bin/env python3
-"""
-⚡ Glyph Forge API Examples ⚡
+"""Small, executable examples for the supported Glyph Forge Python API."""
 
-This module demonstrates the proper usage of the Glyph Forge API
-through clear, concise, and practical examples with Eidosian precision.
-"""
-import os
-import sys
+from __future__ import annotations
+
+import argparse
 from pathlib import Path
 
-# Add the project root to the Python path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from src.glyph_forge.api import get_api
+from glyph_forge import GlyphForgeError, detect_terminal, get_api
 
 
-def example_banner_generation():
-    """Example: Basic banner generation."""
-    print("Example: Basic banner generation")
-    print("-" * 40)
-    
-    api = get_api()
-    banner = api.generate_banner("Hello World", style="boxed")
-    print(banner)
-
-
-def example_custom_styling():
-    """Example: Custom banner styling."""
-    print("\nExample: Custom banner styling")
-    print("-" * 40)
-    
-    api = get_api()
-    banner = api.generate_banner(
-        "CUSTOM",
-        style="minimal",
-        border="double",
-        alignment="center",
-        effects=["glow"]
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Render a banner and optionally convert an image.",
+        epilog="Example: python examples/api_examples.py photo.jpg --width 80",
     )
-    print(banner)
+    parser.add_argument("image", nargs="?", type=Path, help="Optional image to convert")
+    parser.add_argument("--width", type=int, default=80, help="Image width in characters")
+    parser.add_argument("--color", action="store_true", help="Use adaptive terminal color")
+    return parser
 
 
-def example_multiple_fonts():
-    """Example: Using different fonts."""
-    print("\nExample: Using different fonts")
-    print("-" * 40)
-    
-    api = get_api()
-    fonts = ["slant", "standard", "small"]
-    
-    for font in fonts:
-        try:
-            print(f"Font: {font}")
-            print(api.generate_banner("Font", font=font))
-            print()
-        except ValueError:
-            print(f"Font '{font}' not available\n")
+def main() -> int:
+    args = build_parser().parse_args()
+    if args.width < 1:
+        raise SystemExit("ERROR: --width must be positive")
 
+    forge = get_api()
+    print(forge.generate_banner("GLYPH FORGE", font="slant", style="boxed"))
 
-def example_image_conversion(image_path):
-    """Example: Converting an image to Glyph art."""
-    print("\nExample: Image conversion")
-    print("-" * 40)
-    
-    if not os.path.exists(image_path):
-        print(f"Image not found: {image_path}")
-        return
-    
-    api = get_api()
-    
-    # Basic conversion
-    result = api.image_to_Glyph(image_path, width=60)
-    print(result)
-    
-    # With different character set
-    print("\nWith 'blocks' character set:")
-    result = api.image_to_Glyph(image_path, width=60, charset="blocks")
-    print(result)
+    if args.image is None:
+        print("INFO: pass an image path to run the conversion example")
+        return 0
+    if not args.image.is_file():
+        raise SystemExit(f"ERROR: image does not exist: {args.image}")
 
-
-def example_saving_output():
-    """Example: Saving output to a file."""
-    print("\nExample: Saving output to a file")
-    print("-" * 40)
-    
-    api = get_api()
-    banner = api.generate_banner("SAVE ME", style="boxed")
-    
-    output_file = "output.txt"
-    if api.save_to_file(banner, output_file):
-        print(f"Banner saved to {output_file}")
-        print(f"File size: {os.path.getsize(output_file)} bytes")
-    else:
-        print(f"Failed to save to {output_file}")
-
-
-def example_configuration():
-    """Example: Using configuration."""
-    print("\nExample: Using configuration")
-    print("-" * 40)
-    
-    api = get_api()
-    
-    # Get current config value
-    current_font = api.config.get('banner', 'default_font', 'standard')
-    print(f"Current default font: {current_font}")
-    
-    # Change config
-    api.config.set('banner', 'default_font', 'small')
-    
-    # Generate with new default
-    banner = api.generate_banner("Config")
-    print(banner)
-    
-    # Restore original
-    api.config.set('banner', 'default_font', current_font)
-
-
-def run_all_examples():
-    """Run all API examples."""
-    example_banner_generation()
-    example_custom_styling()
-    example_multiple_fonts()
-    
-    # Try to find a sample image
-    sample_paths = [
-        "examples/sample.jpg",
-        "tests/test_images/sample.jpg"
-    ]
-    
-    image_path = None
-    for path in sample_paths:
-        if os.path.exists(path):
-            image_path = path
-            break
-    
-    if image_path:
-        example_image_conversion(image_path)
-    
-    example_saving_output()
-    example_configuration()
+    color_mode = detect_terminal().preferred_color if args.color else "none"
+    try:
+        art = forge.image_to_glyph(
+            str(args.image),
+            width=args.width,
+            color_mode=color_mode,
+            dithering=True,
+        )
+    except GlyphForgeError as exc:
+        raise SystemExit(f"ERROR: {exc}") from exc
+    print(art)
+    return 0
 
 
 if __name__ == "__main__":
-    print("⚡ GLYPH FORGE API EXAMPLES ⚡\n")
-    run_all_examples()
-    print("\nExamples completed!")
+    raise SystemExit(main())

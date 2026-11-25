@@ -1,14 +1,15 @@
 """Utility helpers for Glyph Forge."""
+
 from .glyph_utils import (
-    sanitize_text,
-    resolve_style,
-    trim_margins,
-    center_Glyph_art,
-    measure_Glyph_art,
-    detect_box_borders,
-    get_terminal_size,
-    detect_text_color_support,
     apply_ansi_style,
+    center_Glyph_art,
+    detect_box_borders,
+    detect_text_color_support,
+    get_terminal_size,
+    measure_Glyph_art,
+    resolve_style,
+    sanitize_text,
+    trim_margins,
 )
 
 __all__ = [
@@ -46,6 +47,7 @@ def configure(*_args: Any, **_kwargs: Any) -> None:
 
 def measure_performance(func: Callable[..., Any]) -> Callable[..., Any]:
     """Simple performance measurement decorator."""
+
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         start = time.perf_counter()
         result = func(*args, **kwargs)
@@ -57,8 +59,12 @@ def measure_performance(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def detect_capabilities() -> Dict[str, Any]:
-    """Return minimal capability information."""
-    return {}
+    """Return terminal capabilities as a JSON-serializable dictionary."""
+
+    from glyph_forge.terminal import detect_terminal
+
+    return detect_terminal().as_dict()
+
 
 __all__ += [
     "setup_logger",

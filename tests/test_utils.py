@@ -4,29 +4,26 @@
 Comprehensive tests for utility functions and helper classes.
 """
 
-import pytest
-from unittest import mock
 import os
-
-from glyph_forge.utils.glyph_utils import (
-    sanitize_text,
-    resolve_style,
-    trim_margins,
-    center_Glyph_art,
-    measure_Glyph_art,
-    detect_box_borders,
-    get_terminal_size,
-    detect_text_color_support,
-    apply_ansi_style,
-    wrap_text,
-)
+from unittest import mock
 
 from glyph_forge.utils.alphabet_manager import (
-    AlphabetManager,
-    AlphabetCategory,
     ALPHABETS,
-    SPECIAL_SETS,
     LANGUAGES,
+    SPECIAL_SETS,
+    AlphabetManager,
+)
+from glyph_forge.utils.glyph_utils import (
+    apply_ansi_style,
+    center_Glyph_art,
+    detect_box_borders,
+    detect_text_color_support,
+    get_terminal_size,
+    measure_Glyph_art,
+    resolve_style,
+    sanitize_text,
+    trim_margins,
+    wrap_text,
 )
 
 
@@ -210,14 +207,14 @@ class TestGetTerminalSize:
         assert width > 0
         assert height > 0
 
-    @mock.patch('shutil.get_terminal_size')
+    @mock.patch("shutil.get_terminal_size")
     def test_uses_shutil(self, mock_get_size) -> None:
         """Function should use shutil.get_terminal_size."""
         mock_get_size.return_value = (100, 50)
         width, height = get_terminal_size()
         mock_get_size.assert_called_once()
 
-    @mock.patch('shutil.get_terminal_size', side_effect=AttributeError)
+    @mock.patch("shutil.get_terminal_size", side_effect=AttributeError)
     def test_fallback_on_error(self, mock_get_size) -> None:
         """Function should return fallback values on error."""
         width, height = get_terminal_size()
@@ -354,9 +351,7 @@ class TestAlphabetManager:
     def test_create_custom_density_map(self) -> None:
         """Custom density map should respect range."""
         charset = "ABC"
-        result = AlphabetManager.create_custom_density_map(
-            charset, min_value=100, max_value=200
-        )
+        result = AlphabetManager.create_custom_density_map(charset, min_value=100, max_value=200)
         assert 100 in result
         assert 200 in result
         assert 50 not in result

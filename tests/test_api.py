@@ -27,9 +27,9 @@ def api():
     api = GlyphForgeAPI()
 
     # Inject test config values
-    api.config.set('banner', 'default_style', 'minimal')
-    api.config.set('banner', 'default_font', 'standard')
-    api.config.set('banner', 'default_width', 80)
+    api.config.set("banner", "default_style", "minimal")
+    api.config.set("banner", "default_font", "standard")
+    api.config.set("banner", "default_width", 80)
 
     return api
 
@@ -37,9 +37,7 @@ def api():
 @pytest.fixture
 def mock_banner_generator():
     """Mock the BannerGenerator for isolated testing."""
-    with mock.patch(
-        'glyph_forge.core.banner_generator.BannerGenerator'
-    ) as mock_generator:
+    with mock.patch("glyph_forge.core.banner_generator.BannerGenerator") as mock_generator:
         # Configure mock
         mock_instance = mock_generator.return_value
         mock_instance.generate.return_value = "MOCK BANNER"
@@ -53,9 +51,9 @@ def mock_banner_generator():
 @pytest.fixture
 def mock_image_converter():
     """Mock the ImageGlyphConverter for isolated testing."""
-    with mock.patch(
-        'glyph_forge.services.image_to_Glyph.ImageGlyphConverter'
-    ) as mock_converter:
+    from glyph_forge.services import image_to_glyph
+
+    with mock.patch.object(image_to_glyph, "ImageGlyphConverter") as mock_converter:
         # Configure mock
         mock_instance = mock_converter.return_value
         mock_instance.convert.return_value = "MOCK Glyph ART"
@@ -97,7 +95,7 @@ class TestGlyphForgeAPI:
 
     def test_generate_banner_basic(self, api, mock_banner_generator):
         """📝 Verify basic banner generation."""
-        with mock.patch.object(api, '_banner_generator', mock_banner_generator):
+        with mock.patch.object(api, "_banner_generator", mock_banner_generator):
             result = api.generate_banner("Test Text")
 
             # Check correct method was called
@@ -106,7 +104,7 @@ class TestGlyphForgeAPI:
 
     def test_generate_banner_with_style(self, api, mock_banner_generator):
         """🎭 Verify banner generation with style parameter."""
-        with mock.patch.object(api, '_banner_generator', mock_banner_generator):
+        with mock.patch.object(api, "_banner_generator", mock_banner_generator):
             api.generate_banner("Test", style="boxed")
 
             mock_banner_generator.generate.assert_called_with(
@@ -115,7 +113,7 @@ class TestGlyphForgeAPI:
 
     def test_generate_banner_with_custom_font(self, api, mock_banner_generator):
         """🔤 Verify banner generation with custom font creates new generator."""
-        with mock.patch('glyph_forge.api.glyph_api.BannerGenerator') as mock_bg_class:
+        with mock.patch("glyph_forge.api.glyph_api.BannerGenerator") as mock_bg_class:
             mock_bg_class.return_value = mock_banner_generator
 
             api.generate_banner("Test", font="big")
@@ -127,27 +125,23 @@ class TestGlyphForgeAPI:
 
     # ──── Image Conversion Tests ───────────────────────────────────────
 
-    def test_image_to_Glyph_basic(self, api, mock_image_converter):
+    def test_image_to_glyph_basic(self, api, mock_image_converter):
         """🖼️ Verify basic image conversion."""
-        with mock.patch.object(
-            api, '_get_image_converter', return_value=mock_image_converter
-        ):
-            result = api.image_to_Glyph("image.jpg")
+        with mock.patch.object(api, "_get_image_converter", return_value=mock_image_converter):
+            result = api.image_to_glyph("image.jpg")
 
             mock_image_converter.convert.assert_called_once()
             assert result == "MOCK Glyph ART"
 
-    def test_image_to_Glyph_with_color(self, api, mock_image_converter):
+    def test_image_to_glyph_with_color(self, api, mock_image_converter):
         """🌈 Verify color image conversion."""
-        with mock.patch.object(
-            api, '_get_image_converter', return_value=mock_image_converter
-        ):
-            result = api.image_to_Glyph("image.jpg", color_mode="ansi")
+        with mock.patch.object(api, "_get_image_converter", return_value=mock_image_converter):
+            result = api.image_to_glyph("image.jpg", color_mode="truecolor")
 
             mock_image_converter.convert_color.assert_called_once()
             assert result == "MOCK COLOR Glyph ART"
 
-    def test_image_to_Glyph_with_params(self, api):
+    def test_image_to_glyph_with_params(self, api):
         """⚙️ Verify parameter forwarding to image converter."""
         # Setup more complex mock with parameter verification
         mock_converter = mock.MagicMock()
@@ -155,31 +149,59 @@ class TestGlyphForgeAPI:
         mock_converter.width = 100
         mock_converter.brightness = 1.0
         mock_converter.contrast = 1.0
+        mock_converter.gamma = 1.0
+        mock_converter.aspect_ratio = 0.55
+        mock_converter.resample = "lanczos"
+        mock_converter.autocontrast = False
+        mock_converter.equalize = False
+        mock_converter.invert_image = False
+        mock_converter.edge_enhance = False
+        mock_converter.sharpen = False
+        mock_converter.blur_radius = 0.0
+        mock_converter.posterize_bits = None
         mock_converter.convert.return_value = "MOCK Glyph ART"
 
-        with mock.patch.object(
-            api, '_get_image_converter', return_value=mock_converter
-        ):
-            with mock.patch(
-                'glyph_forge.api.glyph_api.ImageGlyphConverter'
-            ) as mock_constructor:
+        with mock.patch.object(api, "_get_image_converter", return_value=mock_converter):
+            with mock.patch("glyph_forge.api.glyph_api.ImageGlyphConverter") as mock_constructor:
                 mock_constructor.return_value = mock_converter
 
                 # Call with custom parameters
-                api.image_to_Glyph(
-                    "image.jpg", charset="minimal", width=80, height=40, invert=True
-                )
+                api.image_to_glyph("image.jpg", charset="minimal", width=80, height=40, invert=True)
 
                 # Verify correct ImageGlyphConverter instantiation
                 mock_constructor.assert_called_with(
-                    charset="minimal", width=80, height=40, invert=True, dithering=False
+                    charset="minimal",
+                    width=80,
+                    height=40,
+                    invert=True,
+                    dithering=False,
+                    dither_algorithm=None,
+                    gamma=1.0,
+                    aspect_ratio=0.55,
+                    resample="lanczos",
+                    autocontrast=False,
+                    equalize=False,
+                    invert_image=False,
+                    edge_enhance=False,
+                    sharpen=False,
+                    blur_radius=0.0,
+                    posterize_bits=None,
                 )
+
+    def test_legacy_image_name_warns(self, api, mock_image_converter):
+        """The 1.x compatibility alias remains available with migration guidance."""
+
+        with mock.patch.object(api, "_get_image_converter", return_value=mock_image_converter):
+            with pytest.warns(DeprecationWarning, match="use image_to_glyph"):
+                result = api.image_to_Glyph("image.jpg")
+
+        assert result == "MOCK Glyph ART"
 
     # ──── Utility Method Tests ───────────────────────────────────────
 
     def test_get_available_fonts(self, api, mock_banner_generator):
         """📋 Verify font listing works correctly."""
-        with mock.patch.object(api, '_banner_generator', mock_banner_generator):
+        with mock.patch.object(api, "_banner_generator", mock_banner_generator):
             fonts = api.get_available_fonts()
 
             mock_banner_generator.available_fonts.assert_called_once()
@@ -187,9 +209,7 @@ class TestGlyphForgeAPI:
 
     def test_get_available_styles(self, api):
         """🎨 Verify style listing works correctly."""
-        with mock.patch(
-            'glyph_forge.api.glyph_api.get_available_styles'
-        ) as mock_get_styles:
+        with mock.patch("glyph_forge.api.glyph_api.get_available_styles") as mock_get_styles:
             mock_get_styles.return_value = {"minimal": {}, "boxed": {}}
 
             styles = api.get_available_styles()
@@ -198,7 +218,7 @@ class TestGlyphForgeAPI:
 
     def test_get_available_alphabets(self, api):
         """🔡 Verify alphabet listing works correctly."""
-        with mock.patch('glyph_forge.api.glyph_api.AlphabetManager') as mock_manager:
+        with mock.patch("glyph_forge.api.glyph_api.AlphabetManager") as mock_manager:
             mock_manager.list_available_alphabets.return_value = ["general", "blocks"]
 
             alphabets = api.get_available_alphabets()
@@ -222,13 +242,13 @@ class TestGlyphForgeAPI:
             assert os.path.exists(file_path)
 
             # Verify content
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 saved_content = f.read()
             assert saved_content == content
 
     def test_save_to_file_error_handling(self, api):
         """🛑 Verify file saving handles errors gracefully."""
-        with mock.patch('builtins.open', side_effect=IOError("Test error")):
+        with mock.patch("builtins.open", side_effect=IOError("Test error")):
             result = api.save_to_file("content", "/some/path")
 
             assert result is False
@@ -254,25 +274,21 @@ class TestGlyphForgeAPI:
         mock_banner = mock.MagicMock()
         mock_banner.generate.return_value = "FONT PREVIEW"
 
-        with mock.patch('glyph_forge.api.glyph_api.BannerGenerator') as mock_generator:
+        with mock.patch("glyph_forge.api.glyph_api.BannerGenerator") as mock_generator:
             mock_generator.return_value = mock_banner
 
             result = api.preview_font("big")
 
             # Check BannerGenerator was created with correct font
-            mock_generator.assert_called_with(
-                font="big", width=api._banner_generator.width
-            )
+            mock_generator.assert_called_with(font="big", width=api._banner_generator.width)
             assert result == "FONT PREVIEW"
 
     def test_preview_style(self, api, mock_banner_generator):
         """👁️ Verify style preview generation."""
-        with mock.patch.object(api, '_banner_generator', mock_banner_generator):
+        with mock.patch.object(api, "_banner_generator", mock_banner_generator):
             api.preview_style("boxed")
 
-            mock_banner_generator.generate.assert_called_with(
-                "Glyph Forge", style="boxed"
-            )
+            mock_banner_generator.generate.assert_called_with("Glyph Forge", style="boxed")
 
     def test_convert_text_to_art(self, api):
         """🎯 Verify raw text conversion without styling."""
@@ -282,7 +298,7 @@ class TestGlyphForgeAPI:
         mock_banner = mock.MagicMock()
         mock_banner.figlet = mock_figlet
 
-        with mock.patch('glyph_forge.api.glyph_api.BannerGenerator') as mock_generator:
+        with mock.patch("glyph_forge.api.glyph_api.BannerGenerator") as mock_generator:
             mock_generator.return_value = mock_banner
 
             result = api.convert_text_to_art("Test")
@@ -316,7 +332,7 @@ class TestGlyphForgeAPIIntegration:
         boxed = api.generate_banner("X", style="boxed")
 
         # Boxed should have more lines (borders)
-        assert len(boxed.split('\n')) > len(minimal.split('\n'))
+        assert len(boxed.split("\n")) > len(minimal.split("\n"))
 
         # Boxed should contain border characters
         assert any(c in boxed for c in "┌─┐│└┘")
@@ -327,7 +343,7 @@ class TestGlyphForgeAPIIntegration:
         api = get_api()
 
         # Set a config value
-        api.config.set('banner', 'default_style', 'boxed')
+        api.config.set("banner", "default_style", "boxed")
 
         # Generate banner without specifying style
         banner = api.generate_banner("Test")

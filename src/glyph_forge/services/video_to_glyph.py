@@ -1,6 +1,7 @@
 """Video to glyph conversion service."""
 
-from typing import List, Optional
+from typing import Iterable, List, Optional
+
 from PIL import Image
 
 from .image_to_glyph import ImageGlyphConverter
@@ -19,18 +20,24 @@ def video_to_glyph_frames(
         video_path: Path to the input video or GIF file.
         width: Target width of each glyph frame.
         max_frames: Optional limit on number of frames to convert.
-        color_mode: ``"none"``, ``"ansi"`` or ``"html"`` for color output.
+        color_mode: ``"none"``, ``"ansi"``, ``"ansi16"``, ``"ansi256"``,
+            ``"truecolor"``, or ``"html"`` for color output.
 
     Returns:
         List of glyph-art frames as strings.
     """
     converter = ImageGlyphConverter(width=width)
-    images = video_to_images(video_path, max_frames=max_frames)
+    images: Iterable[Image.Image] = video_to_images(video_path, max_frames=max_frames)
 
     frames: List[str] = []
     for img in images:
-        if color_mode.lower() in ("ansi", "html"):
-            frames.append(converter.convert_color(img, color_mode=color_mode))
+        mode = color_mode.lower()
+        if mode == "rgb":
+            mode = "truecolor"
+        if mode == "web":
+            mode = "html"
+        if mode in ("ansi", "ansi16", "ansi256", "truecolor", "html"):
+            frames.append(converter.convert_color(img, color_mode=mode))
         else:
             frames.append(converter.convert(img))
 

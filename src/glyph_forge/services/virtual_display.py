@@ -1,7 +1,7 @@
 """Context manager for temporary virtual displays."""
 
 from contextlib import contextmanager
-from typing import Optional, Iterator
+from typing import Iterator, Optional
 
 from .capture_virtual_display import start_virtual_display, stop_virtual_display
 

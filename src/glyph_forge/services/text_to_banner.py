@@ -1,6 +1,7 @@
 """Banner generation service."""
 
-from typing import Optional, List
+from typing import List, Optional
+
 from ..core.banner_generator import BannerGenerator
 
 _generator = BannerGenerator()
